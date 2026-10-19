@@ -1,0 +1,47 @@
+# Python servisi: biçim ve lint (ruff), tip (mypy) ve testler (pytest).
+# Her PR'da raporlanır; services/ai ya da bu dosya değişmediyse iş atlanır.
+name: ai
+
+on:
+  pull_request:
+  push:
+    branches: [master]
+    paths: ["services/ai/**", ".github/workflows/ai.yml"]
+
+permissions:
+  contents: read
+
+jobs:
+  changes:
+    runs-on: ubuntu-latest
+    outputs:
+      run: ${{ steps.diff.outputs.run }}
+    steps:
+      - uses: actions/checkout@v7
+        with:
+          fetch-depth: 0
+      - id: diff
+        run: |
+          if [ "$GITHUB_EVENT_NAME" != "pull_request" ] || ! git diff --quiet "origin/$GITHUB_BASE_REF...HEAD" -- services/ai .github/workflows/ai.yml; then
+            echo "run=true" >> "$GITHUB_OUTPUT"
+          fi
+
+  ai:
+    needs: changes
+    if: needs.changes.outputs.run == 'true'
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: services/ai
+    steps:
+      - uses: actions/checkout@v7
+      - uses: astral-sh/setup-uv@v10.3.0
+        with:
+          version: "0.11.28"
+          enable-cache: true
+          cache-dependency-glob: services/ai/uv.lock
+      - run: uv sync --frozen
+      - run: uv run ruff format --check .
+      - run: uv run ruff check .
+      - run: uv run mypy app
+      - run: uv run pytest

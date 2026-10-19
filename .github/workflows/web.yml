@@ -1,0 +1,46 @@
+# Arayüz: lint ve biçim (ESLint, Prettier), tip (tsc) ve testler (Vitest).
+# Her PR'da raporlanır; apps/web ya da bu dosya değişmediyse iş atlanır.
+name: web
+
+on:
+  pull_request:
+  push:
+    branches: [master]
+    paths: ["apps/web/**", ".github/workflows/web.yml"]
+
+permissions:
+  contents: read
+
+jobs:
+  changes:
+    runs-on: ubuntu-latest
+    outputs:
+      run: ${{ steps.diff.outputs.run }}
+    steps:
+      - uses: actions/checkout@v7
+        with:
+          fetch-depth: 0
+      - id: diff
+        run: |
+          if [ "$GITHUB_EVENT_NAME" != "pull_request" ] || ! git diff --quiet "origin/$GITHUB_BASE_REF...HEAD" -- apps/web .github/workflows/web.yml; then
+            echo "run=true" >> "$GITHUB_OUTPUT"
+          fi
+
+  web:
+    needs: changes
+    if: needs.changes.outputs.run == 'true'
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: apps/web
+    steps:
+      - uses: actions/checkout@v7
+      - uses: actions/setup-node@v7
+        with:
+          node-version: "24"
+          cache: npm
+          cache-dependency-path: apps/web/package-lock.json
+      - run: npm ci
+      - run: npm run lint
+      - run: npm run typecheck
+      - run: npm test
