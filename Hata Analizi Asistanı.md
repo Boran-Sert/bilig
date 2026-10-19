@@ -210,11 +210,11 @@ Bir `source` kaydı ve kuyrukta bir iş.
 
 Nasıl
 
-PyMuPDF metni çıkarır, kelimelerin ne kadarının Türkçe kelime listesinde bulunduğuna bakılır. %90 üstü metin yolu, altı görüntü yolu.
+PyMuPDF metni çıkarır, kelimelerin ne kadarının Türkçe kelime listesinde bulunduğuna bakılır. %90 üstü metin yolu. Altındaysa önce bozuk font eşlemesi kodla düzeltilmeye çalışılır; düzeltilen metin %90'ı geçerse metin yolu, geçmezse görüntü yolu.
 
 Örnek
 
-Masal sayfasında "Masal; genellikle" metni "0DVDO JHQHOOLNOH" diye çıkıyor, soru bankası çıktısında hiç metin yok: ikisi de görüntü yoluna düşer. Program, ÖDSGM testi ve MEB kitapları metin yolundan gider.
+Masal sayfasında "Masal; genellikle" metni "0DVDO JHQHOOLNOH" diye çıkıyor: her harf 29 kod noktası kaymış, fontun karakter eşlemesi bozuk. Kayma sabitse kodla geri çevrilir ve sayfa metin yoluna döner; Türkçe harflerde (ş, ğ, ı) aynı kaymanın olup olmadığı henüz denenmedi. Soru bankası çıktısında hiç metin yok: görüntü yoluna düşer. Program, ÖDSGM testi ve MEB kitapları metin yolundan gider.
 
 ### A4Kaynak profili (her kitap ya da seri için bir kez)
 
@@ -1642,7 +1642,7 @@ Teslim tarihi 12 Kasım 2026 Perşembe. Plan dört hafta; son hafta dört gün. 
 | Boran | Repo, CI, docker-compose, CLAUDE.md dosyaları ve Claude Code ayarları; embedding, BM25 ve reranker kurulumu (Fatih ile) | Kazanım eşleştirme, doğruluk ölçümü | Bilgi katmanı, alıntılı anlatım, sohbet tool'ları | Prompt iyileştirme, demo, sunum, son incelemeler. Yetişirse soru üretimi ve doğrulama. |
 | Eren | Tablolar (Flyway), giriş ve roller | Test, oturum ve cevap API'leri | Panel API'si, cevap analizi kayıtları | Hata düzeltme, testler |
 | Selman | `job` tablosu, Java'dan Python'u çağıran istemci | Yükleme API'si, iş durumu API'si | İnceleme API'leri, akış aktarımı | Hata düzeltme, uçtan uca test |
-| Fatih | Program katmanı (A1), metin katmanı kontrolü; kontrol seti (Boran ile) | Kaynak profili, kitap ve test ayrıştırma, cevap anahtarı | Görüntü yolu, sayfa birleştirme, kontroller | Gerçek kaynaklarla doğrulama |
+| Fatih | Program katmanı (A1), metin katmanı kontrolü ve bozuk font eşlemesi düzeltme denemesi; kontrol seti (Boran ile) | Kaynak profili, kitap ve test ayrıştırma, sayfa birleştirme, cevap anahtarı | Görüntü yolu, kontroller | Gerçek kaynaklarla doğrulama |
 | Özcan | Arayüz iskeleti, giriş ekranı | Yükleme ekranı, test çözme | Anlatım ve alıntı kartı, sohbet, inceleme ekranı | Öğrenci paneli, telefon görünümü |
 | Sinan | Rakip analizi: MEBİ, yayınevi platformları | MEB izin başvurusu, öğrenci ve öğretmen görüşmeleri | Fiyatlandırma, anlatım tarzı metinleri | Kullanıcı testi, demo senaryosu |
 
