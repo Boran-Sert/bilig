@@ -1,0 +1,28 @@
+# Java servisi: biçim (Spotless), Javadoc (Checkstyle) ve testler.
+# Sadece services/core ya da bu dosya değişince çalışır.
+name: core
+
+on:
+  pull_request:
+    paths: ["services/core/**", ".github/workflows/core.yml"]
+  push:
+    branches: [master]
+    paths: ["services/core/**", ".github/workflows/core.yml"]
+
+permissions:
+  contents: read
+
+jobs:
+  verify:
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: services/core
+    steps:
+      - uses: actions/checkout@v7
+      - uses: actions/setup-java@v6
+        with:
+          distribution: temurin
+          java-version: "25"
+          cache: maven
+      - run: ./mvnw -B verify

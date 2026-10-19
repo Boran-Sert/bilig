@@ -1,0 +1,32 @@
+# Python servisi: biçim ve lint (ruff), tip (mypy) ve testler (pytest).
+# Sadece services/ai ya da bu dosya değişince çalışır.
+name: ai
+
+on:
+  pull_request:
+    paths: ["services/ai/**", ".github/workflows/ai.yml"]
+  push:
+    branches: [master]
+    paths: ["services/ai/**", ".github/workflows/ai.yml"]
+
+permissions:
+  contents: read
+
+jobs:
+  check:
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: services/ai
+    steps:
+      - uses: actions/checkout@v7
+      - uses: astral-sh/setup-uv@v10.3.0
+        with:
+          version: "0.11.28"
+          enable-cache: true
+          cache-dependency-glob: services/ai/uv.lock
+      - run: uv sync --frozen
+      - run: uv run ruff format --check .
+      - run: uv run ruff check .
+      - run: uv run mypy app
+      - run: uv run pytest

@@ -1,0 +1,31 @@
+# Arayüz: lint ve biçim (ESLint, Prettier), tip (tsc) ve testler (Vitest).
+# Sadece apps/web ya da bu dosya değişince çalışır.
+name: web
+
+on:
+  pull_request:
+    paths: ["apps/web/**", ".github/workflows/web.yml"]
+  push:
+    branches: [master]
+    paths: ["apps/web/**", ".github/workflows/web.yml"]
+
+permissions:
+  contents: read
+
+jobs:
+  check:
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: apps/web
+    steps:
+      - uses: actions/checkout@v7
+      - uses: actions/setup-node@v7
+        with:
+          node-version: "24"
+          cache: npm
+          cache-dependency-path: apps/web/package-lock.json
+      - run: npm ci
+      - run: npm run lint
+      - run: npm run typecheck
+      - run: npm test
