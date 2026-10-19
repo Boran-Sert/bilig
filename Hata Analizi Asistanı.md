@@ -805,7 +805,7 @@ Aynı işi yapan ikinci bir kütüphane eklenmez. "Kullanma" sütunu, yapay zeka
 | Metin benzerliği | rapidfuzz | difflib |
 | Log | structlog (JSON çıktı) | `print` |
 | İş kuyruğu | PostgreSQL `job` tablosu, kendi çalışanımız | Celery, RabbitMQ, Redis |
-| Test | pytest, pytest-asyncio, httpx | unittest |
+| Test | pytest, pytest-asyncio, httpx2 (FastAPI TestClient için) | unittest |
 | Lint, format, tip | ruff (lint, format ve `D` docstring kuralları), mypy | black, flake8, isort |
 | Web arayüzü (web) |  |  |
 | Derleme | Vite 8, React 19, TypeScript 6 | Next.js, CRA |
@@ -820,7 +820,7 @@ Aynı işi yapan ikinci bir kütüphane eklenmez. "Kullanma" sütunu, yapay zeka
 | Markdown | react-markdown + remark-gfm + rehype-raw + rehype-sanitize | `dangerouslySetInnerHTML` |
 | Dosya bırakma | react-dropzone | Elle sürükle-bırak |
 | Test | Vitest, Testing Library | Jest, Enzyme |
-| Lint, format | ESLint 9 (flat config) + eslint-plugin-jsdoc + eslint-plugin-i18next, Prettier 3 | TSLint |
+| Lint, format | ESLint 10 (flat config) + eslint-plugin-jsdoc + eslint-plugin-i18next, Prettier 3 | TSLint |
 
 ### 13.3Klasör yapısı
 

@@ -1,10 +1,9 @@
 # Python servisi: biçim ve lint (ruff), tip (mypy) ve testler (pytest).
-# Sadece services/ai ya da bu dosya değişince çalışır.
+# Her PR'da raporlanır; services/ai ya da bu dosya değişmediyse iş atlanır.
 name: ai
 
 on:
   pull_request:
-    paths: ["services/ai/**", ".github/workflows/ai.yml"]
   push:
     branches: [master]
     paths: ["services/ai/**", ".github/workflows/ai.yml"]
@@ -13,7 +12,23 @@ permissions:
   contents: read
 
 jobs:
-  check:
+  changes:
+    runs-on: ubuntu-latest
+    outputs:
+      run: ${{ steps.diff.outputs.run }}
+    steps:
+      - uses: actions/checkout@v7
+        with:
+          fetch-depth: 0
+      - id: diff
+        run: |
+          if [ "$GITHUB_EVENT_NAME" != "pull_request" ] || ! git diff --quiet "origin/$GITHUB_BASE_REF...HEAD" -- services/ai .github/workflows/ai.yml; then
+            echo "run=true" >> "$GITHUB_OUTPUT"
+          fi
+
+  ai:
+    needs: changes
+    if: needs.changes.outputs.run == 'true'
     runs-on: ubuntu-latest
     defaults:
       run:

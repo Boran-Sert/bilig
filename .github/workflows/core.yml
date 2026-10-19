@@ -1,10 +1,9 @@
 # Java servisi: biçim (Spotless), Javadoc (Checkstyle) ve testler.
-# Sadece services/core ya da bu dosya değişince çalışır.
+# Her PR'da raporlanır; services/core ya da bu dosya değişmediyse iş atlanır.
 name: core
 
 on:
   pull_request:
-    paths: ["services/core/**", ".github/workflows/core.yml"]
   push:
     branches: [master]
     paths: ["services/core/**", ".github/workflows/core.yml"]
@@ -13,7 +12,23 @@ permissions:
   contents: read
 
 jobs:
-  verify:
+  changes:
+    runs-on: ubuntu-latest
+    outputs:
+      run: ${{ steps.diff.outputs.run }}
+    steps:
+      - uses: actions/checkout@v7
+        with:
+          fetch-depth: 0
+      - id: diff
+        run: |
+          if [ "$GITHUB_EVENT_NAME" != "pull_request" ] || ! git diff --quiet "origin/$GITHUB_BASE_REF...HEAD" -- services/core .github/workflows/core.yml; then
+            echo "run=true" >> "$GITHUB_OUTPUT"
+          fi
+
+  core:
+    needs: changes
+    if: needs.changes.outputs.run == 'true'
     runs-on: ubuntu-latest
     defaults:
       run:
