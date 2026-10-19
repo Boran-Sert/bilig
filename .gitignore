@@ -14,7 +14,3 @@ __pycache__/
 # Web
 node_modules/
 dist/
-
-# Claude Code kişisel
-.claude/settings.local.json
-CLAUDE.local.md
