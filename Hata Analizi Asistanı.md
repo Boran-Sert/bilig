@@ -1392,21 +1392,31 @@ Bazı kuralları Claude Code'un kendisi uygular. Bu dosyalar repoya commit edili
     ]
   },
   "hooks": {
-    "PreToolUse": [{
-      "matcher": "Edit|Write",
-      "hooks": [{ "type": "command", "command": "${CLAUDE_PROJECT_DIR}/.claude/hooks/protect.sh", "args": [] }]
-    }],
-    "PostToolUse": [{
-      "matcher": "Edit|Write",
-      "hooks": [{ "type": "command", "command": "${CLAUDE_PROJECT_DIR}/.claude/hooks/format.sh", "args": [] }]
-    }]
+    "PreToolUse": [
+      {
+        "matcher": "Edit|Write",
+        "hooks": [
+          { "type": "command", "command": "bash \"${CLAUDE_PROJECT_DIR}/.claude/hooks/protect.sh\"" }
+        ]
+      }
+    ],
+    "PostToolUse": [
+      {
+        "matcher": "Edit|Write",
+        "hooks": [
+          { "type": "command", "command": "bash \"${CLAUDE_PROJECT_DIR}/.claude/hooks/format.sh\"" }
+        ]
+      }
+    ]
   }
 }
 
 # .claude/hooks/protect.sh
 #!/bin/bash
 # Korunan dosyalarda düzenlemeyi engeller.
+command -v jq >/dev/null || { echo "jq kurulu değil (Windows: winget install jqlang.jq)" >&2; exit 2; }
 FILE=$(jq -r '.tool_input.file_path // empty')
+FILE=${FILE//\\//}
 deny() { echo "Korunan dosya: $FILE ($1)" >&2; exit 2; }
 case "$FILE" in
   */.env.example) exit 0 ;;
@@ -1430,7 +1440,9 @@ esac
 exit 0
 ```
 
-- Hook'lar `jq` ister. Windows'ta Claude Code komutları Git Bash ile çalıştırır; `jq` ayrıca kurulur (`winget install jqlang.jq`).
+- Hook'lar `jq` ister. Windows'ta Claude Code komutları Git Bash ile çalıştırır; `jq` ayrıca kurulur (`winget install jqlang.jq`). `jq` yoksa `protect.sh` her düzenlemeyi durdurur.
+- Hook'lar `bash "..."` ile çağrılır, `args` alanı kullanılmaz. `args` olunca komut kabuksuz çalışır ve Windows'ta `.sh` dosyası açılamaz.
+- Windows'ta dosya yolu ters bölüyle gelir; `protect.sh` kalıplara bakmadan önce düz bölüye çevirir.
 - `protect.sh` çıkış kodu 2 ile düzenlemeyi durdurur; Claude nedeni görür ve başka yol arar.
 - Yeni migration dosyası oluşturmak serbesttir; sadece var olan migration dosyası değiştirilemez.
 
