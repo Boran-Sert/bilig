@@ -1265,7 +1265,7 @@ CI (GitHub Actions) her serviste sadece o servisin klasörü değiştiğinde ça
 - Her dosyada başlık açıklaması, her fonksiyonda tek cümlelik docstring var; kod içi yorumlar en fazla 3 kelime.
 - PR 400 satırın altında; commit'ler küçük, tek amaçlı ve her biri derleniyor.
 - Yapay zekayla yazıldıysa 14.6'daki liste işaretlendi.
-- En az bir kişi PR'ı inceledi ve onayladı.
+- Boran PR'ı inceledi ve onayladı.
 
 14
 
