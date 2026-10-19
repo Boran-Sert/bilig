@@ -1448,15 +1448,15 @@ exit 0
 
 ### 14.8AGENTS.md ve CLAUDE.md dosyaları
 
-Ekipte herkes Claude Code kullanmıyor. Ortak kurallar bu yüzden `AGENTS.md`'de durur; Codex, Cursor ve Copilot gibi araçlar bu dosyayı okur. Kök `CLAUDE.md` sadece `@AGENTS.md` satırıyla onu içe aktarır, kurallar iki yerde yazılmaz.
+Ekipte herkes Claude Code kullanmıyor. Ortak kurallar bu yüzden `AGENTS.md`'de durur; Codex, Cursor ve Copilot gibi araçlar bu dosyayı okur. Kök `CLAUDE.md` sadece `@AGENTS.md` satırıyla onu içe aktarır, kurallar iki yerde yazılmaz. Servislerde de aynı düzen geçerlidir. Kökte `CLAUDE.md` olduğu için Claude Code alt klasördeki `AGENTS.md`'yi tek başına okumaz; bu yüzden her serviste onu içe aktaran bir `CLAUDE.md` de durur.
 
 | Dosya | Ne zaman yüklenir | İçerik |
 | --- | --- | --- |
 | `AGENTS.md` (kök) | Her oturumun başında | Proje özeti, servisler, çalışma şekli, kesin yasaklar (14.4), ortak kod kuralları, API, git ve PR, komutlar. Metni 14.9'da. |
 | `CLAUDE.md` (kök) | Her oturumun başında | Sadece `@AGENTS.md` satırı. Claude Code'a özel kural çıkarsa altına yazılır. |
-| `services/core/CLAUDE.md` | Claude bu klasörde bir dosyayı okuyunca ya da yazınca | Java kuralları: 13.2 Java satırları, 13.3 Java yapısı, 13.7, 13.12, 13.15 Java kısmı, kazanım başarısızlık kuralı, komutlar. |
-| `services/ai/CLAUDE.md` | Aynı şekilde | Python kuralları: 13.2 Python satırları, 13.3 Python yapısı, 13.6, 13.10, 13.11, hazırlık hattı (Bölüm 6), komutlar. |
-| `apps/web/CLAUDE.md` | Aynı şekilde | Arayüz kuralları: 13.2 arayüz satırları, 13.3 arayüz yapısı, 13.8 i18n, ekran taslakları (Bölüm 7 ve 8), komutlar. |
+| `services/core/AGENTS.md` ve `CLAUDE.md` | Claude bu klasörde bir dosyayı okuyunca ya da yazınca | Java kuralları: 13.2 Java satırları, 13.3 Java yapısı, 13.7, 13.12, 13.15 Java kısmı, kazanım başarısızlık kuralı, komutlar. |
+| `services/ai/AGENTS.md` ve `CLAUDE.md` | Aynı şekilde | Python kuralları: 13.2 Python satırları, 13.3 Python yapısı, 13.6, 13.10, 13.11, hazırlık hattı (Bölüm 6), komutlar. |
+| `apps/web/AGENTS.md` ve `CLAUDE.md` | Aynı şekilde | Arayüz kuralları: 13.2 arayüz satırları, 13.3 arayüz yapısı, 13.8 i18n, ekran taslakları (Bölüm 7 ve 8), komutlar. |
 | `.claude/rules/migrations.md` | Sadece migration dosyalarına dokunulunca | 13.7 veritabanı kuralları. |
 | `.claude/rules/prompts.md` | Sadece `prompts/` ve `llm_tasks.yaml` dosyalarına dokunulunca | 13.10 yapay zeka kodu kuralları, prompt sürümleme. |
 
