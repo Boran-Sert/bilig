@@ -1,10 +1,9 @@
 # Arayüz: lint ve biçim (ESLint, Prettier), tip (tsc) ve testler (Vitest).
-# Sadece apps/web ya da bu dosya değişince çalışır.
+# Her PR'da raporlanır; apps/web ya da bu dosya değişmediyse iş atlanır.
 name: web
 
 on:
   pull_request:
-    paths: ["apps/web/**", ".github/workflows/web.yml"]
   push:
     branches: [master]
     paths: ["apps/web/**", ".github/workflows/web.yml"]
@@ -13,7 +12,23 @@ permissions:
   contents: read
 
 jobs:
-  check:
+  changes:
+    runs-on: ubuntu-latest
+    outputs:
+      run: ${{ steps.diff.outputs.run }}
+    steps:
+      - uses: actions/checkout@v7
+        with:
+          fetch-depth: 0
+      - id: diff
+        run: |
+          if [ "$GITHUB_EVENT_NAME" != "pull_request" ] || ! git diff --quiet "origin/$GITHUB_BASE_REF...HEAD" -- apps/web .github/workflows/web.yml; then
+            echo "run=true" >> "$GITHUB_OUTPUT"
+          fi
+
+  web:
+    needs: changes
+    if: needs.changes.outputs.run == 'true'
     runs-on: ubuntu-latest
     defaults:
       run:
