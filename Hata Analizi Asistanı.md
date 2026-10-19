@@ -120,7 +120,7 @@ bilig/
 ├── infra/postgres/      Postgres imajı: pgvector + pg_textsearch
 ├── .claude/             Claude Code ayarları, hook'lar, kurallar (Bölüm 14)
 ├── .github/             CI iş akışları ve CODEOWNERS
-├── CLAUDE.md
+├── AGENTS.md, CLAUDE.md
 ├── .editorconfig, .gitattributes
 ├── docker-compose.yml
 └── .env.example
@@ -749,7 +749,7 @@ CI her PR'da değişen alanın derlemesini, testlerini ve format kontrolünü ç
 
 ## Teknoloji ve kod standartları
 
-Bu bölüm CLAUDE.md dosyalarının kaynağıdır. Kodu yapay zeka desteğiyle yazacağımız için herkesin aynı aracı, aynı yapıyı ve aynı adlandırmayı kullanması gerekir. Burada yazmayan bir kütüphane, klasör ya da kural eklenmeden önce ekipte konuşulur ve bu bölüm güncellenir. Yapay zekayla nasıl çalışılacağı [Bölüm 14](#s14)'te.
+Bu bölüm AGENTS.md ve CLAUDE.md dosyalarının kaynağıdır. Kodu yapay zeka desteğiyle yazacağımız için herkesin aynı aracı, aynı yapıyı ve aynı adlandırmayı kullanması gerekir. Burada yazmayan bir kütüphane, klasör ya da kural eklenmeden önce ekipte konuşulur ve bu bölüm güncellenir. Yapay zekayla nasıl çalışılacağı [Bölüm 14](#s14)'te.
 
 ### 13.1Sürümler
 
@@ -1271,7 +1271,7 @@ CI (GitHub Actions) her serviste sadece o servisin klasörü değiştiğinde ça
 
 ## Yapay zekayla geliştirme
 
-Kodun büyük kısmını Claude Code yazacak. Bu bölüm herkesin aynı şekilde çalışmasını ve yapay zekanın her bilgisayarda aynı kodu üretmesini sağlayan kuralları anlatır. CLAUDE.md dosyaları bu bölümden ve Bölüm 13'ten üretilir; 14.9 ve 14.10'daki iskeletler doğrudan kopyalanabilir.
+Kodun büyük kısmını Claude Code yazacak. Bu bölüm herkesin aynı şekilde çalışmasını ve yapay zekanın her bilgisayarda aynı kodu üretmesini sağlayan kuralları anlatır. AGENTS.md ve CLAUDE.md dosyaları bu bölümden ve Bölüm 13'ten üretilir; 14.9 ve 14.10'daki iskeletler doğrudan kopyalanabilir.
 
 ### 14.1Temel ilke
 
@@ -1318,7 +1318,7 @@ Sadece session/ klasörüne ve yeni migration dosyasına dokun.
 
 ### 14.4Kesin yasaklar
 
-Bu liste kök CLAUDE.md'ye aynen girer. Yapay zeka için de insan için de geçerlidir.
+Bu liste kök AGENTS.md'ye aynen girer. Yapay zeka için de insan için de geçerlidir.
 
 1. `.env` dosyasını okuma, değiştirme, commit etme. Yeni değişken `.env.example`'a eklenir.
 2. Bölüm 13.2'deki listenin dışında kütüphane ekleme. Gerekiyorsa önce ekipte konuş.
@@ -1434,11 +1434,14 @@ exit 0
 - `protect.sh` çıkış kodu 2 ile düzenlemeyi durdurur; Claude nedeni görür ve başka yol arar.
 - Yeni migration dosyası oluşturmak serbesttir; sadece var olan migration dosyası değiştirilemez.
 
-### 14.8CLAUDE.md dosyaları
+### 14.8AGENTS.md ve CLAUDE.md dosyaları
+
+Ekipte herkes Claude Code kullanmıyor. Ortak kurallar bu yüzden `AGENTS.md`'de durur; Codex, Cursor ve Copilot gibi araçlar bu dosyayı okur. Kök `CLAUDE.md` sadece `@AGENTS.md` satırıyla onu içe aktarır, kurallar iki yerde yazılmaz.
 
 | Dosya | Ne zaman yüklenir | İçerik |
 | --- | --- | --- |
-| `CLAUDE.md` (kök) | Her oturumun başında | Proje özeti, servisler, çalışma şekli, kesin yasaklar (14.4), ortak kod kuralları, API, git, komutlar. İskelet 14.9'da. |
+| `AGENTS.md` (kök) | Her oturumun başında | Proje özeti, servisler, çalışma şekli, kesin yasaklar (14.4), ortak kod kuralları, API, git ve PR, komutlar. Metni 14.9'da. |
+| `CLAUDE.md` (kök) | Her oturumun başında | Sadece `@AGENTS.md` satırı. Claude Code'a özel kural çıkarsa altına yazılır. |
 | `services/core/CLAUDE.md` | Claude bu klasörde bir dosyayı okuyunca ya da yazınca | Java kuralları: 13.2 Java satırları, 13.3 Java yapısı, 13.7, 13.12, 13.15 Java kısmı, kazanım başarısızlık kuralı, komutlar. |
 | `services/ai/CLAUDE.md` | Aynı şekilde | Python kuralları: 13.2 Python satırları, 13.3 Python yapısı, 13.6, 13.10, 13.11, hazırlık hattı (Bölüm 6), komutlar. |
 | `apps/web/CLAUDE.md` | Aynı şekilde | Arayüz kuralları: 13.2 arayüz satırları, 13.3 arayüz yapısı, 13.8 i18n, ekran taslakları (Bölüm 7 ve 8), komutlar. |
@@ -1448,8 +1451,8 @@ exit 0
 - **Her dosya 200 satırın altında kalır.** Dosya uzadıkça Claude'un kurallara uyma oranı düşer. Bir kısmı ilgilendiren kural servis dosyasına ya da `.claude/rules/` altına gider.
 - **Kurallar kısa, emir kipinde ve kontrol edilebilir yazılır.** "Kod içi yorum en fazla 3 kelime" iyi bir kural; "temiz kod yaz" değil.
 - **Çelişen iki kural olmaz.** Çelişki varsa Claude birini rastgele seçer.
-- **Plan dosyası içe aktarılmaz.** `@dosya` ile eklenen dosya da her oturumda yüklenir ve bağlamı doldurur. CLAUDE.md gereken kuralı kendisi yazar.
-- **CLAUDE.md değişikliği PR ile gelir;** sahibi Boran (CODEOWNERS).
+- **Plan dosyası içe aktarılmaz.** `@dosya` ile eklenen dosya da her oturumda yüklenir ve bağlamı doldurur. CLAUDE.md gereken kuralı kendisi yazar. Tek istisna `@AGENTS.md`; o dosya zaten yüklenmesi gereken kuralların kendisidir.
+- **AGENTS.md ve CLAUDE.md değişikliği PR ile gelir;** sahibi Boran (CODEOWNERS).
 - **Claude aynı hatayı iki kez yaparsa** ilgili dosyaya bir satır eklenir. İşe yaramayan ya da eskiyen kural silinir.
 
 ```
@@ -1468,84 +1471,129 @@ paths:
 - Dosyanın başında ne yaptığını anlatan -- açıklama.
 ```
 
-### 14.9Kök CLAUDE.md iskeleti
+### 14.9Kök AGENTS.md metni
 
-Repoya olduğu gibi konabilir. Yeni bir kural eklenecekse önce bu bölüm güncellenir, sonra dosya.
+Kökteki `AGENTS.md` bu metnin aynısıdır. Yeni bir kural eklenecekse önce bu bölüm güncellenir, sonra dosya.
 
 ```
 # Hata Analizi Asistanı
 
 12. sınıf AYT Türk Dili ve Edebiyatı için öğrencinin yanlışlarını kazanım bazında analiz eden,
 ders kitabından alıntıyla anlatan ve benzer soru üreten sistem.
-Bölüm numaraları ekip planındakilerle aynıdır.
+Bu dosya ekipteki herkesin ve bütün yapay zeka araçlarının uyduğu ortak kurallardır.
+Bölüm numaraları ekip planındakilerle aynıdır (`Hata Analizi Asistanı.md`); gerekirse sadece ilgili bölümü oku.
 
 ## Servisler
-- apps/web: React 19, Vite, TypeScript. Sadece gösterir; iş kuralı yazılmaz.
-- services/core: Java 25, Spring Boot 4.1. Kuralların sahibi: giriş, test, cevap, ilerleme,
+- `apps/web`: React 19, Vite, TypeScript. Sadece gösterir; iş kuralı yazılmaz.
+- `services/core`: Java 25, Spring Boot 4.1. Kuralların sahibi: giriş, test, cevap, ilerleme,
   kazanım başarısı, limit, yetki. Tabloları sadece bu servis oluşturur (Flyway).
-- services/ai: Python 3.13, FastAPI. Claude çağrıları, embedding, arama, PDF hazırlık hattı.
-  ai-worker aynı imajla iş kuyruğunu çalıştırır.
-- postgres: PostgreSQL 18, pgvector, pg_textsearch (infra/postgres).
-Her servisin kendi CLAUDE.md'si var; o servisteki bir dosyaya dokununca yüklenir.
+- `services/ai`: Python 3.13, FastAPI. Claude çağrıları, embedding, arama, PDF hazırlık hattı.
+  `ai-worker` aynı imajla iş kuyruğunu çalıştırır.
+- `postgres`: PostgreSQL 18, pgvector, pg_textsearch (`infra/postgres`).
+- Servise özel kurallar her servisin klasöründeki kural dosyasındadır (14.10).
 
 ## Çalışma şekli
 - Önce ilgili dosyaları oku, sonra plan çıkar. Plan onaylanmadan birden çok dosyayı değiştirme.
 - Sadece istenen işi yap. İşle ilgisiz dosyayı yeniden adlandırma, taşıma, biçimlendirme.
 - Emin olmadığın kütüphane API'sini, alanı ya da endpoint'i uydurma: dosyayı oku ya da sor.
 - Yeni kod yazmadan önce var olanı ara; aynı işi yapan ikinci fonksiyonu yazma.
-- İşi küçük adımlara böl: her adım derlenir ve test edilir. Commit en fazla 150, PR en fazla 400 satır.
+- İşi küçük adımlara böl: her adım derlenir ve test edilir.
 - Her adımdan sonra o servisin format, lint ve test komutunu çalıştır. Kırmızıysa iş bitmemiştir.
 - Aynı hatayı iki denemede çözemezsen dur ve durumu anlat.
 
 ## Kesin yasaklar
-- .env okuma, değiştirme, commit etme. Yeni değişkeni .env.example'a ekle.
-- Plandaki kütüphane listesinin dışında bağımlılık ekleme; gerekiyorsa sor.
+- `.env` okuma, değiştirme, commit etme. Yeni değişkeni `.env.example`'a ekle.
+- Plandaki kütüphane listesinin (13.2) dışında bağımlılık ekleme; gerekiyorsa sor.
 - Uygulanmış migration'ı değiştirme; yeni dosya ekle.
-- Üretilen dosyaları elle düzenleme: schema.d.ts, components/ui/, kilit dosyaları.
+- Üretilen dosyaları elle düzenleme: `schema.d.ts`, `components/ui/`, kilit dosyaları.
 - Testi geçirmek için testi silme, atlama ya da beklenen değeri değiştirme.
-- Kontrolleri susturma (@Disabled, skip, eslint-disable, noqa, @ts-ignore); zorunluysa issue numarası yaz.
-- Hatayı yutma: boş catch, except: pass.
+- Kontrolleri susturma (`@Disabled`, skip, `eslint-disable`, `noqa`, `@SuppressWarnings`,
+  `@ts-ignore`); zorunluysa yanına issue numarası yaz.
+- Hatayı yutma: boş `catch`, `except: pass`.
 - Model adını, prompt metnini, kullanıcıya görünen metni ve sabit sayıları koda gömme.
 - Öğrencinin adını, e-postasını, okulunu Claude'a ya da log'a gönderme.
-- Telifli PDF'i, sayfa görüntüsünü ya da kitap metnini repoya koyma.
+- Telifli PDF'i, sayfa görüntüsünü ya da kitap metnini repoya, test verisine ya da örnek dosyaya koyma.
 - İş kuralını arayüze yazma.
-- Türkçe metinde düz lower() / toLowerCase() kullanma; TurkishText / tr_lower kullan.
+- Türkçe metinde düz `lower()` / `toLowerCase()` kullanma; `TurkishText` / `tr_lower` kullan.
 - Soru için tek kazanım varsayma; kazanımlara sıra ya da ağırlık verme.
-- İkinci kullanım çıkmadan interface, soyut sınıf ya da genel yardımcı yazma.
+- İkinci kullanım çıkmadan interface, soyut sınıf ya da genel yardımcı yazma (istisnalar 13.12).
 
 ## Kod kuralları
 - Kod adları ve log mesajları İngilizce; docstring, yorum ve kullanıcı metni Türkçe.
+- İsimler açıklayıcı; kısaltma yok (`sess` değil `session`).
+- Java ve TypeScript camelCase, Python ve SQL snake_case, sabitler `UPPER_SNAKE_CASE`, tablolar tekil.
 - Her dosyanın başında ne işe yaradığını anlatan açıklama; her fonksiyonda tek cümlelik docstring.
-- Kod içi yorum en fazla 3 kelime. Yapılacak notu: TODO(#issue) ve en fazla 3 kelime.
+- Docstring fonksiyonun ne yaptığını söyler, parametre saymaz. Python'da `def` satırının altında,
+  Java ve TypeScript'te fonksiyonun üstünde (`/** ... */`).
+- Kod içi yorum en fazla 3 kelime. Yapılacak notu: `TODO(#issue)` ve en fazla 3 kelime.
 - Kullanıcı metni i18n dosyasında, değişmeyen değer constants dosyasında,
-  ortama göre değişen değer ayar dosyasında.
+  ortama göre değişen değer ayar dosyasında (13.8).
 - Dosya 300, fonksiyon 40 satırı geçmez; geçerse böl.
+- Satır uzunluğu 100. Biçimi araç verir: Java Spotless, Python ruff, arayüz Prettier.
+- UTF-8 ve LF satır sonu. Java ve Python 4 boşluk; TypeScript, JSON ve YAML 2 boşluk.
 - Altyapıya (iş kuyruğu, dosya, önbellek, hız sınırı, embedding, reranker) sadece arayüzle eriş.
-- İsimler açıklayıcı; kısaltma yok.
+- SQL her zaman parametreli; metin birleştirerek sorgu kurma.
 
 ## API
-- Dışa açık: /api/** (Java). İç: /internal/** (Python), dışarı açılmaz.
-- JSON camelCase, tarih ISO-8601 UTC, id bigint. Hata: RFC 9457 + code + requestId.
+- Dışa açık: `/api/**` (Java). İç: `/internal/**` (Python), dışarı açılmaz.
+- JSON camelCase, tarih ISO-8601 UTC, id `bigint`. Hata: RFC 9457 + `code` + `requestId`.
+- Yetki kontrolü servis katmanında: öğrenci sadece kendi oturumunu, cevabını ve sohbetini görür.
 - Doğru cevap ve sorunun kazanımları öğrenci cevaplamadan gönderilmez.
-- Arayüz tipleri üretilir (npm run gen:api), elle yazılmaz.
+- Arayüz tipleri üretilir (`npm run gen:api`), elle yazılmaz.
 
-## Git
-- Branch: tür/issue-aciklama (örnek: feat/12-test-oturumu). master'a doğrudan push yok.
-- Commit: tür(alan): ne yapıldı. Tür: feat, fix, refactor, test, docs, chore.
-  Alan: web, core, ai, ingest, db, docs.
-- git add -p ile ekle; git add ., --no-verify ve --force kullanma.
+## Git ve PR
+
+### Branch
+- Her iş bir GitHub Issue ile başlar; branch issue numarasıyla açılır ve 1-3 gün yaşar.
+- Ad: `tür/issue-kisa-aciklama`, küçük harf, Türkçe karakter yok. Örnek: `feat/12-test-oturumu`.
+- master'a doğrudan push yok; her değişiklik PR ile gelir.
+- PR açmadan önce `git fetch origin` ve `git rebase origin/master`.
+  Rebase sonrası kendi branch'ine sadece `git push --force-with-lease`.
+
+### Commit
+- Biçim: `tür(alan): ne yapıldı`. Örnek: `feat(ai): kaynak profili önerisi eklendi`.
+- Tür: `feat`, `fix`, `refactor`, `test`, `docs`, `chore`.
+- Alan: `web`, `core`, `ai`, `ingest`, `db`, `infra`, `docs`.
+- Commit küçük ve tek amaçlı: bir migration, bir servis metodu ve testi, bir bileşen.
+  Hedef 150 satırın altı.
+- Her commit derlenir; yarım ya da çalışmayan kod commit edilmez.
+- Commit'i geliştirici atar: diff'i satır satır okur, `git add -p` ile parça parça ekler.
+- `git add .`, `--no-verify` ve `--force` kullanma.
+
+### PR
+- En fazla 400 satır değişiklik; üretilen dosyalar (API tipleri, kilit dosyaları) sayılmaz.
+  Geçecekse işi böl.
+- Büyük iş sırayla ayrı PR'lara bölünür: migration, servis ve testleri, API, arayüz.
+- Açıklama: ne yapıldı, neden, nasıl test edildi, değişen satır sayısı ve `Closes #<issue>`.
+  Geliştirici açıklamayı kendi cümleleriyle yazar.
+- Prompt, profil ya da eşleştirme değiştiyse değerlendirme çalıştırılır, doğruluk PR'a yazılır.
+- Birleşmek için Boran'ın onayı ve yeşil CI şart. Onaydan sonra gelen commit onayı düşürür.
+- Birleştirme "Squash and merge" ile yapılır, ardından branch silinir.
+- İnceleme 24 saat içinde yapılır.
+- Yanlışlıkla commit edilen API anahtarı hemen iptal edilir.
+
+### PR açmadan önce
+- Plan çıkarıldı ve okundu.
+- Diff satır satır okundu; istenmeyen değişiklik yok, her satır açıklanabiliyor.
+- Format, lint, tip kontrolü ve testler yerelde temiz; testler davranışı ölçüyor.
+- Yeni bağımlılık yok; varsa ekipte konuşuldu ve gerekçesi PR'da.
+- Ekran değiştiyse tarayıcıda denendi ve ekran görüntüsü eklendi.
+- API değiştiyse Swagger arayüzünden çağrıldı.
+- Yapay zekanın sık yaptığı hatalar (14.5) yok: eski sürüm kodu, uydurma API, sahte uygulama,
+  kalıntı `print` / `console.log`, sessiz yan değişiklik.
 
 ## Komutlar
-- Java: cd services/core && ./mvnw spotless:apply verify
-- Python: cd services/ai && uv run ruff format . && uv run ruff check . && uv run mypy app && uv run pytest
-- Web: cd apps/web && npm run lint && npm run typecheck && npm test
-- Hepsi birlikte: docker compose up --build
+- Java: `cd services/core && ./mvnw spotless:apply verify` (Windows: `mvnw.cmd`)
+- Python: `cd services/ai && uv run ruff format . && uv run ruff check . && uv run mypy app && uv run pytest`
+- Web: `cd apps/web && npm run lint && npm run typecheck && npm test`
+- Hepsi birlikte: `docker compose up --build`
 
 ## İş ne zaman bitmiş sayılır
-- Format, lint, tip kontrolü ve testler temiz.
-- Yeni kullanıcı metni i18n dosyasında, yeni ortam değişkeni .env.example'da.
+- Format, lint, tip kontrolü ve testler temiz; CI yeşil.
+- Yeni kullanıcı metni i18n dosyasında, yeni ortam değişkeni `.env.example`'da.
 - API değiştiyse arayüz tipleri yeniden üretildi; prompt değiştiyse değerlendirme çalıştırıldı.
 - Her dosyada başlık açıklaması, her fonksiyonda tek cümlelik docstring var.
+- Boran PR'ı inceledi ve onayladı.
 ```
 
 ### 14.10Servis CLAUDE.md iskeletleri
