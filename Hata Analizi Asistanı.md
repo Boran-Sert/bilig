@@ -694,7 +694,7 @@ Her iş kendi kısa ömürlü branch'inde yapılır, PR ile incelenir ve tek com
 | Branch | `tür/issue-kisa-aciklama`, küçük harf, Türkçe karakter yok | `feat/12-test-oturumu` |
 | Commit | `tür(alan): ne yapıldı` | `feat(ai): kaynak profili önerisi eklendi` |
 | Tür | `feat` · `fix` · `refactor` · `test` · `docs` · `chore` |  |
-| Alan | `web` · `core` · `ai` · `ingest` · `db` · `docs` |  |
+| Alan | `web` · `core` · `ai` · `ingest` · `db` · `infra` · `docs` |  |
 
 ### Günlük çalışma
 
