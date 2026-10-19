@@ -120,7 +120,7 @@ bilig/
 ├── infra/postgres/      Postgres imajı: pgvector + pg_textsearch
 ├── .claude/             Claude Code ayarları, hook'lar, kurallar (Bölüm 14)
 ├── .github/             CI iş akışları ve CODEOWNERS
-├── AGENTS.md, CLAUDE.md
+├── AGENTS.md, CLAUDE.md, PLAN.md
 ├── .editorconfig, .gitattributes
 ├── docker-compose.yml
 └── .env.example
