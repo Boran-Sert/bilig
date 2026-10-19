@@ -820,7 +820,7 @@ Aynı işi yapan ikinci bir kütüphane eklenmez. "Kullanma" sütunu, yapay zeka
 | Markdown | react-markdown + remark-gfm + rehype-raw + rehype-sanitize | `dangerouslySetInnerHTML` |
 | Dosya bırakma | react-dropzone | Elle sürükle-bırak |
 | Test | Vitest, Testing Library | Jest, Enzyme |
-| Lint, format | ESLint 9 (flat config) + eslint-plugin-jsdoc + eslint-plugin-i18next, Prettier 3 | TSLint |
+| Lint, format | ESLint 10 (flat config) + eslint-plugin-jsdoc + eslint-plugin-i18next, Prettier 3 | TSLint |
 
 ### 13.3Klasör yapısı
 
