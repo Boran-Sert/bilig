@@ -1392,21 +1392,31 @@ Bazı kuralları Claude Code'un kendisi uygular. Bu dosyalar repoya commit edili
     ]
   },
   "hooks": {
-    "PreToolUse": [{
-      "matcher": "Edit|Write",
-      "hooks": [{ "type": "command", "command": "${CLAUDE_PROJECT_DIR}/.claude/hooks/protect.sh", "args": [] }]
-    }],
-    "PostToolUse": [{
-      "matcher": "Edit|Write",
-      "hooks": [{ "type": "command", "command": "${CLAUDE_PROJECT_DIR}/.claude/hooks/format.sh", "args": [] }]
-    }]
+    "PreToolUse": [
+      {
+        "matcher": "Edit|Write",
+        "hooks": [
+          { "type": "command", "command": "bash \"${CLAUDE_PROJECT_DIR}/.claude/hooks/protect.sh\"" }
+        ]
+      }
+    ],
+    "PostToolUse": [
+      {
+        "matcher": "Edit|Write",
+        "hooks": [
+          { "type": "command", "command": "bash \"${CLAUDE_PROJECT_DIR}/.claude/hooks/format.sh\"" }
+        ]
+      }
+    ]
   }
 }
 
 # .claude/hooks/protect.sh
 #!/bin/bash
 # Korunan dosyalarda düzenlemeyi engeller.
+command -v jq >/dev/null || { echo "jq kurulu değil (Windows: winget install jqlang.jq)" >&2; exit 2; }
 FILE=$(jq -r '.tool_input.file_path // empty')
+FILE=${FILE//\\//}
 deny() { echo "Korunan dosya: $FILE ($1)" >&2; exit 2; }
 case "$FILE" in
   */.env.example) exit 0 ;;
@@ -1430,21 +1440,23 @@ esac
 exit 0
 ```
 
-- Hook'lar `jq` ister. Windows'ta Claude Code komutları Git Bash ile çalıştırır; `jq` ayrıca kurulur (`winget install jqlang.jq`).
+- Hook'lar `jq` ister. Windows'ta Claude Code komutları Git Bash ile çalıştırır; `jq` ayrıca kurulur (`winget install jqlang.jq`). `jq` yoksa `protect.sh` her düzenlemeyi durdurur.
+- Hook'lar `bash "..."` ile çağrılır, `args` alanı kullanılmaz. `args` olunca komut kabuksuz çalışır ve Windows'ta `.sh` dosyası açılamaz.
+- Windows'ta dosya yolu ters bölüyle gelir; `protect.sh` kalıplara bakmadan önce düz bölüye çevirir.
 - `protect.sh` çıkış kodu 2 ile düzenlemeyi durdurur; Claude nedeni görür ve başka yol arar.
 - Yeni migration dosyası oluşturmak serbesttir; sadece var olan migration dosyası değiştirilemez.
 
 ### 14.8AGENTS.md ve CLAUDE.md dosyaları
 
-Ekipte herkes Claude Code kullanmıyor. Ortak kurallar bu yüzden `AGENTS.md`'de durur; Codex, Cursor ve Copilot gibi araçlar bu dosyayı okur. Kök `CLAUDE.md` sadece `@AGENTS.md` satırıyla onu içe aktarır, kurallar iki yerde yazılmaz.
+Ekipte herkes Claude Code kullanmıyor. Ortak kurallar bu yüzden `AGENTS.md`'de durur; Codex, Cursor ve Copilot gibi araçlar bu dosyayı okur. Kök `CLAUDE.md` sadece `@AGENTS.md` satırıyla onu içe aktarır, kurallar iki yerde yazılmaz. Servislerde de aynı düzen geçerlidir. Kökte `CLAUDE.md` olduğu için Claude Code alt klasördeki `AGENTS.md`'yi tek başına okumaz; bu yüzden her serviste onu içe aktaran bir `CLAUDE.md` de durur.
 
 | Dosya | Ne zaman yüklenir | İçerik |
 | --- | --- | --- |
 | `AGENTS.md` (kök) | Her oturumun başında | Proje özeti, servisler, çalışma şekli, kesin yasaklar (14.4), ortak kod kuralları, API, git ve PR, komutlar. Metni 14.9'da. |
 | `CLAUDE.md` (kök) | Her oturumun başında | Sadece `@AGENTS.md` satırı. Claude Code'a özel kural çıkarsa altına yazılır. |
-| `services/core/CLAUDE.md` | Claude bu klasörde bir dosyayı okuyunca ya da yazınca | Java kuralları: 13.2 Java satırları, 13.3 Java yapısı, 13.7, 13.12, 13.15 Java kısmı, kazanım başarısızlık kuralı, komutlar. |
-| `services/ai/CLAUDE.md` | Aynı şekilde | Python kuralları: 13.2 Python satırları, 13.3 Python yapısı, 13.6, 13.10, 13.11, hazırlık hattı (Bölüm 6), komutlar. |
-| `apps/web/CLAUDE.md` | Aynı şekilde | Arayüz kuralları: 13.2 arayüz satırları, 13.3 arayüz yapısı, 13.8 i18n, ekran taslakları (Bölüm 7 ve 8), komutlar. |
+| `services/core/AGENTS.md` ve `CLAUDE.md` | Claude bu klasörde bir dosyayı okuyunca ya da yazınca | Java kuralları: 13.2 Java satırları, 13.3 Java yapısı, 13.7, 13.12, 13.15 Java kısmı, kazanım başarısızlık kuralı, komutlar. |
+| `services/ai/AGENTS.md` ve `CLAUDE.md` | Aynı şekilde | Python kuralları: 13.2 Python satırları, 13.3 Python yapısı, 13.6, 13.10, 13.11, hazırlık hattı (Bölüm 6), komutlar. |
+| `apps/web/AGENTS.md` ve `CLAUDE.md` | Aynı şekilde | Arayüz kuralları: 13.2 arayüz satırları, 13.3 arayüz yapısı, 13.8 i18n, ekran taslakları (Bölüm 7 ve 8), komutlar. |
 | `.claude/rules/migrations.md` | Sadece migration dosyalarına dokunulunca | 13.7 veritabanı kuralları. |
 | `.claude/rules/prompts.md` | Sadece `prompts/` ve `llm_tasks.yaml` dosyalarına dokunulunca | 13.10 yapay zeka kodu kuralları, prompt sürümleme. |
 
@@ -1596,10 +1608,12 @@ Bölüm numaraları ekip planındakilerle aynıdır (`Hata Analizi Asistanı.md`
 - Boran PR'ı inceledi ve onayladı.
 ```
 
-### 14.10Servis CLAUDE.md iskeletleri
+### 14.10Servis AGENTS.md metinleri
+
+Her servisteki `AGENTS.md` bu metnin aynısıdır; yanındaki `CLAUDE.md` onu `@AGENTS.md` ile içe aktarır.
 
 ```
-# services/core/CLAUDE.md
+# services/core/AGENTS.md
 # core (Java)
 Spring Boot 4.1, Java 25 (Temurin), Maven Wrapper. Kuralların sahibi bu servis.
 
@@ -1626,7 +1640,7 @@ Spring Boot 4.1, Java 25 (Temurin), Maven Wrapper. Kuralların sahibi bu servis.
 ## Komut
 - ./mvnw spotless:apply verify   (Windows: mvnw.cmd)
 
-# services/ai/CLAUDE.md
+# services/ai/AGENTS.md
 # ai (Python)
 FastAPI, Python 3.13, uv. Claude çağrıları, embedding, arama ve PDF hazırlık hattı.
 
@@ -1654,7 +1668,7 @@ FastAPI, Python 3.13, uv. Claude çağrıları, embedding, arama ve PDF hazırl�
 ## Komut
 - uv run ruff format . && uv run ruff check . && uv run mypy app && uv run pytest
 
-# apps/web/CLAUDE.md
+# apps/web/AGENTS.md
 # web (React)
 React 19, Vite 8, TypeScript 6 (strict), shadcn/ui, Tailwind CSS 4.
 
