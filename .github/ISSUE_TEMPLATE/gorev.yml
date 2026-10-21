@@ -1,0 +1,55 @@
+# Görev issue'su: ekip planı Bölüm 12'deki şablon.
+name: Görev
+description: Tek kişinin, tek PR'lık, en fazla 1-2 günlük işi.
+body:
+  - type: textarea
+    id: amac
+    attributes:
+      label: Amaç
+      description: Ne yapılıyor ve neden (1-2 cümle).
+    validations:
+      required: true
+  - type: textarea
+    id: yapilacaklar
+    attributes:
+      label: Yapılacaklar
+      description: Her dosyanın tam yolu, yeni mi değişiyor mu ve ne yapacağı.
+      placeholder: "- services/core/.../admin/SourceController.java (yeni): ne yapar"
+    validations:
+      required: true
+  - type: textarea
+    id: sozlesme
+    attributes:
+      label: Sözleşme
+      description: Tablo (docs/veritabani.md), endpoint, istek ve cevap örneği ya da fonksiyon imzası.
+    validations:
+      required: true
+  - type: textarea
+    id: kapsam-disi
+    attributes:
+      label: Kapsam dışı
+      description: Bu issue'da yapılmayanlar ve hangi issue'da yapılacağı.
+  - type: textarea
+    id: bekler
+    attributes:
+      label: Bekler
+      description: Birleşmeden bu PR'ın birleşemeyeceği issue'lar. İşe başlamak için beklenmez.
+      placeholder: "#12, #14 ya da Yok"
+    validations:
+      required: true
+  - type: textarea
+    id: kabul
+    attributes:
+      label: Kabul kriterleri
+      description: Test edilebilir maddeler. "Çalışıyor" bir kriter değildir.
+      value: |
+        - [ ] 
+        - [ ] Format, lint ve testler temiz.
+    validations:
+      required: true
+  - type: textarea
+    id: claude
+    attributes:
+      label: Claude Code'a ilk istek
+      description: Hazır istek metni (plan Bölüm 14.3).
+      render: text

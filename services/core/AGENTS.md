@@ -2,7 +2,8 @@
 Spring Boot 4.1, Java 25 (Temurin), Maven Wrapper. Kuralların sahibi bu servis.
 
 ## Yapı
-- Özelliğe göre paket: auth, test, session, question, tutor, dashboard, content, admin,
+- Tablo ve kolon adları `docs/veritabani.md`'dedir; ad uydurulmaz.
+- Özelliğe göre paket: auth, exam, session, question, tutor, dashboard, content, admin,
   job, storage, ratelimit, report; ortaklar common ve config.
 - Her özellikte: Entity, Repository, Service, Controller ve dto/ (record).
 
