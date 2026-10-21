@@ -2,6 +2,7 @@
 FastAPI, Python 3.13, uv. Claude çağrıları, embedding, arama ve PDF hazırlık hattı.
 
 ## Yapı
+- Tablo ve kolon adları `docs/veritabani.md`'dedir; ad uydurulmaz.
 - app/api iç uç noktalar, app/llm Claude, app/search embedding + BM25 + reranker,
   app/ingest hazırlık hattı, app/tutor anlatım ve sohbet, app/jobs iş kuyruğu,
   app/schemas Pydantic modelleri, app/text Türkçe metin araçları.
@@ -15,7 +16,7 @@ FastAPI, Python 3.13, uv. Claude çağrıları, embedding, arama ve PDF hazırl�
 - Embedding EmbeddingProvider, reranker Reranker arayüzüyle; model başka yerde yüklenmez.
 - Servisler arası veri Pydantic modeliyle taşınır, dict ile değil. Her fonksiyonda tip ipucu.
 - SQL elle ve parametreli yazılır; Python tablo oluşturmaz.
-- Hazırlık adımları tekrar çalıştırılabilir: önce çıktıyı yaz, sonra job.step'i ilerlet.
+- Hazırlık adımları tekrar çalıştırılabilir: önce çıktıyı yaz, sonra background_job.last_completed_step'i ilerlet.
 - Türkçe metin için app/text/turkish.py (tr_lower, normalize_nfc).
 
 ## Test
