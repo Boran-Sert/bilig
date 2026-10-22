@@ -1,6 +1,12 @@
 spring:
   application:
     name: core
+  flyway:
+    out-of-order: true
+  jpa:
+    hibernate:
+      ddl-auto: validate
+    open-in-view: false
 
 server:
   port: 8081
