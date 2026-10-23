@@ -7,16 +7,39 @@ olduğu gibi saklanır. Grup adı, kazanımlardan önceki büyük harfli başlı
 "B) YAZMA") alınır. Okuma kazanımlardan sonraki ilk bölüm başlığında ("3.3. ÜNİTE, ...") durur.
 Kazanım başlığı noktaya kadar sürer ve küçük harfle başlayan satırlarla devam eder; noktasız
 biten ya da büyük harfli satıra taşan başlık, açıklamayı yutmamak için hatayla durdurulur.
+
+Komut: uv run python -m app.ingest.readers.program <pdf> [--dry-run]
+Okunan ağacı grup başına kazanım sayısıyla log'a yazar; --dry-run verilmezse veritabanına yazar.
 """
 
+import argparse
+import asyncio
 import re
 from collections.abc import Iterable
 from itertools import takewhile
 from pathlib import Path
 
 import pymupdf
+import structlog
 
-from app.schemas.program import LearningOutcome, LearningOutcomeGroup
+from app.config import LogSettings, get_settings
+from app.constants import (
+    PROGRAM_CURRICULUM_MODEL,
+    PROGRAM_CURRICULUM_NAME,
+    PROGRAM_CURRICULUM_YEAR,
+    PROGRAM_SUBJECT_CODE,
+    PROGRAM_SUBJECT_NAME,
+)
+from app.db.pool import close_pool, open_pool
+from app.db.queries.program import save_program
+from app.log import configure_logging
+from app.schemas.program import (
+    Curriculum,
+    LearningOutcome,
+    LearningOutcomeGroup,
+    Program,
+    Subject,
+)
 from app.text.turkish import normalize_nfc, tr_lower, tr_upper
 
 _OUTCOME = re.compile(r"^([A-Z])\.\s*(\d+)\.(?:\s*(\d+)\.)?\s+(\S.*)$")
@@ -26,6 +49,36 @@ _SECTION_HEADING = re.compile(r"^\d+\.\d+\.\s+[A-ZÇĞİÖŞÜ]{2,}")
 _ITEM_MARKER = re.compile(r"^[a-zçğıöşü]\.\s")
 _PAGE_NUMBER = re.compile(r"^\d+$")
 _SPACES = re.compile(r"\s+")
+
+
+def main(argv: list[str] | None = None) -> None:
+    """Komut satırından program PDF'ini okur; --dry-run yoksa veritabanına yazar."""
+    parser = argparse.ArgumentParser(description="Öğretim programından kazanım ağacını okur.")
+    parser.add_argument("pdf", type=Path)
+    parser.add_argument("--dry-run", action="store_true", help="veritabanına yazmaz")
+    arguments = parser.parse_args(argv)
+    configure_logging(LogSettings())
+    program = read_program(arguments.pdf)
+    structlog.get_logger().info(
+        "program parsed",
+        curriculum=program.curriculum.name,
+        outcomes={group.code: len(group.outcomes) for group in program.groups},
+    )
+    if not arguments.dry_run:
+        asyncio.run(_save(program), loop_factory=asyncio.SelectorEventLoop)
+
+
+def read_program(path: Path) -> Program:
+    """Program PDF'ini okuyup ders ve program bilgisiyle kazanım ağacını döner."""
+    return Program(
+        subject=Subject(code=PROGRAM_SUBJECT_CODE, name=PROGRAM_SUBJECT_NAME),
+        curriculum=Curriculum(
+            name=PROGRAM_CURRICULUM_NAME,
+            model=PROGRAM_CURRICULUM_MODEL,
+            year=PROGRAM_CURRICULUM_YEAR,
+        ),
+        groups=read_outcome_groups(path),
+    )
 
 
 def read_outcome_groups(path: Path) -> list[LearningOutcomeGroup]:
@@ -144,6 +197,21 @@ class _ProgramParser:
         self._paragraph_break = False
 
 
+async def _save(program: Program) -> None:
+    """Kazanım ağacını veritabanına yazar ve sonucu log'a yazar."""
+    pool = await open_pool(get_settings().database)
+    try:
+        async with pool.connection() as connection:
+            summary = await save_program(connection, program)
+    finally:
+        await close_pool()
+    structlog.get_logger().info("program saved", **summary.model_dump())
+
+
 def _join_lines(previous: str, line: str) -> str:
     """Bölünmüş satırı öncekine ekler; satır sonu tiresinde boşluk bırakmaz."""
     return f"{previous}{line}" if previous.endswith("-") else f"{previous} {line}"
+
+
+if __name__ == "__main__":
+    main()
