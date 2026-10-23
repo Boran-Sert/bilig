@@ -31,6 +31,8 @@ convention = "google"
 python_version = "3.13"
 strict = true
 plugins = ["pydantic.mypy"]
+# PyMuPDF'nin bazı metotlarında tip ipucu yok.
+untyped_calls_exclude = ["pymupdf"]
 
 [tool.pytest.ini_options]
 pythonpath = ["."]
