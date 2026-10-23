@@ -10,6 +10,10 @@ başlamadığı aranır ("romanlarından" → "roman"). Türk alfabesi dışınd
 denenir. Kesme işaretinden ya da kapanan tırnaktan sonraki ekler, tek harfli parçalar, sayılar,
 Romen rakamları ve web adresleri hesaba katılmaz; "ve/veya", "e-posta", "1.Şiir" gibi birleşik
 yazımlar parçalarına ayrılır.
+
+Oran eşiğin altındaysa önce bozuk font eşlemesi kodla düzeltilmeye çalışılır (font_fix.py);
+düzeltilmiş metin eşiği geçerse sayfa metin yolundan gider ve uygulanan düzeltme sonuçta
+taşınır. Sağlam sayfaya ve çok az kelimeli sayfaya düzeltme denenmez.
 """
 
 import re
@@ -20,12 +24,14 @@ import pymupdf
 from pydantic import BaseModel
 
 from app.constants import (
+    FONT_FIX_MIN_WORDS,
     TEXT_LAYER_MIN_RATIO,
     TEXT_LAYER_MIN_STEM_LENGTH,
     TEXT_LAYER_MIN_WORD_LENGTH,
     TURKISH_LETTERS,
     WORD_LIST_FILE,
 )
+from app.ingest.font_fix import FontFix, apply_fix, candidate_fixes
 from app.text.turkish import normalize_nfc, tr_lower
 
 _EDGE_NON_WORD = re.compile(r"^\W+|\W+$")
@@ -39,15 +45,36 @@ _REPOSITORY_ROOT_DEPTH = 4
 
 
 class TextLayerResult(BaseModel):
-    """Sayfadaki bilinen kelime oranı ve metin yolunun seçilip seçilmediği."""
+    """Bilinen kelime oranı, metin yolunun seçilip seçilmediği ve gerekiyorsa font düzeltmesi."""
 
     ratio: float
     ok: bool
+    fix: FontFix | None = None
 
 
 def check_page(page: pymupdf.Page) -> TextLayerResult:
-    """Sayfanın metin katmanının metin yolu için yeterince sağlam olup olmadığını ölçer."""
-    return measure_text(page_text(page))
+    """Sayfanın metin katmanını ölçer; oran düşükse font düzeltmesi dener."""
+    text = page_text(page)
+    result = measure_text(text)
+    if result.ok:
+        return result
+    return find_font_fix(text) or result
+
+
+def find_font_fix(text: str) -> TextLayerResult | None:
+    """Metni eşiğin üstüne çıkaran düzeltmelerden oranı en yüksek olanı döner.
+
+    Kısa metinde 128 kayma adayından biri tesadüfen eşiği geçebildiği için düzeltme sadece
+    yeterince uzun metinde denenir.
+    """
+    if len(extract_words(text)) < FONT_FIX_MIN_WORDS:
+        return None
+    best = None
+    for fix in candidate_fixes(text):
+        fixed = measure_text(apply_fix(text, fix))
+        if fixed.ok and (best is None or fixed.ratio > best.ratio):
+            best = TextLayerResult(ratio=fixed.ratio, ok=True, fix=fix)
+    return best
 
 
 def page_text(page: pymupdf.Page) -> str:

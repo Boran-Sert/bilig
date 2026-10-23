@@ -59,9 +59,9 @@ def test_pdf_page_with_lost_turkish_letters_takes_image_path() -> None:
     assert not result.ok
 
 
-def test_pdf_page_with_shifted_codes_takes_image_path() -> None:
-    """Karakter kodları kaymış sayfa ("Masal" yerine "0DVDO") görüntü yoluna düşer."""
-    result = check_page(saved_page("helvetica", SHIFTED_PARAGRAPH))
+def test_shifted_codes_have_low_ratio() -> None:
+    """Karakter kodları kaymış metnin ("Masal" yerine "0DVDO") düzeltmeden önceki oranı düşüktür."""
+    result = measure_text(SHIFTED_PARAGRAPH)
 
     assert not result.ok
     assert result.ratio < 0.2
