@@ -6,8 +6,9 @@ sayfa metin yolundan, geçmezse görüntü yolundan işlenir.
 
 Türkçe eklemeli bir dil olduğu için kelimenin kendisi değil, listedeki bir kökle başlayıp
 başlamadığı aranır ("romanlarından" → "roman"). Türk alfabesi dışında harf taşıyan kelime
-(ý, þ, ð gibi kodlama bozuklukları) bilinmeyen sayılır. Tek harfli parçalar, sayılar ve
-kesme işaretinden sonraki ekler hesaba katılmaz.
+(ý, þ, ð gibi kodlama bozuklukları) bilinmeyen sayılır. Kesme işaretinden ya da kapanan
+tırnaktan sonraki ekler, tek harfli parçalar, sayılar ve Romen rakamları hesaba katılmaz;
+"ve/veya", "e-posta", "1.Şiir" gibi birleşik yazımlar parçalarına ayrılır.
 """
 
 import re
@@ -27,7 +28,9 @@ from app.constants import (
 from app.text.turkish import normalize_nfc, tr_lower
 
 _EDGE_NON_WORD = re.compile(r"^\W+|\W+$")
-_APOSTROPHE = re.compile(r"['’]")
+_SUFFIX_MARK = re.compile(r"['’\"”]")
+_JOINER = re.compile(r"[/.\-–]")
+_ROMAN_NUMERAL = re.compile(r"^[IVXLCDM]+$")
 _REPOSITORY_ROOT_DEPTH = 4
 
 
@@ -60,21 +63,35 @@ def measure_text(text: str) -> TextLayerResult:
 
 
 def extract_words(text: str) -> list[str]:
-    """Metni Türkçe küçük harfe çevirip oranı hesaplanacak kelimelere böler."""
+    """Metni oranı hesaplanacak kelimelere böler ve Türkçe küçük harfe çevirir."""
     words = []
-    for raw in tr_lower(normalize_nfc(text)).split():
-        word = _APOSTROPHE.split(_EDGE_NON_WORD.sub("", raw))[0]
-        if len(word) >= TEXT_LAYER_MIN_WORD_LENGTH and any(char.isalpha() for char in word):
-            words.append(word)
+    for raw in normalize_nfc(text).split():
+        stem_part = _SUFFIX_MARK.split(_EDGE_NON_WORD.sub("", raw))[0]
+        for part in _JOINER.split(stem_part):
+            word = _EDGE_NON_WORD.sub("", part)
+            if _is_countable(word):
+                words.append(tr_lower(word))
     return words
+
+
+def _is_countable(word: str) -> bool:
+    """Parça sayı, tek harf ya da Romen rakamı değil de bir kelimeyse doğru döner."""
+    return (
+        len(word) >= TEXT_LAYER_MIN_WORD_LENGTH
+        and any(char.isalpha() for char in word)
+        and not _ROMAN_NUMERAL.match(word)
+    )
 
 
 def is_known_word(word: str, known_words: frozenset[str]) -> bool:
     """Kelime Türk alfabesindeyse ve listedeki bir kökle başlıyorsa doğru döner."""
     if not set(word) <= TURKISH_LETTERS:
         return False
+    if word in known_words:
+        return True
     return any(
-        word[:end] in known_words for end in range(len(word), TEXT_LAYER_MIN_STEM_LENGTH - 1, -1)
+        word[:end] in known_words
+        for end in range(len(word) - 1, TEXT_LAYER_MIN_STEM_LENGTH - 1, -1)
     )
 
 

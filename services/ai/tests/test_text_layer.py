@@ -12,6 +12,7 @@ import pymupdf
 import pytest
 
 from app.constants import TEXT_LAYER_MIN_RATIO, TURKISH_LETTERS, WORD_LIST_FILE
+from app.ingest import text_layer
 from app.ingest.text_layer import (
     check_page,
     extract_words,
@@ -137,6 +138,16 @@ def test_is_known_word_rejects_letters_outside_turkish_alphabet() -> None:
     assert not is_known_word("romaný", frozenset({"roman"}))
 
 
+def test_is_known_word_matches_whole_word_shorter_than_stem_limit(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    """Kök sınırından kısa kelime listede birebir varsa bilinir."""
+    monkeypatch.setattr(text_layer, "TEXT_LAYER_MIN_STEM_LENGTH", 3)
+
+    assert is_known_word("ve", frozenset({"ve"}))
+    assert not is_known_word("vey", frozenset({"ve"}))
+
+
 def test_is_known_word_does_not_match_single_letter_stem() -> None:
     """Tek harfli bir önek kök sayılmaz."""
     assert not is_known_word("obzt", frozenset({"o"}))
@@ -146,12 +157,12 @@ def test_word_list_is_clean() -> None:
     """Kök listesi boş değil; her satır Türk alfabesinde, küçük harf, NFC ve en az iki harf."""
     words = load_word_list()
 
-    assert len(words) > 40_000
+    assert len(words) > 70_000
     for word in words:
         assert len(word) >= 2
         assert set(word) <= TURKISH_LETTERS
         assert unicodedata.is_normalized("NFC", word)
-    assert {"roman", "şiir", "tiyatro", "kazanım", "git", "kitab"} <= words
+    assert {"roman", "şiir", "tiyatro", "kazanım", "git", "kitab", "orhan", "vb"} <= words
 
 
 def test_word_list_file_is_sorted_without_duplicates() -> None:
@@ -160,3 +171,22 @@ def test_word_list_file_is_sorted_without_duplicates() -> None:
     lines = path.read_text(encoding="utf-8").splitlines()
 
     assert lines == sorted(set(lines))
+
+
+def test_extract_words_splits_joined_spellings() -> None:
+    """Eğik çizgi, tire, nokta ve uzun tireyle birleşik yazımlar parçalarına ayrılır."""
+    assert extract_words("ve/veya e-posta 1.Şiir masal–fabl") == [
+        "ve",
+        "veya",
+        "posta",
+        "şiir",
+        "masal",
+        "fabl",
+    ]
+
+
+def test_extract_words_skips_roman_numerals_and_quoted_suffixes() -> None:
+    """Romen rakamları sayılmaz; kapanan tırnaktan sonraki ek atılır."""
+    words = extract_words("I, II ve III. öncüllerden hangisi “Çerçeve”nin IV. bölümünde DİL")
+
+    assert words == ["ve", "öncüllerden", "hangisi", "çerçeve", "bölümünde", "dil"]
