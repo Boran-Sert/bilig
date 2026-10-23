@@ -31,7 +31,8 @@ kök listesi. Her satırda bir kök biçimi; küçük harf, Unicode NFC, sadece 
      (`kitap` → `kitab`, `renk` → `reng`, `git` → `gid`).
    - `LastVowelDrop` etiketli kökün son ünlüsü düşmüş biçimi (`ağız` → `ağz`).
    - `Doubling` etiketli kökün son ünsüzü ikilenmiş biçimi (`hak` → `hakk`).
-4. Sonuç tekrarsız ve Unicode kod noktası sırasıyla yazılır (75.662 satır).
+   - `demek` ve `yemek` fiillerinin daralmış kökleri (`diy`, `yiy`: diyor, yiyor).
+4. Sonuç tekrarsız ve Unicode kod noktası sırasıyla yazılır (75.664 satır).
 
 Kontrol bir kelimenin kendisini değil, bu listedeki bir kökle başlayıp başlamadığını arar
 (`romanlarından` → `roman`); bu yüzden çekimli biçimler listeye eklenmez.

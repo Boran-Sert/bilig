@@ -16069,6 +16069,7 @@ divlek
 divleğ
 divriği
 divya
+diy
 diya
 diyab
 diyabakır
@@ -68583,6 +68584,7 @@ yivaçar
 yivle
 yivlemek
 yivlemeğ
+yiy
 yiyecek
 yiyeceğ
 yiyici

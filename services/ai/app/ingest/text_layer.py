@@ -6,9 +6,10 @@ sayfa metin yolundan, geçmezse görüntü yolundan işlenir.
 
 Türkçe eklemeli bir dil olduğu için kelimenin kendisi değil, listedeki bir kökle başlayıp
 başlamadığı aranır ("romanlarından" → "roman"). Türk alfabesi dışında harf taşıyan kelime
-(ý, þ, ð gibi kodlama bozuklukları) bilinmeyen sayılır. Kesme işaretinden ya da kapanan
-tırnaktan sonraki ekler, tek harfli parçalar, sayılar ve Romen rakamları hesaba katılmaz;
-"ve/veya", "e-posta", "1.Şiir" gibi birleşik yazımlar parçalarına ayrılır.
+(ý, þ, ð gibi kodlama bozuklukları) bilinmeyen sayılır; şapkalı yazım (lâle) şapkasız da
+denenir. Kesme işaretinden ya da kapanan tırnaktan sonraki ekler, tek harfli parçalar, sayılar,
+Romen rakamları ve web adresleri hesaba katılmaz; "ve/veya", "e-posta", "1.Şiir" gibi birleşik
+yazımlar parçalarına ayrılır.
 """
 
 import re
@@ -29,8 +30,11 @@ from app.text.turkish import normalize_nfc, tr_lower
 
 _EDGE_NON_WORD = re.compile(r"^\W+|\W+$")
 _SUFFIX_MARK = re.compile(r"['’\"”]")
-_JOINER = re.compile(r"[/.\-–]")
+_JOINER = re.compile(r"[/.,;:\-–]")
 _ROMAN_NUMERAL = re.compile(r"^[IVXLCDM]+$")
+_WEB_ADDRESS = re.compile(r"://|www\.|@", re.IGNORECASE)
+_SOFT_HYPHEN = "\u00ad"
+_CIRCUMFLEX_FOLD = str.maketrans("âîû", "aiu")
 _REPOSITORY_ROOT_DEPTH = 4
 
 
@@ -65,7 +69,9 @@ def measure_text(text: str) -> TextLayerResult:
 def extract_words(text: str) -> list[str]:
     """Metni oranı hesaplanacak kelimelere böler ve Türkçe küçük harfe çevirir."""
     words = []
-    for raw in normalize_nfc(text).split():
+    for raw in normalize_nfc(text).replace(_SOFT_HYPHEN, "").split():
+        if _WEB_ADDRESS.search(raw):
+            continue
         stem_part = _SUFFIX_MARK.split(_EDGE_NON_WORD.sub("", raw))[0]
         for part in _JOINER.split(stem_part):
             word = _EDGE_NON_WORD.sub("", part)
@@ -84,9 +90,16 @@ def _is_countable(word: str) -> bool:
 
 
 def is_known_word(word: str, known_words: frozenset[str]) -> bool:
-    """Kelime Türk alfabesindeyse ve listedeki bir kökle başlıyorsa doğru döner."""
+    """Türk alfabesindeki kelime ya da şapkasız yazımı bir kökle başlıyorsa doğru döner."""
     if not set(word) <= TURKISH_LETTERS:
         return False
+    return _has_known_stem(word, known_words) or _has_known_stem(
+        word.translate(_CIRCUMFLEX_FOLD), known_words
+    )
+
+
+def _has_known_stem(word: str, known_words: frozenset[str]) -> bool:
+    """Kelime listede birebir varsa ya da listedeki bir kökle başlıyorsa doğru döner."""
     if word in known_words:
         return True
     return any(

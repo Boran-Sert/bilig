@@ -162,7 +162,7 @@ def test_word_list_is_clean() -> None:
         assert len(word) >= 2
         assert set(word) <= TURKISH_LETTERS
         assert unicodedata.is_normalized("NFC", word)
-    assert {"roman", "şiir", "tiyatro", "kazanım", "git", "kitab", "orhan", "vb"} <= words
+    assert {"roman", "şiir", "tiyatro", "kazanım", "git", "kitab", "orhan", "vb", "diy"} <= words
 
 
 def test_word_list_file_is_sorted_without_duplicates() -> None:
@@ -190,3 +190,30 @@ def test_extract_words_skips_roman_numerals_and_quoted_suffixes() -> None:
     words = extract_words("I, II ve III. öncüllerden hangisi “Çerçeve”nin IV. bölümünde DİL")
 
     assert words == ["ve", "öncüllerden", "hangisi", "çerçeve", "bölümünde", "dil"]
+
+
+def test_extract_words_skips_web_addresses_and_soft_hyphens() -> None:
+    """Web ve e-posta adresleri sayılmaz; yumuşak tire kelimeyi bölmez."""
+    words = extract_words("Kaynak: www.ornek.com.tr https://ornek.org yazar@ornek.com edebi­yat")
+
+    assert words == ["kaynak", "edebiyat"]
+
+
+def test_extract_words_splits_words_joined_by_punctuation() -> None:
+    """Boşluksuz virgül, noktalı virgül ve iki noktayla bitişen kelimeler ayrılır."""
+    assert extract_words("ey,mavi deniz;rüzgâr ses:söz") == [
+        "ey",
+        "mavi",
+        "deniz",
+        "rüzgâr",
+        "ses",
+        "söz",
+    ]
+
+
+def test_is_known_word_accepts_circumflex_spelling() -> None:
+    """Şapkalı yazım, listede şapkasız kökü varsa tanınır."""
+    known_words = frozenset({"lale", "hikaye"})
+
+    assert is_known_word("lâlesidir", known_words)
+    assert is_known_word("hikâyeler", known_words)
