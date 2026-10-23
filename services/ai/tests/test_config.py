@@ -2,7 +2,7 @@
 
 import pytest
 
-from app.config import SettingsError, load_settings
+from app.config import SettingsError, get_settings, load_settings
 
 DATABASE_URL = "postgresql://app:secret@localhost:5432/hata_analizi"
 
@@ -49,3 +49,15 @@ def test_load_settings_rejects_non_postgres_url(monkeypatch: pytest.MonkeyPatch)
 
     with pytest.raises(SettingsError, match="DATABASE_URL is invalid"):
         load_settings()
+
+
+def test_get_settings_reads_once(monkeypatch: pytest.MonkeyPatch) -> None:
+    """Ayarlar bir kez okunur; sonraki çağrılar aynı nesneyi döner."""
+    monkeypatch.setenv("DATABASE_URL", DATABASE_URL)
+    get_settings.cache_clear()
+
+    first = get_settings()
+    monkeypatch.setenv("LOG_LEVEL", "ERROR")
+
+    assert get_settings() is first
+    get_settings.cache_clear()

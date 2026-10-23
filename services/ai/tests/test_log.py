@@ -55,3 +55,30 @@ def test_log_respects_level(capsys: pytest.CaptureFixture[str]) -> None:
     output = capsys.readouterr().out
     assert "hidden" not in output
     assert json.loads(output)["level"] == "WARNING"
+
+
+def test_exception_log_stays_on_one_line(capsys: pytest.CaptureFixture[str]) -> None:
+    """Hata izi içeren kayıt da tek satırdır ve izi exception alanında taşır."""
+    configure_logging(LogSettings(log_level="INFO"))
+
+    try:
+        raise ValueError("broken page")
+    except ValueError:
+        structlog.get_logger().exception("page failed")
+
+    lines = capsys.readouterr().out.splitlines()
+    assert len(lines) == 1
+    record = json.loads(lines[0])
+    assert record["level"] == "ERROR"
+    assert "ValueError: broken page" in record["exception"]
+
+
+def test_cleared_request_context_is_not_logged(capsys: pytest.CaptureFixture[str]) -> None:
+    """Temizlenen istek kimliği sonraki kayıtlara eklenmez."""
+    configure_logging(LogSettings(log_level="INFO"))
+    bind_request_id("req-1")
+    clear_request_context()
+
+    structlog.get_logger().info("after request")
+
+    assert "requestId" not in json.loads(capsys.readouterr().out)

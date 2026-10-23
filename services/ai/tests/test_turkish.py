@@ -50,3 +50,18 @@ def test_ascii_fold_removes_turkish_marks() -> None:
 def test_ascii_fold_keeps_ascii_text() -> None:
     """ASCII metin değişmez."""
     assert ascii_fold("feat/12-test-oturumu") == "feat/12-test-oturumu"
+
+
+def test_tr_lower_keeps_lowercase_text() -> None:
+    """Zaten küçük olan metin değişmez."""
+    assert tr_lower("ılık ırmak") == "ılık ırmak"
+
+
+def test_normalize_nfc_keeps_composed_text() -> None:
+    """Zaten NFC olan metin değişmez."""
+    assert normalize_nfc("Kâtip Üslûp") == "Kâtip Üslûp"
+
+
+def test_ascii_fold_drops_other_non_ascii() -> None:
+    """Karşılığı olmayan ASCII dışı işaretler atılır."""
+    assert ascii_fold("Yazar’ın «eseri»") == "Yazarin eseri"
