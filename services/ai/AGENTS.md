@@ -22,6 +22,10 @@ FastAPI, Python 3.13, uv. Claude çağrıları, embedding, arama ve PDF hazırl�
 ## Test
 - pytest ve pytest-asyncio. Testte Claude çağrıları sahte nesneyle; gerçek çağrı sadece app.eval.run'da.
 - Test PDF'leri kendi ürettiğimiz küçük dosyalardır.
+- Veritabanına dokunan her test `db` fixture'ını kullanır; test kendi transaction'ında çalışır ve
+  geri alınır.
+- Yerelde önce `docker compose up -d postgres core` (core migration'ları uygular). `DATABASE_URL`,
+  `.env`'deki değerde `postgres` yerine `localhost` yazılarak verilir.
 
 ## Komut
 - uv run ruff format . && uv run ruff check . && uv run mypy app && uv run pytest
