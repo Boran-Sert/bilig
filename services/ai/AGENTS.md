@@ -25,3 +25,5 @@ FastAPI, Python 3.13, uv. Claude çağrıları, embedding, arama ve PDF hazırl�
 
 ## Komut
 - uv run ruff format . && uv run ruff check . && uv run mypy app && uv run pytest
+- Yerelde servis: uv run uvicorn app.main:app --reload --port 8000. Windows'ta --reload şart:
+  onsuz uvicorn ProactorEventLoop seçer ve psycopg bu döngüde bağlanamaz.
