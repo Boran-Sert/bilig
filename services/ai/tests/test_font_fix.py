@@ -14,6 +14,7 @@ from app.constants import FONT_FIX_MIN_WORDS
 from app.ingest import text_layer
 from app.ingest.font_fix import FontFix, FontFixKind, apply_fix, candidate_fixes
 from app.ingest.text_layer import TextLayerResult, check_page, find_font_fix, measure_text
+from tests.word_list import KNOWN_WORDS
 
 PARAGRAPH = (
     "Masal, olağanüstü olayların anlatıldığı kısa bir türdür. Kahramanlar çoğu zaman bir "
@@ -106,9 +107,9 @@ def test_shifted_page_is_fixed_and_takes_text_path() -> None:
     """Kodları 29 kaymış sayfa düzeltilir, metin yoluna gider ve düzeltme sonuçta taşınır."""
     page = saved_page(garble(PARAGRAPH, SHIFT))
 
-    result = check_page(page)
+    result = check_page(page, KNOWN_WORDS)
 
-    assert measure_text(text_layer.page_text(page)).ratio < 0.2
+    assert measure_text(text_layer.page_text(page), KNOWN_WORDS).ratio < 0.2
     assert result.ok
     assert result.ratio >= 0.9
     assert result.fix == FontFix(kind=FontFixKind.CODE_SHIFT, shift=SHIFT)
@@ -116,7 +117,7 @@ def test_shifted_page_is_fixed_and_takes_text_path() -> None:
 
 def test_codepage_page_is_fixed_and_takes_text_path() -> None:
     """ı → ý bozukluğu olan sayfa kod sayfası düzeltmesiyle metin yoluna gider."""
-    result = check_page(saved_page(to_cp1252(PARAGRAPH)))
+    result = check_page(saved_page(to_cp1252(PARAGRAPH)), KNOWN_WORDS)
 
     assert result.ok
     assert result.fix == FontFix(kind=FontFixKind.TURKISH_CODEPAGE)
@@ -126,7 +127,7 @@ def test_sound_page_is_not_changed(monkeypatch: pytest.MonkeyPatch) -> None:
     """Sağlam sayfaya düzeltme denenmez ve sonuçta düzeltme yoktur."""
     monkeypatch.setattr(text_layer, "candidate_fixes", fail_if_called)
 
-    result = check_page(saved_page(PARAGRAPH))
+    result = check_page(saved_page(PARAGRAPH), KNOWN_WORDS)
 
     assert result.ok
     assert result.fix is None
@@ -138,7 +139,7 @@ def test_page_without_text_is_not_fixed(monkeypatch: pytest.MonkeyPatch) -> None
     document = pymupdf.open()
     document.new_page()
 
-    result = check_page(pymupdf.open("pdf", document.tobytes())[0])
+    result = check_page(pymupdf.open("pdf", document.tobytes())[0], KNOWN_WORDS)
 
     assert not result.ok
     assert result.fix is None
@@ -148,7 +149,7 @@ def test_page_with_lost_letters_stays_on_image_path() -> None:
     """Harfleri kaybolmuş (ş → ·) sayfa kodla düzelmez ve görüntü yoluna düşer."""
     lost = "".join("·" if char in "ğĞşŞıİ" else char for char in PARAGRAPH)
 
-    result = check_page(saved_page(lost))
+    result = check_page(saved_page(lost), KNOWN_WORDS)
 
     assert not result.ok
     assert result.fix is None
@@ -158,7 +159,7 @@ def test_find_font_fix_returns_none_when_nothing_passes() -> None:
     """Hiçbir düzeltme eşiği geçirmezse sonuç yoktur."""
     lost = "".join("·" if char in "ğĞşŞıİ" else char for char in PARAGRAPH)
 
-    assert find_font_fix(lost) is None
+    assert find_font_fix(lost, KNOWN_WORDS) is None
 
 
 def test_find_font_fix_skips_short_text() -> None:
@@ -166,7 +167,7 @@ def test_find_font_fix_skips_short_text() -> None:
     short = garble("Masal olağanüstü olayları anlatır", SHIFT)
 
     assert len(short.split()) < FONT_FIX_MIN_WORDS
-    assert find_font_fix(short) is None
+    assert find_font_fix(short, KNOWN_WORDS) is None
 
 
 def test_find_font_fix_finds_no_shift_for_random_text() -> None:
@@ -178,7 +179,7 @@ def test_find_font_fix_finds_no_shift_for_random_text() -> None:
         for _ in range(FONT_FIX_MIN_WORDS)
     ]
 
-    assert find_font_fix(" ".join(words)) is None
+    assert find_font_fix(" ".join(words), KNOWN_WORDS) is None
 
 
 def test_find_font_fix_prefers_highest_ratio(monkeypatch: pytest.MonkeyPatch) -> None:
@@ -194,4 +195,6 @@ def test_find_font_fix_prefers_highest_ratio(monkeypatch: pytest.MonkeyPatch) ->
 
     long_text = " ".join(["bozuk"] * FONT_FIX_MIN_WORDS)
 
-    assert find_font_fix(long_text) == TextLayerResult(ratio=1.0, ok=True, fix=stronger)
+    assert find_font_fix(long_text, KNOWN_WORDS) == TextLayerResult(
+        ratio=1.0, ok=True, fix=stronger
+    )

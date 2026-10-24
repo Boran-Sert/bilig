@@ -2,7 +2,8 @@
 
 Bir PDF sayfasının metin katmanı sağlam mı, ona bakar: sayfadaki kelimelerin ne kadarı
 Türkçe kök listesinde (data/turkce_kelimeler.txt) bir kökle başlıyor. Oran eşiği geçerse
-sayfa metin yolundan, geçmezse görüntü yolundan işlenir.
+sayfa metin yolundan, geçmezse görüntü yolundan işlenir. Liste, yolu WORD_LIST_PATH ayarında
+olan dosyadan bir kez yüklenir ve kontrol fonksiyonlarına parametre olarak verilir.
 
 Türkçe eklemeli bir dil olduğu için kelimenin kendisi değil, listedeki bir kökle başlayıp
 başlamadığı aranır ("romanlarından" → "roman"). Türk alfabesi dışında harf taşıyan kelime
@@ -30,7 +31,6 @@ from app.constants import (
     TEXT_LAYER_MIN_STEM_LENGTH,
     TEXT_LAYER_MIN_WORD_LENGTH,
     TURKISH_LETTERS,
-    WORD_LIST_FILE,
 )
 from app.ingest.font_fix import FontFix, apply_fix, candidate_fixes
 from app.text.turkish import normalize_nfc, tr_lower
@@ -42,7 +42,6 @@ _ROMAN_NUMERAL = re.compile(r"^[IVXLCDM]+$")
 _WEB_ADDRESS = re.compile(r"://|www\.|@", re.IGNORECASE)
 _SOFT_HYPHEN = "\u00ad"
 _CIRCUMFLEX_FOLD = str.maketrans("âîû", "aiu")
-_REPOSITORY_ROOT_DEPTH = 4
 
 
 class TextLayerResult(BaseModel):
@@ -53,22 +52,22 @@ class TextLayerResult(BaseModel):
     fix: FontFix | None = None
 
 
-def check_page(page: pymupdf.Page) -> TextLayerResult:
+def check_page(page: pymupdf.Page, known_words: frozenset[str]) -> TextLayerResult:
     """Sayfanın metin katmanını ölçer; oran düşükse font düzeltmesi dener."""
     text = page_text(page)
-    result = measure_text(text)
+    result = measure_text(text, known_words)
     if result.ok:
         return result
-    return find_font_fix(text) or result
+    return find_font_fix(text, known_words) or result
 
 
-def find_font_fix(text: str) -> TextLayerResult | None:
+def find_font_fix(text: str, known_words: frozenset[str]) -> TextLayerResult | None:
     """Metni eşiğin üstüne çıkaran düzeltmelerden oranı en yüksek olanı döner."""
     if len(extract_words(text)) < FONT_FIX_MIN_WORDS:
         return None
     best = None
     for fix in candidate_fixes(text):
-        fixed = measure_text(apply_fix(text, fix))
+        fixed = measure_text(apply_fix(text, fix), known_words)
         if fixed.ok and (best is None or fixed.ratio > best.ratio):
             best = TextLayerResult(ratio=fixed.ratio, ok=True, fix=fix)
     return best
@@ -80,12 +79,11 @@ def page_text(page: pymupdf.Page) -> str:
     return text
 
 
-def measure_text(text: str) -> TextLayerResult:
+def measure_text(text: str, known_words: frozenset[str]) -> TextLayerResult:
     """Metindeki kelimelerin kök listesinde bulunma oranını hesaplar."""
     words = extract_words(text)
     if not words:
         return TextLayerResult(ratio=0.0, ok=False)
-    known_words = load_word_list()
     ratio = sum(is_known_word(word, known_words) for word in words) / len(words)
     return TextLayerResult(ratio=ratio, ok=ratio >= TEXT_LAYER_MIN_RATIO)
 
@@ -133,8 +131,10 @@ def _has_known_stem(word: str, known_words: frozenset[str]) -> bool:
 
 
 @lru_cache(maxsize=1)
-def load_word_list() -> frozenset[str]:
-    """Türkçe kök listesini repodaki dosyadan bir kez okur."""
-    path = Path(__file__).resolve().parents[_REPOSITORY_ROOT_DEPTH] / WORD_LIST_FILE
+def load_word_list(path: Path) -> frozenset[str]:
+    """Türkçe kök listesini verilen dosyadan bir kez okur; liste boşsa hata verir."""
     lines = path.read_text(encoding="utf-8").splitlines()
-    return frozenset(line.strip() for line in lines if line.strip())
+    words = frozenset(line.strip() for line in lines if line.strip())
+    if not words:
+        raise ValueError(f"Word list is empty: {path}")
+    return words
