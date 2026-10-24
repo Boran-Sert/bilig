@@ -5,8 +5,8 @@ verir. Kazanımlar "A.2. 5. Metnin olay örgüsünü belirler." ya da "B.3. ..."
 Kazanımın altındaki a, b, c maddeleri ya da maddesiz paragraf o kazanımın MEB açıklamasıdır ve
 olduğu gibi saklanır. Grup adı, kazanımlardan önceki büyük harfli başlıktan ("1. ŞİİR",
 "B) YAZMA") alınır. Okuma kazanımlardan sonraki ilk bölüm başlığında ("3.3. ÜNİTE, ...") durur.
-Kazanım başlığı noktaya kadar sürer; birkaç satırda noktayla bitmeyen başlık, açıklamayı
-başlığa katmamak için hatayla durdurulur.
+Kazanım başlığı noktaya kadar sürer ve küçük harfle başlayan satırlarla devam eder; noktasız
+biten ya da büyük harfli satıra taşan başlık, açıklamayı yutmamak için hatayla durdurulur.
 """
 
 import re
@@ -16,7 +16,6 @@ from pathlib import Path
 
 import pymupdf
 
-from app.constants import PROGRAM_TITLE_MAX_LINES
 from app.schemas.program import LearningOutcome, LearningOutcomeGroup
 from app.text.turkish import normalize_nfc, tr_lower, tr_upper
 
@@ -116,7 +115,7 @@ class _ProgramParser:
         if self._code is None:
             return
         if not self._title[-1].endswith(".") and not _ITEM_MARKER.match(line):
-            if len(self._title) == PROGRAM_TITLE_MAX_LINES:
+            if line[0].isupper():
                 raise ValueError(f"Title of {self._code} does not end with a period")
             self._title.append(line)
         elif _ITEM_MARKER.match(line) or self._paragraph_break or not self._explanation:
@@ -129,6 +128,8 @@ class _ProgramParser:
         """Açık kazanımı grubuna ekler."""
         if self._code is None:
             return
+        if not self._title[-1].endswith("."):
+            raise ValueError(f"Title of {self._code} does not end with a period")
         group = self._groups[self._code.rsplit(".", 1)[0]]
         if any(outcome.code == self._code for outcome in group.outcomes):
             raise ValueError(f"Duplicate learning outcome code {self._code}")
