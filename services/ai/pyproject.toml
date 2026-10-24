@@ -4,7 +4,16 @@ version = "0.1.0"
 description = "Hata Analizi Asistanı yapay zeka servisi"
 requires-python = ">=3.13,<3.14"
 dependencies = [
+    "anthropic>=2.2.0",
     "fastapi>=0.149.0",
+    "jinja2>=3.1.6",
+    "pgvector>=0.5.1",
+    "psycopg[binary,pool]>=3.3.6",
+    "pydantic-settings>=2.16.1",
+    "pymupdf>=2.0",
+    "pyyaml>=6.0.3",
+    "rapidfuzz>=3.14.6",
+    "structlog>=26.1.0",
     "uvicorn>=0.54.0",
 ]
 
@@ -21,6 +30,9 @@ convention = "google"
 [tool.mypy]
 python_version = "3.13"
 strict = true
+plugins = ["pydantic.mypy"]
+# Tipsiz PyMuPDF çağrıları
+untyped_calls_exclude = ["pymupdf"]
 
 [tool.pytest.ini_options]
 pythonpath = ["."]
@@ -31,5 +43,6 @@ dev = [
     "httpx2>=2.15.1",
     "mypy>=2.4.0",
     "pytest>=9.1.1",
+    "pytest-asyncio>=1.4.0",
     "ruff>=0.17.1",
 ]

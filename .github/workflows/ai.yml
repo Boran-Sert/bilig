@@ -1,12 +1,18 @@
 # Python servisi: biçim ve lint (ruff), tip (mypy) ve testler (pytest).
-# Her PR'da raporlanır; services/ai ya da bu dosya değişmediyse iş atlanır.
+# Testler projenin Postgres imajına karşı çalışır; tabloları core'un Flyway migration'ları kurar.
+# Her PR'da raporlanır; services/ai, migration'lar, Postgres imajı ya da bu dosya değişmediyse
+# iş atlanır.
 name: ai
 
 on:
   pull_request:
   push:
     branches: [master]
-    paths: ["services/ai/**", ".github/workflows/ai.yml"]
+    paths:
+      - "services/ai/**"
+      - "services/core/src/main/resources/db/migration/**"
+      - "infra/postgres/Dockerfile"
+      - ".github/workflows/ai.yml"
 
 permissions:
   contents: read
@@ -22,7 +28,7 @@ jobs:
           fetch-depth: 0
       - id: diff
         run: |
-          if [ "$GITHUB_EVENT_NAME" != "pull_request" ] || ! git diff --quiet "origin/$GITHUB_BASE_REF...HEAD" -- services/ai .github/workflows/ai.yml; then
+          if [ "$GITHUB_EVENT_NAME" != "pull_request" ] || ! git diff --quiet "origin/$GITHUB_BASE_REF...HEAD" -- services/ai services/core/src/main/resources/db/migration infra/postgres/Dockerfile .github/workflows/ai.yml; then
             echo "run=true" >> "$GITHUB_OUTPUT"
           fi
 
@@ -30,11 +36,21 @@ jobs:
     needs: changes
     if: needs.changes.outputs.run == 'true'
     runs-on: ubuntu-latest
+    env:
+      POSTGRES_DB: hata_analizi
+      POSTGRES_USER: app
+      POSTGRES_PASSWORD: ci
+      DATABASE_URL: postgresql://app:ci@localhost:5432/hata_analizi
     defaults:
       run:
         working-directory: services/ai
     steps:
       - uses: actions/checkout@v7
+      - name: Start postgres
+        working-directory: .
+        run: |
+          docker build -t postgres-ci infra/postgres
+          docker run -d -p 5432:5432 -e POSTGRES_DB -e POSTGRES_USER -e POSTGRES_PASSWORD postgres-ci
       - uses: astral-sh/setup-uv@v10.3.0
         with:
           version: "0.11.28"
@@ -44,4 +60,14 @@ jobs:
       - run: uv run ruff format --check .
       - run: uv run ruff check .
       - run: uv run mypy app
+      - name: Apply migrations
+        working-directory: .
+        run: >-
+          docker run --rm --network host
+          -v "$PWD/services/core/src/main/resources/db/migration:/flyway/sql:ro"
+          flyway/flyway:12.4.0
+          -url="jdbc:postgresql://localhost:5432/$POSTGRES_DB"
+          -user="$POSTGRES_USER" -password="$POSTGRES_PASSWORD"
+          -locations=filesystem:/flyway/sql -outOfOrder=true -connectRetries=10
+          migrate
       - run: uv run pytest

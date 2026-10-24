@@ -39,6 +39,7 @@ services:
     volumes:
       - data:/data
       - models:/models
+      - ./data:/app/data:ro
     depends_on:
       postgres:
         condition: service_healthy
