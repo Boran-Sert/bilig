@@ -1,10 +1,13 @@
 """Ortam değişkenlerinden ayar okumayı test eder."""
 
+from pathlib import Path
+
 import pytest
 
-from app.config import SettingsError, get_settings, load_settings
+from app.config import SettingsError, get_settings, load_ingest_settings, load_settings
 
 DATABASE_URL = "postgresql://app:secret@localhost:5432/hata_analizi"
+WORD_LIST_PATH = "/app/data/turkce_kelimeler.txt"
 
 
 def test_load_settings_reads_environment(monkeypatch: pytest.MonkeyPatch) -> None:
@@ -61,3 +64,27 @@ def test_get_settings_reads_once(monkeypatch: pytest.MonkeyPatch) -> None:
 
     assert get_settings() is first
     get_settings.cache_clear()
+
+
+def test_load_settings_does_not_need_word_list_path(monkeypatch: pytest.MonkeyPatch) -> None:
+    """ai-api'nin ayarları kök listesi yolu olmadan da okunur."""
+    monkeypatch.setenv("DATABASE_URL", DATABASE_URL)
+    monkeypatch.delenv("WORD_LIST_PATH", raising=False)
+
+    assert load_settings().database.database_url is not None
+
+
+def test_load_ingest_settings_reads_word_list_path(monkeypatch: pytest.MonkeyPatch) -> None:
+    """Hazırlık hattı ayarları veritabanı adresi olmadan da okunur."""
+    monkeypatch.delenv("DATABASE_URL", raising=False)
+    monkeypatch.setenv("WORD_LIST_PATH", WORD_LIST_PATH)
+
+    assert load_ingest_settings().word_list_path == Path(WORD_LIST_PATH)
+
+
+def test_load_ingest_settings_names_missing_word_list_path(monkeypatch: pytest.MonkeyPatch) -> None:
+    """Kök listesi yolu verilmezse değişkenin adını söyleyen hatayla durur."""
+    monkeypatch.delenv("WORD_LIST_PATH", raising=False)
+
+    with pytest.raises(SettingsError, match="WORD_LIST_PATH is missing"):
+        load_ingest_settings()
