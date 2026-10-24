@@ -5,6 +5,7 @@ Ortama göre değişen değerler burada değil, app/config.py'deki ayarlardadır
 
 SERVICE_NAME = "ai"
 REQUEST_ID_HEADER = "X-Request-Id"
+UVICORN_LOGGERS = ("uvicorn", "uvicorn.access", "uvicorn.error")
 
 DB_POOL_MIN_SIZE = 1
 DB_POOL_MAX_SIZE = 10
