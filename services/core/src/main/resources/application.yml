@@ -1,4 +1,7 @@
 spring:
+  messages:
+    basename: messages_tr
+    encoding: UTF-8
   application:
     name: core
   flyway:
