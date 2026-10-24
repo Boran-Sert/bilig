@@ -198,14 +198,17 @@ class _ProgramParser:
 
 
 async def _save(program: Program) -> None:
-    """Kazanım ağacını veritabanına yazar ve sonucu log'a yazar."""
+    """Kazanım ağacını yazar, sonucu log'a yazar; PDF'te olmayan kazanım varsa uyarır."""
     pool = await open_pool(get_settings().database)
     try:
         async with pool.connection() as connection:
             summary = await save_program(connection, program)
     finally:
         await close_pool()
-    structlog.get_logger().info("program saved", **summary.model_dump())
+    log = structlog.get_logger()
+    log.info("program saved", **summary.model_dump())
+    if summary.missing:
+        log.warning("outcomes missing from pdf", missing=summary.missing)
 
 
 def _join_lines(previous: str, line: str) -> str:
