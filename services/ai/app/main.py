@@ -3,7 +3,7 @@
 Java servisinin çağırdığı iç uç noktalar /internal altında durur ve dışarı açılmaz.
 Açılışta ayarlar okunur, log kurulur ve veritabanı havuzu açılır; kapanışta havuz kapanır.
 Her isteğin X-Request-Id başlığı o isteğin log kayıtlarına requestId olarak bağlanır.
-Başlatma: python -m uvicorn app.main:app
+Başlatma: python -m uvicorn app.main:app (Windows'ta --reload ile; services/ai/AGENTS.md).
 """
 
 import uuid
