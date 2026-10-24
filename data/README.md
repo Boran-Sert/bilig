@@ -8,6 +8,8 @@ metni bu klasöre konmaz.
 Metin katmanı kontrolünün (`services/ai/app/ingest/text_layer.py`, plan A3) kullandığı Türkçe
 kök listesi. Her satırda bir kök biçimi; küçük harf, Unicode NFC, sadece Türk alfabesi
 (`a-z` içinden q, w, x hariç; ç, ğ, ı, ö, ş, ü ve â, î, û).
+Dosya imaja girmez: compose bu klasörü `ai-worker`'a `/app/data` olarak salt okunur bağlar,
+yolu `WORD_LIST_PATH` ayarı verir.
 
 ### Kaynak ve lisans
 - Kaynak: [Zemberek-NLP](https://github.com/ahmetaa/zemberek-nlp), commit
