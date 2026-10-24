@@ -1,3 +1,4 @@
+package com.hataanalizi.core.common;
 
 /**
  * Servislerin bilinen bir iş hatasını bildirmek için fırlattığı istisnadır. Hata kodunu ve Türkçe

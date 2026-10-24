@@ -1,3 +1,4 @@
+package com.hataanalizi.core.common;
 
 import org.springframework.http.HttpStatus;
 
@@ -13,20 +14,20 @@ public enum ErrorCode {
     NOT_FOUND(HttpStatus.NOT_FOUND),
     INTERNAL_ERROR(HttpStatus.INTERNAL_SERVER_ERROR),
 
-    // auth
+// auth
 
-    // sınav
+// sınav
 
-    // oturum
+// oturum
 
-    // kaynak
+// kaynak
 
-    // iş
+// iş
 
-    // inceleme
+// inceleme
 
-    // sohbet
-    ;
+// sohbet
+;
 
     private final HttpStatus status;
 
