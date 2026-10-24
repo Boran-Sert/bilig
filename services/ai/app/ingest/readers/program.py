@@ -53,9 +53,9 @@ _SPACES = re.compile(r"\s+")
 
 def main(argv: list[str] | None = None) -> None:
     """Komut satırından program PDF'ini okur; --dry-run yoksa veritabanına yazar."""
-    parser = argparse.ArgumentParser(description="Öğretim programından kazanım ağacını okur.")
+    parser = argparse.ArgumentParser(description="Read learning outcomes from a curriculum PDF.")
     parser.add_argument("pdf", type=Path)
-    parser.add_argument("--dry-run", action="store_true", help="veritabanına yazmaz")
+    parser.add_argument("--dry-run", action="store_true", help="do not write to the database")
     arguments = parser.parse_args(argv)
     configure_logging(LogSettings())
     program = read_program(arguments.pdf)
