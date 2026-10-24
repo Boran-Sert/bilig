@@ -45,11 +45,10 @@ class GlobalExceptionHandlerTest {
         ResourceBundleMessageSource messageSource = new ResourceBundleMessageSource();
         messageSource.setBasename("messages_tr");
         messageSource.setDefaultEncoding("UTF-8");
-        mockMvc =
-                MockMvcBuilders.standaloneSetup(new ProbeController())
-                        .setControllerAdvice(new GlobalExceptionHandler(messageSource))
-                        .addFilters(new RequestIdFilter())
-                        .build();
+        mockMvc = MockMvcBuilders.standaloneSetup(new ProbeController())
+                .setControllerAdvice(new GlobalExceptionHandler(messageSource))
+                .addFilters(new RequestIdFilter())
+                .build();
 
         handlerLogger = (Logger) LoggerFactory.getLogger(GlobalExceptionHandler.class);
         logAppender = new ListAppender<>();
@@ -66,21 +65,18 @@ class GlobalExceptionHandlerTest {
     /** ApiException doğru durum, Türkçe detail, code ve başlıkla aynı requestId ile döner. */
     @Test
     void apiExceptionReturnsStatusAndTurkishDetail() throws Exception {
-        MvcResult result =
-                mockMvc.perform(get("/probe/not-found"))
-                        .andExpect(status().isNotFound())
-                        .andExpect(jsonPath("$.type").value("about:blank"))
-                        .andExpect(jsonPath("$.title").value("Not Found"))
-                        .andExpect(jsonPath("$.status").value(404))
-                        .andExpect(jsonPath("$.detail").value("İstenen kaynak bulunamadı."))
-                        .andExpect(jsonPath("$.code").value("NOT_FOUND"))
-                        .andReturn();
+        MvcResult result = mockMvc.perform(get("/probe/not-found"))
+                .andExpect(status().isNotFound())
+                .andExpect(jsonPath("$.type").value("about:blank"))
+                .andExpect(jsonPath("$.title").value("Not Found"))
+                .andExpect(jsonPath("$.status").value(404))
+                .andExpect(jsonPath("$.detail").value("İstenen kaynak bulunamadı."))
+                .andExpect(jsonPath("$.code").value("NOT_FOUND"))
+                .andReturn();
 
         String headerValue = result.getResponse().getHeader(RequestIdFilter.HEADER_NAME);
         String bodyValue =
-                JsonPath.read(
-                        result.getResponse().getContentAsString(StandardCharsets.UTF_8),
-                        "$.requestId");
+                JsonPath.read(result.getResponse().getContentAsString(StandardCharsets.UTF_8), "$.requestId");
         assertThat(bodyValue).isNotBlank().isEqualTo(headerValue);
     }
 
@@ -96,10 +92,9 @@ class GlobalExceptionHandlerTest {
     /** Doğrulama hatası 400 VALIDATION_FAILED döner ve hatalı alanlar listelenir. */
     @Test
     void validationErrorReturnsBadRequestWithFieldErrors() throws Exception {
-        mockMvc.perform(
-                        post("/probe/validate")
-                                .contentType(MediaType.APPLICATION_JSON)
-                                .content("{\"title\":\"\",\"size\":0}"))
+        mockMvc.perform(post("/probe/validate")
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("{\"title\":\"\",\"size\":0}"))
                 .andExpect(status().isBadRequest())
                 .andExpect(jsonPath("$.status").value(400))
                 .andExpect(jsonPath("$.code").value("VALIDATION_FAILED"))
@@ -113,28 +108,20 @@ class GlobalExceptionHandlerTest {
     /** Beklenmeyen hata 500 döner, ayrıntı cevaba değil log'a yazılır. */
     @Test
     void unexpectedErrorHidesDetailFromResponseAndLogsIt() throws Exception {
-        MvcResult result =
-                mockMvc.perform(get("/probe/boom"))
-                        .andExpect(status().isInternalServerError())
-                        .andExpect(jsonPath("$.code").value("INTERNAL_ERROR"))
-                        .andExpect(
-                                jsonPath("$.detail")
-                                        .value(
-                                                "Beklenmeyen bir hata oluştu. Lütfen daha sonra"
-                                                        + " tekrar dene."))
-                        .andExpect(jsonPath("$.requestId").isNotEmpty())
-                        .andReturn();
+        MvcResult result = mockMvc.perform(get("/probe/boom"))
+                .andExpect(status().isInternalServerError())
+                .andExpect(jsonPath("$.code").value("INTERNAL_ERROR"))
+                .andExpect(
+                        jsonPath("$.detail").value("Beklenmeyen bir hata oluştu. Lütfen daha sonra" + " tekrar dene."))
+                .andExpect(jsonPath("$.requestId").isNotEmpty())
+                .andReturn();
 
         assertThat(result.getResponse().getContentAsString(StandardCharsets.UTF_8))
                 .doesNotContain(SECRET_DETAIL);
         assertThat(logAppender.list)
-                .anyMatch(
-                        event ->
-                                event.getLevel() == Level.ERROR
-                                        && event.getThrowableProxy() != null
-                                        && event.getThrowableProxy()
-                                        .getMessage()
-                                        .contains(SECRET_DETAIL));
+                .anyMatch(event -> event.getLevel() == Level.ERROR
+                        && event.getThrowableProxy() != null
+                        && event.getThrowableProxy().getMessage().contains(SECRET_DETAIL));
     }
 
     /** Eşleşmeyen yol Spring'den gelse bile ortak biçimde 404 NOT_FOUND döner. */

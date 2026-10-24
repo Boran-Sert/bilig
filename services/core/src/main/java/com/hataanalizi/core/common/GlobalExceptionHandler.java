@@ -66,30 +66,20 @@ public class GlobalExceptionHandler extends ResponseEntityExceptionHandler {
     /** Doğrulama hatasını 400 olarak döndürür ve hatalı alanları listeler. */
     @Override
     protected ResponseEntity<Object> handleMethodArgumentNotValid(
-            MethodArgumentNotValidException exception,
-            HttpHeaders headers,
-            HttpStatusCode status,
-            WebRequest request) {
+            MethodArgumentNotValidException exception, HttpHeaders headers, HttpStatusCode status, WebRequest request) {
         ProblemDetail problem = createProblem(ErrorCode.VALIDATION_FAILED);
-        List<FieldViolation> violations =
-                exception.getBindingResult().getFieldErrors().stream()
-                        .map(error -> new FieldViolation(error.getField(), error.getDefaultMessage()))
-                        .toList();
+        List<FieldViolation> violations = exception.getBindingResult().getFieldErrors().stream()
+                .map(error -> new FieldViolation(error.getField(), error.getDefaultMessage()))
+                .toList();
         problem.setProperty(ERRORS_PROPERTY, violations);
-        return handleExceptionInternal(
-                exception, problem, headers, ErrorCode.VALIDATION_FAILED.getStatus(), request);
+        return handleExceptionInternal(exception, problem, headers, ErrorCode.VALIDATION_FAILED.getStatus(), request);
     }
 
     /** Spring'in kendi hata cevaplarına da requestId ve mümkünse code ekler. */
     @Override
     protected ResponseEntity<Object> handleExceptionInternal(
-            Exception exception,
-            Object body,
-            HttpHeaders headers,
-            HttpStatusCode statusCode,
-            WebRequest request) {
-        ResponseEntity<Object> response =
-                super.handleExceptionInternal(exception, body, headers, statusCode, request);
+            Exception exception, Object body, HttpHeaders headers, HttpStatusCode statusCode, WebRequest request) {
+        ResponseEntity<Object> response = super.handleExceptionInternal(exception, body, headers, statusCode, request);
         if (response != null && response.getBody() instanceof ProblemDetail problem) {
             completeProblem(problem, statusCode);
         }
@@ -99,9 +89,7 @@ public class GlobalExceptionHandler extends ResponseEntityExceptionHandler {
     /** Hata koduna göre Türkçe metinli, code ve requestId taşıyan ProblemDetail üretir. */
     private ProblemDetail createProblem(ErrorCode errorCode, Object... arguments) {
         ProblemDetail problem =
-                ProblemDetail.forStatusAndDetail(
-                        errorCode.getStatus(),
-                        resolveMessage(errorCode, arguments));
+                ProblemDetail.forStatusAndDetail(errorCode.getStatus(), resolveMessage(errorCode, arguments));
 
         problem.setType(URI.create("about:blank"));
         problem.setTitle(errorCode.getStatus().getReasonPhrase());
@@ -115,12 +103,10 @@ public class GlobalExceptionHandler extends ResponseEntityExceptionHandler {
         Map<String, Object> properties = problem.getProperties();
         boolean hasCode = properties != null && properties.containsKey(CODE_PROPERTY);
         if (!hasCode) {
-            resolveCode(statusCode)
-                    .ifPresent(
-                            errorCode -> {
-                                problem.setDetail(resolveMessage(errorCode));
-                                problem.setProperty(CODE_PROPERTY, errorCode.name());
-                            });
+            resolveCode(statusCode).ifPresent(errorCode -> {
+                problem.setDetail(resolveMessage(errorCode));
+                problem.setProperty(CODE_PROPERTY, errorCode.name());
+            });
         }
         problem.setProperty(REQUEST_ID_PROPERTY, RequestIdFilter.currentRequestId());
     }
