@@ -49,8 +49,9 @@ class Program(BaseModel):
 
 
 class ProgramSaveSummary(BaseModel):
-    """Programın veritabanına yazılmasında kaç kazanımın eklendiği, değiştiği ve aynı kaldığı."""
+    """Kaç kazanımın eklendiği, değiştiği, aynı kaldığı ve programda olup PDF'te bulunmadığı."""
 
     inserted: int
     updated: int
     unchanged: int
+    missing: int

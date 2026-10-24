@@ -1,9 +1,11 @@
 """Öğretim programı okuyucusunu test eder.
 
-Test PDF'i burada üretilir. Satırlar gerçek programın biçimini (kod yazımları, çok satırlı
-başlık, harfli ve harfsiz açıklama, sayfa numarası, sayfa geçişi) taklit eder; metinler bu test
-için yazılmıştır.
+Test PDF'i burada üretilir; komut testleri de aynı PDF'i kullanır. Satırlar gerçek programın
+biçimini (kod yazımları, çok satırlı başlık, harfli ve harfsiz açıklama, sayfa numarası, sayfa
+geçişi) taklit eder; metinler bu test için yazılmıştır.
 """
+
+from pathlib import Path
 
 import pymupdf
 import pytest
@@ -56,16 +58,20 @@ PAGES = [
 ]
 
 
-@pytest.fixture(scope="module")
-def groups(tmp_path_factory: pytest.TempPathFactory) -> list[LearningOutcomeGroup]:
-    """Test satırlarını her biri ayrı sayfada olacak biçimde PDF'e yazıp okur."""
+def write_program_pdf(path: Path) -> Path:
+    """Test satırlarını her biri ayrı sayfada olacak biçimde PDF'e yazar."""
     document = pymupdf.open()
     for lines in PAGES:
         page = document.new_page(width=900)
         page.insert_htmlbox(pymupdf.Rect(30, 30, 870, 820), "<br>".join(lines))
-    path = tmp_path_factory.mktemp("program") / "program.pdf"
     document.save(path)
-    return read_outcome_groups(path)
+    return path
+
+
+@pytest.fixture(scope="module")
+def groups(tmp_path_factory: pytest.TempPathFactory) -> list[LearningOutcomeGroup]:
+    """Test programını PDF'e yazıp okur."""
+    return read_outcome_groups(write_program_pdf(tmp_path_factory.mktemp("program") / "p.pdf"))
 
 
 def outcome(groups: list[LearningOutcomeGroup], code: str) -> LearningOutcome:

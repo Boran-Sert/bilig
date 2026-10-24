@@ -13,6 +13,7 @@ from typing import Any
 import pytest
 
 from app.db.queries.program import (
+    COUNT_MISSING_LEARNING_OUTCOMES,
     UPSERT_CURRICULUM,
     UPSERT_LEARNING_OUTCOME,
     UPSERT_LEARNING_OUTCOME_GROUP,
@@ -73,6 +74,7 @@ class FakeConnection:
         self.in_transaction = False
         self.transaction_error: BaseException | None = None
         self.fail_on: str | None = None
+        self.missing = 0
 
     @asynccontextmanager
     async def transaction(self) -> AsyncIterator[None]:
@@ -93,13 +95,15 @@ class FakeConnection:
             raise RuntimeError("database failed")
         if query is UPSERT_LEARNING_OUTCOME:
             return FakeCursor(next(self.outcome_rows))
+        if query is COUNT_MISSING_LEARNING_OUTCOMES:
+            return FakeCursor((self.missing,))
         self.next_id += 1
         return FakeCursor((self.next_id,))
 
 
 @pytest.mark.asyncio
 async def test_save_program_writes_tree_in_order_inside_transaction() -> None:
-    """Ders, program, her grup ve kazanımları sırayla, hepsi tek transaction içinde yazılır."""
+    """Ağaç sırayla yazılır, sonra eksik kazanımlar sayılır; hepsi tek transaction içinde."""
     connection = FakeConnection([(True,), (True,), (True,)])
 
     await save_program(connection, PROGRAM)
@@ -112,6 +116,7 @@ async def test_save_program_writes_tree_in_order_inside_transaction() -> None:
         UPSERT_LEARNING_OUTCOME,
         UPSERT_LEARNING_OUTCOME_GROUP,
         UPSERT_LEARNING_OUTCOME,
+        COUNT_MISSING_LEARNING_OUTCOMES,
     ]
     assert all(in_transaction for _, _, in_transaction in connection.calls)
 
@@ -156,8 +161,11 @@ async def test_save_program_sends_search_text_for_each_outcome() -> None:
 @pytest.mark.parametrize(
     ("rows", "expected"),
     [
-        ([(True,), (True,), (False,)], ProgramSaveSummary(inserted=2, updated=1, unchanged=0)),
-        ([None, None, (False,)], ProgramSaveSummary(inserted=0, updated=1, unchanged=2)),
+        (
+            [(True,), (True,), (False,)],
+            ProgramSaveSummary(inserted=2, updated=1, unchanged=0, missing=0),
+        ),
+        ([None, None, (False,)], ProgramSaveSummary(inserted=0, updated=1, unchanged=2, missing=0)),
     ],
 )
 async def test_save_program_counts_inserted_updated_and_unchanged(
@@ -167,6 +175,24 @@ async def test_save_program_counts_inserted_updated_and_unchanged(
     summary = await save_program(FakeConnection(rows), PROGRAM)
 
     assert summary == expected
+
+
+@pytest.mark.asyncio
+async def test_save_program_reports_outcomes_missing_from_pdf() -> None:
+    """Programda olup PDF'te bulunmayan kazanımlar, okunan grup-kod çiftleriyle sayılır."""
+    connection = FakeConnection([None, None, None])
+    connection.missing = 4
+
+    summary = await save_program(connection, PROGRAM)
+
+    query, values, _ = connection.calls[-1]
+    assert query is COUNT_MISSING_LEARNING_OUTCOMES
+    assert values == {
+        "curriculum_id": 102,
+        "group_codes": ["A.1", "A.1", "B"],
+        "outcome_codes": ["A.1.1", "A.1.2", "B.1"],
+    }
+    assert summary == ProgramSaveSummary(inserted=0, updated=0, unchanged=3, missing=4)
 
 
 @pytest.mark.asyncio

@@ -3,7 +3,8 @@
 Ders, program, kazanım grubu ve kazanım benzersiz anahtarlarıyla upsert edilir; komut ikinci
 kez çalışınca kopya satır oluşmaz. Kazanımın arama metni değişirse eski embedding silinir,
 çünkü artık o metne ait değildir; kazanım vektörleri ayrı adımda yeniden hesaplanır (#123).
-Değişmeyen kazanım güncellenmez. Tablolar core'un Flyway migration'larıyla kurulur.
+Değişmeyen kazanım güncellenmez. Programda kayıtlı olup PDF'te artık olmayan kazanımlar
+silinmez (soru bağları olabilir), sadece sayılır. Tablolar core'un Flyway migration'larıyla kurulur.
 """
 
 from psycopg import AsyncConnection
@@ -47,9 +48,22 @@ WHERE (learning_outcome.title, learning_outcome.meb_explanation, learning_outcom
 RETURNING (xmax = 0) AS inserted
 """
 
+COUNT_MISSING_LEARNING_OUTCOMES = """
+SELECT count(*)
+FROM learning_outcome
+JOIN learning_outcome_group
+    ON learning_outcome_group.id = learning_outcome.learning_outcome_group_id
+WHERE learning_outcome_group.curriculum_id = %(curriculum_id)s
+    AND NOT EXISTS (
+        SELECT 1
+        FROM unnest(%(group_codes)s::text[], %(outcome_codes)s::text[]) AS saved(group_code, code)
+        WHERE saved.group_code = learning_outcome_group.code AND saved.code = learning_outcome.code
+    )
+"""
+
 
 async def save_program(connection: AsyncConnection, program: Program) -> ProgramSaveSummary:
-    """Kazanım ağacını tek transaction'da yazar ve kaç kazanımın değiştiğini döner."""
+    """Ağacı tek transaction'da yazar; değişen ve PDF'te olmayan kazanımları sayıp döner."""
     inserted = updated = unchanged = 0
     async with connection.transaction():
         subject_id = await _fetch_id(connection, UPSERT_SUBJECT, program.subject.model_dump())
@@ -78,7 +92,10 @@ async def save_program(connection: AsyncConnection, program: Program) -> Program
                     inserted += 1
                 else:
                     updated += 1
-    return ProgramSaveSummary(inserted=inserted, updated=updated, unchanged=unchanged)
+        missing = await _count_missing(connection, curriculum_id, program)
+    return ProgramSaveSummary(
+        inserted=inserted, updated=updated, unchanged=unchanged, missing=missing
+    )
 
 
 def build_search_text(subject_name: str, group_name: str, outcome: LearningOutcome) -> str:
@@ -93,4 +110,19 @@ async def _fetch_id(connection: AsyncConnection, query: str, values: dict[str, o
     row = await cursor.fetchone()
     if row is None:
         raise RuntimeError("Upsert returned no id")
+    return int(row[0])
+
+
+async def _count_missing(connection: AsyncConnection, curriculum_id: int, program: Program) -> int:
+    """Programda kayıtlı olup okunan ağaçta bulunmayan kazanımları sayar."""
+    pairs = [(group.code, outcome.code) for group in program.groups for outcome in group.outcomes]
+    values = {
+        "curriculum_id": curriculum_id,
+        "group_codes": [group_code for group_code, _ in pairs],
+        "outcome_codes": [outcome_code for _, outcome_code in pairs],
+    }
+    cursor = await connection.execute(COUNT_MISSING_LEARNING_OUTCOMES, values)
+    row = await cursor.fetchone()
+    if row is None:
+        raise RuntimeError("Count returned no row")
     return int(row[0])
