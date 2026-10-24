@@ -13,7 +13,8 @@ yazımlar parçalarına ayrılır.
 
 Oran eşiğin altındaysa önce bozuk font eşlemesi kodla düzeltilmeye çalışılır (font_fix.py);
 düzeltilmiş metin eşiği geçerse sayfa metin yolundan gider ve uygulanan düzeltme sonuçta
-taşınır. Sağlam sayfaya ve çok az kelimeli sayfaya düzeltme denenmez.
+taşınır. Sağlam sayfaya ve çok az kelimeli sayfaya düzeltme denenmez: kısa metinde onlarca
+kayma adayından biri tesadüfen eşiği geçebilir.
 """
 
 import re
@@ -62,11 +63,7 @@ def check_page(page: pymupdf.Page) -> TextLayerResult:
 
 
 def find_font_fix(text: str) -> TextLayerResult | None:
-    """Metni eşiğin üstüne çıkaran düzeltmelerden oranı en yüksek olanı döner.
-
-    Kısa metinde 128 kayma adayından biri tesadüfen eşiği geçebildiği için düzeltme sadece
-    yeterince uzun metinde denenir.
-    """
+    """Metni eşiğin üstüne çıkaran düzeltmelerden oranı en yüksek olanı döner."""
     if len(extract_words(text)) < FONT_FIX_MIN_WORDS:
         return None
     best = None

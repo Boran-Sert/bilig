@@ -18,11 +18,10 @@ from enum import StrEnum
 
 from pydantic import BaseModel
 
-from app.constants import FONT_FIX_MAX_SHIFT
+from app.constants import FONT_FIX_FIRST_VISIBLE_CODE, FONT_FIX_MAX_SHIFT
 
 _CODEPAGE_TABLE = str.maketrans("ýþðÝÞÐ", "ışğİŞĞ")
 _CODEPAGE_MARKS = frozenset("ýþðÝÞÐ")
-_FIRST_VISIBLE_CODE = 0x21
 
 
 class FontFixKind(StrEnum):
@@ -64,6 +63,6 @@ def _shift_character(char: str, shift: int) -> str:
     if char.isspace():
         return char
     code = ord(char) + shift
-    if code < _FIRST_VISIBLE_CODE or code > sys.maxunicode or not chr(code).isprintable():
+    if code < FONT_FIX_FIRST_VISIBLE_CODE or code > sys.maxunicode or not chr(code).isprintable():
         return char
     return chr(code)
