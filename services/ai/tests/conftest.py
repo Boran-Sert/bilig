@@ -2,13 +2,21 @@
 
 configure_logging kök logger'ın handler'larını değiştirdiği için, onu çağıran testte pytest'in
 caplog'u kayıt görmez; bu testler çıktıyı capsys ile okur.
+
+Veritabanı testleri core'un migration'larıyla kurulmuş gerçek Postgres'e bağlanır.
+Her test kendi transaction'ında çalışır ve test bitince yaptığı her şey geri alınır.
 """
 
+import asyncio
 import logging
-from collections.abc import Iterator
+import os
+from collections.abc import AsyncIterator, Callable, Iterator, Mapping
 
+import psycopg
 import pytest
+import pytest_asyncio
 import structlog
+from psycopg.rows import TupleRow
 
 from app.constants import UVICORN_LOGGERS
 from app.log import clear_request_context
@@ -29,3 +37,25 @@ def restore_logging() -> Iterator[None]:
         log.handlers[:] = handlers
         log.propagate = propagate
         log.setLevel(level)
+
+
+def pytest_asyncio_loop_factories() -> Mapping[str, Callable[[], asyncio.AbstractEventLoop]]:
+    """Async testleri psycopg'nin Windows'ta da desteklediği selector döngüsüyle çalıştırır."""
+    return {"selector": asyncio.SelectorEventLoop}
+
+
+@pytest.fixture
+def database_url() -> str:
+    """Test veritabanının adresini DATABASE_URL ortam değişkeninden okur."""
+    url = os.environ.get("DATABASE_URL")
+    if not url:
+        pytest.fail("DATABASE_URL is not set; see services/ai/AGENTS.md")
+    return url
+
+
+@pytest_asyncio.fixture
+async def db(database_url: str) -> AsyncIterator[psycopg.AsyncConnection[TupleRow]]:
+    """Testi kendi transaction'ında çalıştırır ve test bitince geri alır."""
+    async with await psycopg.AsyncConnection.connect(database_url) as connection:
+        async with connection.transaction(force_rollback=True):
+            yield connection
