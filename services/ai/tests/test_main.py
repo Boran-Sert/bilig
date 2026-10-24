@@ -21,8 +21,6 @@ def fresh_settings() -> Iterator[None]:
     get_settings.cache_clear()
     yield
     get_settings.cache_clear()
-    structlog.contextvars.clear_contextvars()
-    structlog.reset_defaults()
 
 
 @pytest.fixture
