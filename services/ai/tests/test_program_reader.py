@@ -182,6 +182,16 @@ def test_duplicate_outcome_code_fails() -> None:
         parse_outcome_groups(lines)
 
 
+def test_title_without_period_fails_instead_of_swallowing_explanation() -> None:
+    """Başlık üç satıra kadar birleşir; noktasız başlık altındaki paragrafı yutmaz, hata verir."""
+    wrapped = ["1. ŞİİR", "A.1. 1. Şiirde millî", "ve evrensel", "değerleri belirler."]
+    unfinished = [*wrapped[:3], "değerleri belirler", "Bu kazanımda değerler ele alınır."]
+
+    assert outcome(parse_outcome_groups(wrapped), "A.1.1").title.endswith("değerleri belirler.")
+    with pytest.raises(ValueError, match="Title of A.1.1 does not end with a period"):
+        parse_outcome_groups(unfinished)
+
+
 def test_outcome_before_heading_fails() -> None:
     """Başlıksız kazanımın grubu adlandırılamaz; okuma hatayla durur."""
     with pytest.raises(ValueError, match="before any heading"):
