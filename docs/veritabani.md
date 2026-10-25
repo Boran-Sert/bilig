@@ -6,7 +6,7 @@ PostgreSQL 18 + pgvector + pg_textsearch. Şemayı sadece Java servisi Flyway il
 - Her tabloda `id bigint generated always as identity` birincil anahtardır (ara tablolar hariç; onlarda iki kolonlu birincil anahtar var).
 - Her tabloda `created_at timestamptz not null default now()`; güncellenen tablolarda `updated_at`.
 - Sabit değer kümeleri `text` + `CHECK`, değerler büyük harf.
-- Vektörler `vector(768)` (gte-multilingual-base), HNSW index ve `vector_cosine_ops` ile.
+- Vektörler `vector(1024)` (bge-m3), HNSW index ve `vector_cosine_ops` ile.
 - Kelime araması `search_text` kolonunda, BM25 index'iyle (`pg_textsearch`, `text_config='turkish'`).
 - Yabancı anahtar adı `<tablo>_id`, index adı `idx_<tablo>_<kolon>`, tekillik `uq_...`.
 
@@ -136,7 +136,7 @@ erDiagram
 | title | text | hayır | | "Metindeki zaman ve mekânın özelliklerini belirler." |
 | meb_explanation | text | evet | | Kazanımın altındaki MEB açıklaması |
 | search_text | text | hayır | | Yol + başlık + açıklama |
-| embedding | vector(768) | evet | | |
+| embedding | vector(1024) | evet | | |
 | created_at | timestamptz | hayır | now() | |
 
 - `uq_learning_outcome_group_id_code` UNIQUE (learning_outcome_group_id, code)
@@ -214,7 +214,7 @@ erDiagram
 | confidence | real | evet | | Ayrıştırma güveni, 0–1 |
 | status | text | hayır | 'DRAFT' | CHECK IN ('DRAFT', 'REVIEW', 'PUBLISHED', 'REJECTED') |
 | search_text | text | hayır | | title_path + markdown |
-| embedding | vector(768) | evet | | |
+| embedding | vector(1024) | evet | | |
 | created_at | timestamptz | hayır | now() | |
 | updated_at | timestamptz | hayır | now() | |
 
@@ -249,7 +249,7 @@ Alıntı kartındaki "TDE 12 Ders Kitabı · s. 174" bilgisi saklanmaz; `source_
 | difficulty | smallint | evet | | CHECK (difficulty BETWEEN 1 AND 5) |
 | status | text | hayır | 'DRAFT' | CHECK IN ('DRAFT', 'REVIEW', 'PUBLISHED', 'REJECTED') |
 | content_hash | char(64) | hayır | | UNIQUE · aynı soru iki kez girmez |
-| embedding | vector(768) | evet | | |
+| embedding | vector(1024) | evet | | |
 | created_at | timestamptz | hayır | now() | |
 | updated_at | timestamptz | hayır | now() | |
 
@@ -306,7 +306,7 @@ Sorunun kazanım kolonu yoktur; kazanımlar `question_outcome`'da.
 | note_md | text | evet | | Kısa not |
 | status | text | hayır | 'DRAFT' | CHECK IN ('DRAFT', 'PUBLISHED') |
 | search_text | text | hayır | | name + diğer yazımlar + not |
-| embedding | vector(768) | evet | | |
+| embedding | vector(1024) | evet | | |
 | created_at | timestamptz | hayır | now() | |
 | updated_at | timestamptz | hayır | now() | |
 
