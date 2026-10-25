@@ -1224,8 +1224,8 @@ VITE_API_BASE_URL=/api
 | --- | --- | --- | --- |
 | web | nginx + derlenmiş React | 8080 → 80 | `/api` isteklerini core'a iletir |
 | core | Java 25 | 8081 | `/data` volume'ü bağlı |
-| ai-api | Python 3.13 | 8000, sadece iç ağ | `/data` ve `/models` bağlı |
-| ai-worker | ai-api ile aynı imaj | yok | Komut: `python -m app.worker` |
+| ai-api | Python 3.13 | 8000, sadece iç ağ | `/data` ve `/models` bağlı; `gpus: all`, NVIDIA ekran kartı ister |
+| ai-worker | ai-api ile aynı imaj | yok | Komut: `python -m app.worker`; `gpus: all` |
 | postgres | `infra/postgres`'tan derlenir | 5432 | `pgdata` volume'ü, ICU tr-TR, `shared_preload_libraries=pg_textsearch` |
 
 ### 13.19Komutlar
@@ -1233,6 +1233,12 @@ VITE_API_BASE_URL=/api
 ```
 # Her şey birlikte
 docker compose up --build
+
+# Modeller, bir kez (/models volume'üne)
+docker compose run --rm -e HF_HUB_OFFLINE=0 ai-api python -m scripts.download_models
+
+# NVIDIA ekran kartı olmayan makinede (Mac) ai-api ve ai-worker açılmaz;
+# Docker'da sadece postgres, core ve web açılır, ai servisleri aşağıdaki gibi yerelde çalışır
 
 # Geliştirirken: sadece veritabanı Docker'da, servisler yerelde
 docker compose up -d postgres
