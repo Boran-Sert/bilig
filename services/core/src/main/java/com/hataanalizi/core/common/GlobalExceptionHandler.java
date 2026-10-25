@@ -3,7 +3,6 @@ package com.hataanalizi.core.common;
 import java.net.URI;
 import java.util.List;
 import java.util.Locale;
-import java.util.Map;
 import java.util.Optional;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -32,6 +31,7 @@ public class GlobalExceptionHandler extends ResponseEntityExceptionHandler {
     private static final String CODE_PROPERTY = "code";
     private static final String REQUEST_ID_PROPERTY = "requestId";
     private static final String ERRORS_PROPERTY = "errors";
+    private static final URI PROBLEM_TYPE = URI.create("about:blank");
 
     private final MessageSource messageSource;
 
@@ -67,12 +67,12 @@ public class GlobalExceptionHandler extends ResponseEntityExceptionHandler {
     @Override
     protected ResponseEntity<Object> handleMethodArgumentNotValid(
             MethodArgumentNotValidException exception, HttpHeaders headers, HttpStatusCode status, WebRequest request) {
-        ProblemDetail problem = createProblem(ErrorCode.VALIDATION_FAILED);
+        ProblemDetail problem = exception.getBody();
         List<FieldViolation> violations = exception.getBindingResult().getFieldErrors().stream()
                 .map(error -> new FieldViolation(error.getField(), error.getDefaultMessage()))
                 .toList();
         problem.setProperty(ERRORS_PROPERTY, violations);
-        return handleExceptionInternal(exception, problem, headers, ErrorCode.VALIDATION_FAILED.getStatus(), request);
+        return handleExceptionInternal(exception, problem, headers, status, request);
     }
 
     /** Spring'in kendi hata cevaplarına da requestId ve mümkünse code ekler. */
@@ -91,8 +91,7 @@ public class GlobalExceptionHandler extends ResponseEntityExceptionHandler {
         ProblemDetail problem =
                 ProblemDetail.forStatusAndDetail(errorCode.getStatus(), resolveMessage(errorCode, arguments));
 
-        problem.setType(URI.create("about:blank"));
-        problem.setTitle(errorCode.getStatus().getReasonPhrase());
+        problem.setType(PROBLEM_TYPE);
         problem.setProperty(CODE_PROPERTY, errorCode.name());
         problem.setProperty(REQUEST_ID_PROPERTY, RequestIdFilter.currentRequestId());
         return problem;
@@ -100,14 +99,12 @@ public class GlobalExceptionHandler extends ResponseEntityExceptionHandler {
 
     /** Spring'in ürettiği ProblemDetail'e requestId ve durumuna uyan code ekler. */
     private void completeProblem(ProblemDetail problem, HttpStatusCode statusCode) {
-        Map<String, Object> properties = problem.getProperties();
-        boolean hasCode = properties != null && properties.containsKey(CODE_PROPERTY);
-        if (!hasCode) {
-            resolveCode(statusCode).ifPresent(errorCode -> {
-                problem.setDetail(resolveMessage(errorCode));
-                problem.setProperty(CODE_PROPERTY, errorCode.name());
-            });
-        }
+        problem.setType(PROBLEM_TYPE);
+
+        resolveCode(statusCode).ifPresent(errorCode -> {
+            problem.setDetail(resolveMessage(errorCode));
+            problem.setProperty(CODE_PROPERTY, errorCode.name());
+        });
         problem.setProperty(REQUEST_ID_PROPERTY, RequestIdFilter.currentRequestId());
     }
 

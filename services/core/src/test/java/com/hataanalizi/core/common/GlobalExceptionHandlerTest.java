@@ -45,6 +45,7 @@ class GlobalExceptionHandlerTest {
         ResourceBundleMessageSource messageSource = new ResourceBundleMessageSource();
         messageSource.setBasename("messages_tr");
         messageSource.setDefaultEncoding("UTF-8");
+        messageSource.setAlwaysUseMessageFormat(true);
         mockMvc = MockMvcBuilders.standaloneSetup(new ProbeController())
                 .setControllerAdvice(new GlobalExceptionHandler(messageSource))
                 .addFilters(new RequestIdFilter())
