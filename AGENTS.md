@@ -109,6 +109,9 @@ Bölüm numaraları ekip planındakilerle aynıdır (`Hata Analizi Asistanı.md`
 - Python: `cd services/ai && uv run ruff format . && uv run ruff check . && uv run mypy app && uv run pytest`
 - Web: `cd apps/web && npm run lint && npm run typecheck && npm test`
 - Hepsi birlikte: `docker compose up --build`
+- Modeller, bir kez: `docker compose run --rm -e HF_HUB_OFFLINE=0 ai-api python -m scripts.download_models`
+- ai-api ve ai-worker NVIDIA ekran kartı ister (`gpus: all`). Kartı olmayan makinede (Mac)
+  `docker compose up -d postgres core web` çalıştır, ai servislerini yerelde `uv run` ile başlat.
 
 ## İş ne zaman bitmiş sayılır
 - Format, lint, tip kontrolü ve testler temiz; CI yeşil.

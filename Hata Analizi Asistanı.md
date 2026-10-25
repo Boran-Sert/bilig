@@ -103,7 +103,7 @@ Kesik çizgili kutu dış servis. Python servisi hem anlık istekleri (anlatım,
 | --- | --- |
 | Web arayüzü | React, Vite, TypeScript, shadcn/ui, TanStack Query, Recharts, react-markdown, react-dropzone |
 | Java servisi | Spring Boot (Web, Security, Data JPA, Validation), Flyway, springdoc-openapi |
-| Python servisi | FastAPI, anthropic SDK, PyMuPDF, sentence-transformers (gte-multilingual-base embedding, bge-reranker-v2-m3), psycopg, pgvector, Pydantic, Jinja2, rapidfuzz |
+| Python servisi | FastAPI, anthropic SDK, PyMuPDF, sentence-transformers (bge-m3 embedding, bge-reranker-v2-m3), psycopg, pgvector, Pydantic, Jinja2, rapidfuzz |
 | Veritabanı | PostgreSQL, pgvector (vektör araması), pg_textsearch (Türkçe BM25 kelime araması) |
 
 Sürümler ve her iş için seçilen kütüphanelerin tam listesi [Bölüm 13](#s13)'te.
@@ -339,7 +339,7 @@ Kayıtta sadece "bu soru A.2.3, A.2.6, A.2.7 ve A.2.8'i ölçer" yazar. Şık ba
 
 Her paragraf, soru, kazanım ve not iki şekilde indekslenir:
 
-- **Vektör:** gte-multilingual-base metni 768 sayılık vektöre çevirir; pgvector'da HNSW index'iyle tutulur. Paragrafın başına başlık yolu eklenir: "TDE 12 Ders Kitabı › Roman › Roman Türleri". Tek başına anlamı eksik kalan bir paragraf da böylece doğru konuyla eşleşir.
+- **Vektör:** bge-m3 metni 1024 sayılık vektöre çevirir; pgvector'da HNSW index'iyle tutulur. Paragrafın başına başlık yolu eklenir: "TDE 12 Ders Kitabı › Roman › Roman Türleri". Tek başına anlamı eksik kalan bir paragraf da böylece doğru konuyla eşleşir.
 - **Kelime (BM25):** pg_textsearch aynı metni Türkçe kök bulmayla indeksler. Yazar adı, eser adı ve "bilinç akışı" gibi terimleri vektör aramasının kaçırdığı yerde yakalar.
 
 ### A10Soru havuzu
@@ -611,7 +611,7 @@ QUESTION_VERIFY:   { model: claude-sonnet-5-5, prompt: question_verify.j2 }
 
 - **Alıntı ve JSON birlikte çalışmaz.** Anlatım ve sohbet alıntılı serbest metindir; diğer bütün görevler Pydantic şemasıyla JSON döner.
 - **Alıntı paragraf düzeyinde.** Claude bir bloğu bütün olarak alıntılar; bu yüzden içerik paragraf paragraf saklanır.
-- **Arama modelleri:** embedding için gte-multilingual-base (768 boyut), yeniden sıralama için bge-reranker-v2-m3. İkisi de Apache 2.0 lisanslı ve Python servisinin içinde CPU'da çalışır; ayrı sunucu ya da ekran kartı gerekmez.
+- **Arama modelleri:** embedding için bge-m3 (1024 boyut, MIT), yeniden sıralama için bge-reranker-v2-m3 (Apache 2.0). İkisi de Python servisinin içinde çalışır; ekran kartı varsa onu, yoksa CPU'yu kullanır. Ayrı sunucu gerekmez.
 - **Prompt'lar** `prompts/tde/` klasöründe, sürümlü. Her çağrıda prompt sürümü kaydedilir.
 - Eşleştirme çağrıları birbirinden bağımsızdır; her çağrıda bağlam sıfırdan başlar.
 - Claude'a öğrencinin adı veya okulu gönderilmez.
@@ -760,14 +760,14 @@ Ana sürümler burada sabittir. Yama sürümleri ilk kurulum PR'ında kilit dosy
 | Java | 25 (LTS) | Eclipse Temurin JDK. IDE değil, Java'nın kendisi; Docker imajı da `eclipse-temurin:25` |
 | IDE | IntelliJ IDEA 2025.3+ | Java için. JDK olarak Temurin 25 seçilir. Python ve React tarafında editör serbest; biçimi Spotless, ruff, Prettier ve `.editorconfig` belirler |
 | Spring Boot | 4.1.x | Maven ve Maven Wrapper (`mvnw`) |
-| Python | 3.13 | Paket yöneticisi uv. PyTorch CPU sürümü kurulur |
+| Python | 3.13 | Paket yöneticisi uv. PyTorch Linux'ta PyPI'dan, Windows'ta cu132 deposundan kurulur; ekran kartı yoksa CPU'da çalışır |
 | Node.js | 24 (LTS) | Paket yöneticisi npm |
 | TypeScript | 6.0 | `strict: true` |
 | React | 19 | Vite 8 ile |
 | PostgreSQL | 18 | Kendi imajımız (`infra/postgres`): `pgvector/pgvector:pg18` üstüne pg_textsearch. pgvector 0.8.x |
 | Docker | Compose v2 | `docker compose` (tire yok) |
 | Claude modelleri | `claude-haiku-5-5`, `claude-sonnet-5-5` | Sadece `llm_tasks.yaml` içinde yazılır |
-| Embedding | `Alibaba-NLP/gte-multilingual-base` | 768 boyut, Apache 2.0 |
+| Embedding | `BAAI/bge-m3` | 1024 boyut, MIT |
 | Reranker | `BAAI/bge-reranker-v2-m3` | Apache 2.0 |
 | BM25 | `pg_textsearch` 1.x | PostgreSQL lisansı, Türkçe metin ayarıyla |
 
@@ -869,7 +869,7 @@ services/ai/
 │   ├── constants.py
 │   ├── api/                /internal router'ları: explain.py, chat.py, hint.py, analysis.py
 │   ├── llm/                runner.py (run_task), tasks.py (LlmTask), prompts.py, pricing.py
-│   ├── search/             EmbeddingProvider ve Reranker (arayüz), GteEmbedding, BgeReranker,
+│   ├── search/             EmbeddingProvider ve Reranker (arayüz), BgeEmbedding, BgeReranker,
 │   │                       vector.py, bm25.py, hybrid.py (hybrid_search, RRF)
 │   ├── jobs/               JobQueue (arayüz), PostgresJobQueue, JobStore (iş durumu)
 │   ├── storage.py          FileStorage (arayüz), LocalFileStorage
@@ -976,7 +976,7 @@ Block { type: "paragraph" | "table" | "list" | "numbered_items", md: string }
 - **Her tabloda** `created_at timestamptz not null default now()`; güncellenen tablolarda `updated_at`.
 - **Sabit değer kümeleri** PostgreSQL enum değil, `text` + `CHECK` ile tutulur; değerler büyük harf (`'IN_PROGRESS'`).
 - **İsimler:** index `idx_<tablo>_<kolonlar>`, tekillik `uq_...`, yabancı anahtar `fk_...`.
-- **Vektör:** `vector(768)`, HNSW index, `vector_cosine_ops`; sorguda `<=>` (kosinüs uzaklığı).
+- **Vektör:** `vector(1024)`, HNSW index, `vector_cosine_ops`; sorguda `<=>` (kosinüs uzaklığı).
 - **Kelime araması (BM25):** eklentiyi ilk migration kurar: `CREATE EXTENSION IF NOT EXISTS pg_textsearch;` Index: `CREATE INDEX idx_content_block_bm25 ON content_block USING bm25 (search_text) WITH (text_config = 'turkish');` Sorgu: `ORDER BY search_text <@> :query LIMIT 30`. Skor negatiftir; küçük olan önce gelir. Aynı index `kg_node` ve `curriculum_node` için de kurulur.
 - **Türkçe sıralama:** veritabanı ICU `tr-TR` yereliyle kurulur (`POSTGRES_INITDB_ARGS=--locale-provider=icu --icu-locale=tr-TR`).
 - **Esnek içerik** `jsonb` kolonlarda; aranacak ya da filtrelenecek alan ayrı kolona çıkarılır.
@@ -1033,12 +1033,12 @@ error.FILE_NOT_PDF=Sadece PDF dosyası yüklenebilir.
 ### 13.11Embedding ve arama kuralları
 
 - Embedding ve reranker sadece `app/search/` içindeki arayüzlerle kullanılır: `EmbeddingProvider` (`encode(texts)`) ve `Reranker` (`rerank(query, docs, top_k)`). Modeller süreç başına bir kez yüklenir; başka yerde `SentenceTransformer` ya da `CrossEncoder` oluşturulmaz.
-- **Embedding:** `Alibaba-NLP/gte-multilingual-base`, 768 boyut, `normalize_embeddings=True`, toplu işlemde 32'lik gruplar, en fazla 2048 token. Sorgu ve belge için ön ek (prompt) kullanılmaz.
+- **Embedding:** `BAAI/bge-m3`, 1024 boyut, `normalize_embeddings=True`, toplu işlemde 32'lik gruplar, en fazla 2048 token. Sorgu ve belge için ön ek (prompt) kullanılmaz.
 - **Başlık yolu:** paragrafın vektörü ve BM25 metni başlık yoluyla birlikte hesaplanır: "TDE 12 Ders Kitabı › Roman › Roman Türleri" + paragraf. Kazanım da yoluyla: "12. sınıf › Roman › Metnin olay örgüsünü belirler".
 - **Arama sırası her yerde aynı:** vektör (ilk 30) ve BM25 (ilk 30) ayrı çalışır, RRF ile birleşir (her sonuç için `1 / (60 + sıra)` toplanır, ilk 20), sonra reranker. Tek fonksiyon: `hybrid_search(query, filters, top_k, rerank)`.
 - **Reranker:** `BAAI/bge-reranker-v2-m3`, `max_length=512`. "Neden yanlış?" ve sohbet aramasında açık; kazanım eşleştirmede ve benzer soruda kapalı, çünkü orada seçimi Haiku ya da SQL yapıyor.
 - **Süre:** arama ve reranker birlikte 1 saniyenin altında kalmalı. Aşarsa reranker'a giden aday sayısı 20'den 10'a indirilir (`constants.py`).
-- **Model dosyaları:** gte modeli Hugging Face'ten kendi kodunu çalıştırır (`trust_remote_code=True`). Bu yüzden modeller `scripts/download_models.py` ile sabit commit'ten `/models`'e bir kez indirilir; servis `HF_HUB_OFFLINE=1` ile çalışır ve çalışırken hiçbir şey indirmez.
+- **Model dosyaları:** modeller `scripts/download_models.py` ile ayardaki sabit commit'ten (`EMBEDDING_REVISION`, `RERANKER_REVISION`) `/models`'e bir kez indirilir; servis `HF_HUB_OFFLINE=1` ile çalışır ve çalışırken hiçbir şey indirmez. Hugging Face'ten kendi kodunu çalıştıran (`trust_remote_code=True`) model seçilmez, çünkü o kod sabit commit'e bağlanamıyor.
 - Embedding modeli değişirse bütün vektörler yeniden hesaplanır (`EMBED` işi); iki modelin vektörleri karıştırılmaz.
 
 ### 13.12İş kuyruğu, dosyalar ve büyüme noktaları
@@ -1058,7 +1058,7 @@ error.FILE_NOT_PDF=Sadece PDF dosyası yüklenebilir.
 | Dosya saklama | `FileStorage` (Java, Python) | `LocalFileStorage`: `/data` volume'ü | S3 uyumlu nesne deposu (MinIO, bulut) | `STORAGE_TYPE=local` |
 | Hız sınırı | `RateLimiter` (Java) | `DatabaseRateLimiter`: günlük sayım | `RedisRateLimiter` | `RATE_LIMIT_TYPE=database` |
 | Önbellek | Spring Cache (`@Cacheable`) | Bellek içi | Redis | `SPRING_CACHE_TYPE=simple` |
-| Embedding | `EmbeddingProvider`, `Reranker` (Python) | `GteEmbedding`, `BgeReranker` | GPU sunucusu ya da API | `EMBEDDING_PROVIDER=local` |
+| Embedding | `EmbeddingProvider`, `Reranker` (Python) | `BgeEmbedding`, `BgeReranker` | GPU sunucusu ya da API | `EMBEDDING_PROVIDER=local` |
 | Dil modeli | `run_task` + `llm_tasks.yaml` | Claude API | Model ya da sağlayıcı değişimi | `llm_tasks.yaml` |
 
 ```
@@ -1207,7 +1207,7 @@ SPRING_CACHE_TYPE=simple
 DATABASE_URL=postgresql://app:degistir@postgres:5432/hata_analizi
 ANTHROPIC_API_KEY=
 EMBEDDING_PROVIDER=local
-EMBEDDING_MODEL=Alibaba-NLP/gte-multilingual-base
+EMBEDDING_MODEL=BAAI/bge-m3
 RERANKER_MODEL=BAAI/bge-reranker-v2-m3
 HF_HOME=/models
 HF_HUB_OFFLINE=1
@@ -1224,8 +1224,8 @@ VITE_API_BASE_URL=/api
 | --- | --- | --- | --- |
 | web | nginx + derlenmiş React | 8080 → 80 | `/api` isteklerini core'a iletir |
 | core | Java 25 | 8081 | `/data` volume'ü bağlı |
-| ai-api | Python 3.13 | 8000, sadece iç ağ | `/data` ve `/models` bağlı |
-| ai-worker | ai-api ile aynı imaj | yok | Komut: `python -m app.worker` |
+| ai-api | Python 3.13 | 8000, sadece iç ağ | `/data` ve `/models` bağlı; `gpus: all`, NVIDIA ekran kartı ister |
+| ai-worker | ai-api ile aynı imaj | yok | Komut: `python -m app.worker`; `gpus: all` |
 | postgres | `infra/postgres`'tan derlenir | 5432 | `pgdata` volume'ü, ICU tr-TR, `shared_preload_libraries=pg_textsearch` |
 
 ### 13.19Komutlar
@@ -1233,6 +1233,12 @@ VITE_API_BASE_URL=/api
 ```
 # Her şey birlikte
 docker compose up --build
+
+# Modeller, bir kez (/models volume'üne)
+docker compose run --rm -e HF_HUB_OFFLINE=0 ai-api python -m scripts.download_models
+
+# NVIDIA ekran kartı olmayan makinede (Mac) ai-api ve ai-worker açılmaz;
+# Docker'da sadece postgres, core ve web açılır, ai servisleri aşağıdaki gibi yerelde çalışır
 
 # Geliştirirken: sadece veritabanı Docker'da, servisler yerelde
 docker compose up -d postgres
@@ -1479,7 +1485,7 @@ paths:
 - Tablo ve kolon tekil, snake_case. id bigint generated always as identity.
 - Her tabloda created_at timestamptz not null default now().
 - Sabit değer kümeleri text + CHECK, değerler büyük harf.
-- Vektör vector(768) + HNSW (vector_cosine_ops). Kelime araması BM25 (pg_textsearch, 'turkish').
+- Vektör vector(1024) + HNSW (vector_cosine_ops). Kelime araması BM25 (pg_textsearch, 'turkish').
 - Dosyanın başında ne yaptığını anlatan -- açıklama.
 ```
 
@@ -1796,4 +1802,4 @@ Pull request. Branch'teki değişikliğin incelenip master'a alınma isteği.
 - İlk yüklenecek ders kitapları: MEB yayını mı, özel yayınevi mi?
 - Başarısız kazanım nasıl düzelir? Yanlış sayıları hiç azalmadığı için şu kurala göre bir kez başarısız olan kazanım hep öyle kalır.
 
-Kaynaklar: [Claude alıntılı arama sonuçları](https://platform.claude.com/docs/en/build-with-claude/search-results) · [Claude yapısal çıktı](https://platform.claude.com/docs/en/build-with-claude/structured-outputs) · [Claude Batch ve fiyatlar](https://platform.claude.com/docs/en/build-with-claude/batch-processing) · [gte-multilingual-base](https://huggingface.co/Alibaba-NLP/gte-multilingual-base) · [bge-reranker-v2-m3](https://huggingface.co/BAAI/bge-reranker-v2-m3) · [pg_textsearch](https://github.com/timescale/pg_textsearch) · [Claude Code CLAUDE.md](https://code.claude.com/docs/en/memory) · [Claude Code hook'ları](https://code.claude.com/docs/en/hooks) · [Maarif Modeli, ortaöğretim](https://tymm.meb.gov.tr/taslak-cerceve-planlari/ortaogretim)
+Kaynaklar: [Claude alıntılı arama sonuçları](https://platform.claude.com/docs/en/build-with-claude/search-results) · [Claude yapısal çıktı](https://platform.claude.com/docs/en/build-with-claude/structured-outputs) · [Claude Batch ve fiyatlar](https://platform.claude.com/docs/en/build-with-claude/batch-processing) · [bge-m3](https://huggingface.co/BAAI/bge-m3) · [bge-reranker-v2-m3](https://huggingface.co/BAAI/bge-reranker-v2-m3) · [pg_textsearch](https://github.com/timescale/pg_textsearch) · [Claude Code CLAUDE.md](https://code.claude.com/docs/en/memory) · [Claude Code hook'ları](https://code.claude.com/docs/en/hooks) · [Maarif Modeli, ortaöğretim](https://tymm.meb.gov.tr/taslak-cerceve-planlari/ortaogretim)

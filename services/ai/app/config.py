@@ -3,8 +3,9 @@
 Her özelliğin ayarları kendi bloğundadır; yeni ayar kendi bloğuna eklenir ve
 .env.example'a yazılır. Ayar sadece ortam değişkeninden okunur, .env dosyası okunmaz.
 Eksik ya da hatalı ayarda servis açılırken hangi değişkenin sorunlu olduğunu söyleyen
-SettingsError ile durur. Sadece bir sürecin kullandığı blok (IngestSettings) Settings'e
-konmaz, kendi load_ fonksiyonuyla okunur.
+SettingsError ile durur. Sadece bir sürecin kullandığı blok (IngestSettings) ve veritabanı
+olmadan çalışan model indirme betiğinin okuduğu blok (EmbeddingSettings) Settings'e konmaz,
+kendi load_ fonksiyonuyla okunur.
 """
 
 from functools import lru_cache
@@ -43,6 +44,18 @@ class IngestSettings(BaseSettings):
     word_list_path: Path
 
 
+class EmbeddingSettings(BaseSettings):
+    """Embedding ve reranker model adları ve sabit commit'leri; Settings'ten ayrı okunur."""
+
+    model_config = SettingsConfigDict(extra="ignore")
+
+    embedding_provider: Literal["local"] = "local"
+    embedding_model: str
+    embedding_revision: str
+    reranker_model: str
+    reranker_revision: str
+
+
 class Settings(BaseModel):
     """Servisin bütün ayar blokları."""
 
@@ -62,6 +75,14 @@ def load_ingest_settings() -> IngestSettings:
     """Hazırlık hattı ayarlarını okur; sorun varsa değişken adlarıyla hata verir."""
     try:
         return IngestSettings()
+    except ValidationError as error:
+        raise SettingsError(_describe_errors(error)) from error
+
+
+def load_embedding_settings() -> EmbeddingSettings:
+    """Embedding ve reranker ayarlarını okur; sorun varsa değişken adlarıyla hata verir."""
+    try:
+        return EmbeddingSettings()
     except ValidationError as error:
         raise SettingsError(_describe_errors(error)) from error
 
