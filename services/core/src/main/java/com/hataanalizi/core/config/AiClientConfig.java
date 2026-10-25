@@ -28,21 +28,20 @@ public class AiClientConfig {
             @Value("${INTERNAL_TOKEN}") String internalToken,
             @Value("${app.ai.connect-timeout}") Duration connectTimeout,
             @Value("${app.ai.read-timeout}") Duration readTimeout) {
-        HttpClient httpClient =
-                HttpClient.newBuilder()
-                        .version(HttpClient.Version.HTTP_1_1)
-                        .connectTimeout(connectTimeout)
-                        .build();
+        HttpClient httpClient = HttpClient.newBuilder()
+                .version(HttpClient.Version.HTTP_1_1)
+                .connectTimeout(connectTimeout)
+                .build();
         JdkClientHttpRequestFactory requestFactory = new JdkClientHttpRequestFactory(httpClient);
         requestFactory.setReadTimeout(readTimeout);
-        return aiRestClientBuilder(baseUrl, internalToken).requestFactory(requestFactory).build();
+        return aiRestClientBuilder(baseUrl, internalToken)
+                .requestFactory(requestFactory)
+                .build();
     }
 
     /** Adresi ve iç başlık ekleyicisini kurar; zaman aşımı eklemez, testte kullanılır. */
     public RestClient.Builder aiRestClientBuilder(String baseUrl, String internalToken) {
-        return RestClient.builder()
-                .baseUrl(baseUrl)
-                .requestInterceptor(internalHeaders(internalToken));
+        return RestClient.builder().baseUrl(baseUrl).requestInterceptor(internalHeaders(internalToken));
     }
 
     /** Her isteğe token'ı ve o anki istek numarasını ekleyen ekleyiciyi döndürür. */

@@ -14,21 +14,21 @@ public enum ErrorCode {
     NOT_FOUND(HttpStatus.NOT_FOUND),
     INTERNAL_ERROR(HttpStatus.INTERNAL_SERVER_ERROR),
 
-// auth
+    // auth
 
-// sınav
+    // sınav
 
-// oturum
+    // oturum
 
-// kaynak
+    // kaynak
 
-// iş
+    // iş
 
-// inceleme
+    // inceleme
 
     // sohbet
     AI_UNAVAILABLE(HttpStatus.SERVICE_UNAVAILABLE),
-;
+    ;
 
     private final HttpStatus status;
 
