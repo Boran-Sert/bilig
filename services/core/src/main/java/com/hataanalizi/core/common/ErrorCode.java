@@ -26,7 +26,8 @@ public enum ErrorCode {
 
 // inceleme
 
-// sohbet
+    // sohbet
+    AI_UNAVAILABLE(HttpStatus.SERVICE_UNAVAILABLE),
 ;
 
     private final HttpStatus status;
