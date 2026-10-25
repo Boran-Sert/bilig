@@ -50,10 +50,10 @@ dev = [
 ]
 
 [tool.uv.sources]
-torch = { index = "pytorch-cpu" }
+torch = { index = "pytorch-cu132", marker = "sys_platform == 'win32'" }
 
-# Sadece CPU sürümü
+# Windows için CUDA
 [[tool.uv.index]]
-name = "pytorch-cpu"
-url = "https://download.pytorch.org/whl/cpu"
+name = "pytorch-cu132"
+url = "https://download.pytorch.org/whl/cu132"
 explicit = true
