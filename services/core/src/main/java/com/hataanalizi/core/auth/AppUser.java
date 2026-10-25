@@ -11,6 +11,7 @@ import java.time.OffsetDateTime;
 import lombok.Getter;
 import lombok.NoArgsConstructor;
 import lombok.Setter;
+import org.hibernate.annotations.UpdateTimestamp;
 
 /** Kullanıcı tablosundaki öğrenci ve içerik yöneticisi kayıtlarını temsil eder. */
 @Entity
@@ -47,7 +48,7 @@ public class AppUser {
     private Short grade;
 
     @Column(name = "explain_style", nullable = false, columnDefinition = "text")
-    private String explainStyle;
+    private String explainStyle = "SIMPLE";
 
     @Column(name = "external_user_id", columnDefinition = "text")
     private String externalUserId;
@@ -55,6 +56,7 @@ public class AppUser {
     @Column(name = "created_at", nullable = false, insertable = false, updatable = false)
     private OffsetDateTime createdAt;
 
-    @Column(name = "updated_at", nullable = false, insertable = false, updatable = false)
+    @UpdateTimestamp
+    @Column(name = "updated_at", nullable = false)
     private OffsetDateTime updatedAt;
 }
