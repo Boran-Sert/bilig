@@ -32,6 +32,7 @@ public class RequestIdFilter extends OncePerRequestFilter {
         return MDC.get(MDC_KEY);
     }
 
+    /** İstek kimliğini belirler, cevap başlığına ve MDC'ye yazar, istek zincirini çalıştırır. */
     @Override
     protected void doFilterInternal(HttpServletRequest request, HttpServletResponse response, FilterChain filterChain)
             throws ServletException, IOException {
