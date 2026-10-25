@@ -22,6 +22,7 @@ services:
   ai-api:
     build: services/ai
     env_file: .env
+    gpus: all
     expose:
       - "8000"
     volumes:
@@ -36,6 +37,7 @@ services:
     command: ["python", "-m", "app.worker"]
     init: true
     env_file: .env
+    gpus: all
     volumes:
       - data:/data
       - models:/models
