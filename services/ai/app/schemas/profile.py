@@ -113,3 +113,14 @@ class SourceProfile(BaseModel):
     name: str
     description: str
     rules: list[StyleRule]
+
+
+class ProfiledLine(BaseModel):
+    """Profil uygulanmış satır: blok türü, markdown, baskın stil, kutusu ve sayfadaki yeri."""
+
+    page_no: int
+    block_type: BlockType
+    markdown: str
+    style: TextStyle
+    box_bbox: BoundingBox | None
+    bbox: BoundingBox

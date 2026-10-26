@@ -1,11 +1,14 @@
-"""Kaynak profili: profilleri okuma, stil sayımı ve kayıtlı profili bulma (hazırlık hattı A4).
+"""Kaynak profili: profilleri okuma, stil sayımı, profil bulma ve uygulama (hazırlık hattı A4).
 
 Stil sayımı stil başına harf sayısını, ilk farklı örnek metinleri ve geçtiği ilk sayfaları verir;
 harf sayıları ve sıra (harf sayısı, eşitlikte stilin alanları) satırların yazım sırasından
 bağımsızdır, aynı PDF her seferinde aynı sonucu verir. Kayıtlı profillerden, kurallarının
 belgedeki harflerin en az PROFILE_MATCH_MIN_COVERAGE kadarını kapsadığı en yüksek kapsamlı profil
-seçilir; hiçbiri yetmezse profil önerisi istenir (#128). Kurallar sırayla denenir, stile uyan ilk
-kural kazanır; kuralda boş bırakılan alan her değerle eşleşir.
+seçilir; hiçbiri yetmezse profil önerisi istenir (#128). Profil uygulanırken satırın türünü
+satırda en çok harf tutan stile uyan ilk kural belirler; kurala uymayan satır METIN olur, IGNORE
+satırı atılır. İtalik ve kalın parçalar *...* ve **...** olarak korunur; sadece eşleşen kural
+italik ya da kalını açıkça istiyorsa (kalın başlık) o işaret konmaz. Edebiyat'ta italik eser
+adıdır, satırın çoğunu tutsa da kaybolmaz.
 """
 
 from collections import Counter
@@ -22,8 +25,10 @@ from app.constants import (
 )
 from app.ingest.styles import styled_lines
 from app.schemas.profile import (
+    ProfiledLine,
     SourceProfile,
     StyleCount,
+    StyledLine,
     StyleMatch,
     StyleRule,
     TextStyle,
@@ -93,6 +98,29 @@ def profile_coverage(counts: list[StyleCount], profile: SourceProfile) -> float:
     return covered / total
 
 
+def apply_profile(page: pymupdf.Page, profile: SourceProfile) -> list[ProfiledLine]:
+    """Sayfanın satırlarını profile göre blok türüne ve markdown metne çevirir."""
+    profiled = []
+    for line in styled_lines(page):
+        dominant = dominant_span_index(line)
+        span = line.spans[dominant]
+        rule = rule_for(span.style, profile)
+        target = rule.block_type if rule else "METIN"
+        if target == "IGNORE":
+            continue
+        profiled.append(
+            ProfiledLine(
+                page_no=line.page_no,
+                block_type=target,
+                markdown=line_markdown(line, rule.match if rule else None),
+                style=span.style,
+                box_bbox=span.box_bbox,
+                bbox=line.bbox,
+            )
+        )
+    return profiled
+
+
 def rule_for(style: TextStyle, profile: SourceProfile) -> StyleRule | None:
     """Stile uyan ilk kuralı döner; uyan kural yoksa boş döner."""
     return next((rule for rule in profile.rules if matches(style, rule.match)), None)
@@ -105,6 +133,45 @@ def matches(style: TextStyle, match: StyleMatch) -> bool:
     if boxed is not None and (style.box is not None) != boxed:
         return False
     return all(getattr(style, field) == value for field, value in wanted.items())
+
+
+def dominant_span_index(line: StyledLine) -> int:
+    """Satırda en çok harf tutan stilin ilk parçasının yerini döner; eşitlikte önceki kazanır."""
+    characters: Counter[TextStyle] = Counter()
+    for span in line.spans:
+        characters[span.style] += len(span.text.strip())
+    dominant = max(characters, key=lambda style: characters[style])
+    return next(index for index, span in enumerate(line.spans) if span.style == dominant)
+
+
+def line_markdown(line: StyledLine, match: StyleMatch | None) -> str:
+    """Satırı markdown'a çevirir; aynı işaretli komşu parçalar tek işaret çifti alır."""
+    keep_bold = match is not None and match.bold is True
+    keep_italic = match is not None and match.italic is True
+    runs: list[tuple[str, str]] = []
+    for span in line.spans:
+        text = span.text.replace("\\", "\\\\").replace("*", "\\*").replace("_", "\\_")
+        if not text.strip() and runs:
+            runs[-1] = (runs[-1][0], runs[-1][1] + text)
+            continue
+        mark = ("**" if span.style.bold and not keep_bold else "") + (
+            "*" if span.style.italic and not keep_italic else ""
+        )
+        if runs and runs[-1][0] == mark:
+            runs[-1] = (mark, runs[-1][1] + text)
+        else:
+            runs.append((mark, text))
+    return " ".join("".join(wrap(mark, text) for mark, text in runs).split())
+
+
+def wrap(mark: str, text: str) -> str:
+    """Metnin çevresindeki boşluğu dışarıda bırakarak işaret çiftiyle sarar."""
+    core = text.strip()
+    if not mark or not core:
+        return text
+    before = " " if text[0].isspace() else ""
+    after = " " if text[-1].isspace() else ""
+    return f"{before}{mark}{core}{mark[::-1]}{after}"
 
 
 def style_sort_key(style: TextStyle) -> tuple[str, float, bool, bool, str, str]:
