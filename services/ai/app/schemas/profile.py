@@ -50,6 +50,15 @@ class StyledLine(BaseModel):
     bbox: BoundingBox
 
 
+class StyleCount(BaseModel):
+    """Bir stilin belgede kaç harf tuttuğu, ilk farklı örnekleri ve geçtiği ilk sayfalar."""
+
+    style: TextStyle
+    characters: int
+    samples: list[str]
+    pages: list[int]
+
+
 class StyleMatch(BaseModel):
     """Kuralın aradığı stil alanları; boş alan her değerle eşleşir, en az bir alan dolu olur."""
 
