@@ -7,16 +7,26 @@ sınıfı, sırası ve adı tutulduğu için tablonun geri kalanı (süre, döne
 Ünite kazanım gruplarına adındaki türle bağlanır (plan A1): Hikâye, Roman, Masal → A.2;
 Şiir → A.1; Tiyatro → A.3; Makale, Deneme → A.4. Tür, ünite adının kelimelerinden biri olmalıdır
 ("Romanı" bağlanmaz); şapkalı harf şapkasız da eşleşir. Kurala uymayan ünite (Giriş, Mektup)
-kazanıma bağlanmaz. Veritabanına yazma ve komut ayrı PR'da (#108, 2/2) gelir.
+kazanıma bağlanmaz.
+
+Komut: uv run python -m app.ingest.readers.program_units <pdf> [--dry-run]
+Önce kazanımlar yüklenmiş olmalıdır (app.ingest.readers.program).
 """
 
+import argparse
+import asyncio
 import re
 from collections.abc import Iterable
 from pathlib import Path
 
 import pymupdf
+import structlog
 
-from app.constants import UNIT_GROUP_KEYWORDS
+from app.config import LogSettings, get_settings
+from app.constants import PROGRAM_CURRICULUM_NAME, PROGRAM_SUBJECT_CODE, UNIT_GROUP_KEYWORDS
+from app.db.pool import close_pool, open_pool
+from app.db.queries.program import save_units
+from app.log import configure_logging
 from app.schemas.program import CurriculumUnit
 from app.text.turkish import normalize_nfc, tr_lower, tr_upper
 
@@ -26,6 +36,22 @@ _WORD_PART = re.compile(r"([ /(-]+)")
 _HYPHEN_SPACES = re.compile(r"\s*-\s*")
 _LOWER_WORDS = frozenset({"ve"})
 _CIRCUMFLEX_FOLD = str.maketrans("âîû", "aiu")
+
+
+def main(argv: list[str] | None = None) -> None:
+    """Komut satırından program PDF'inin ünitelerini okur; --dry-run yoksa veritabanına yazar."""
+    parser = argparse.ArgumentParser(description="Read curriculum units from a curriculum PDF.")
+    parser.add_argument("pdf", type=Path)
+    parser.add_argument("--dry-run", action="store_true", help="do not write to the database")
+    arguments = parser.parse_args(argv)
+    configure_logging(LogSettings())
+    units = read_units(arguments.pdf)
+    structlog.get_logger().info(
+        "units parsed",
+        units=[f"{unit.grade}.{unit.unit_no} {unit.title} {unit.group_codes}" for unit in units],
+    )
+    if not arguments.dry_run:
+        asyncio.run(_save(units), loop_factory=asyncio.SelectorEventLoop)
 
 
 def read_units(path: Path) -> list[CurriculumUnit]:
@@ -83,3 +109,20 @@ def unit_group_codes(title: str) -> list[str]:
         if code and code not in codes:
             codes.append(code)
     return codes
+
+
+async def _save(units: list[CurriculumUnit]) -> None:
+    """Üniteleri ve kazanım bağlarını yazar, sonucu log'a yazar."""
+    pool = await open_pool(get_settings().database)
+    try:
+        async with pool.connection() as connection:
+            summary = await save_units(
+                connection, PROGRAM_SUBJECT_CODE, PROGRAM_CURRICULUM_NAME, units
+            )
+    finally:
+        await close_pool()
+    structlog.get_logger().info("units saved", **summary.model_dump())
+
+
+if __name__ == "__main__":
+    main()
