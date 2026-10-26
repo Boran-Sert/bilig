@@ -17,6 +17,15 @@ PROGRAM_CURRICULUM_NAME = "TDE Öğretim Programı 2018"
 PROGRAM_CURRICULUM_MODEL = "LEGACY"
 PROGRAM_CURRICULUM_YEAR = 2018
 SEARCH_PATH_SEPARATOR = " › "
+UNIT_GROUP_KEYWORDS = {  # şapkasız küçük harf
+    "hikaye": "A.2",
+    "roman": "A.2",
+    "masal": "A.2",
+    "şiir": "A.1",
+    "tiyatro": "A.3",
+    "makale": "A.4",
+    "deneme": "A.4",
+}
 
 TURKISH_LETTERS = frozenset("abcçdefgğhıijklmnoöprsştuüvyzâîû")
 TEXT_LAYER_MIN_RATIO = 0.90
