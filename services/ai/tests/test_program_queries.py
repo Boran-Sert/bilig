@@ -1,8 +1,7 @@
 """Kazanım ağacını veritabanına yazan sorguları sahte bağlantıyla test eder.
 
-Program tabloları core migration'ıyla (#93) gelene kadar CI'da gerçek veritabanı yok. Bu yüzden
-burada sorguların sırası, parametreleri, transaction kullanımı ve sayımlar ölçülür. Upsert'ün
-gerçek Postgres'teki davranışı (kopya satır, embedding sıfırlama) PR açıklamasında elle denendi.
+Burada sorguların sırası, parametreleri, transaction kullanımı ve sayımlar ölçülür. Upsert'ün
+gerçek Postgres'teki davranışı (kopya satır, embedding sıfırlama) test_program_queries_db.py'de.
 """
 
 import re
