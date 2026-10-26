@@ -2,6 +2,7 @@
 
 import json
 import re
+import unicodedata
 from collections import Counter
 from pathlib import Path
 from typing import Any
@@ -62,6 +63,15 @@ def test_question_text_is_not_empty(questions: list[dict[str, Any]]) -> None:
         assert list(question["options"]) == OPTION_KEYS, question["id"]
         for text in question["options"].values():
             assert isinstance(text, str) and text.strip(), question["id"]
+
+
+def test_text_is_clean_unicode() -> None:
+    """Dosya NFC'dir; satır başı (CR) ve yumuşak tire (U+00AD) içermez."""
+    content = CONTROL_SET.read_bytes().decode("utf-8")
+
+    assert unicodedata.is_normalized("NFC", content)
+    assert "\r" not in content
+    assert "­" not in content
 
 
 def test_correct_answer_is_an_option(questions: list[dict[str, Any]]) -> None:
