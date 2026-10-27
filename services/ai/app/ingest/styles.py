@@ -4,10 +4,14 @@ Her metin parçasının stili PyMuPDF'in verdiği font, yarım puana yuvarlanmı
 italiklik ve yazı rengiyle parçanın ortasının düştüğü en küçük dolgulu kutudan oluşur. Kutu
 sayılan çizim dikdörtgen, dörtgen ya da köşesi yuvarlak kutudur (eğri köşeler ve en az üç düz
 kenar); daire, dilim ve üçgen kutu değildir. Görünmez dolgu (opaklık 0) ve sayfanın
-PROFILE_BOX_MAX_PAGE_SHARE kadarını kaplayan zemin de kutu sayılmaz. Aynı alanlı kutulardan en son
-çizilen (üstte kalan) seçilir. PyMuPDF birleşik harfin işaretini ayrı, çoğu zaman başka fontlu
-bir parça olarak verebilir (s ve çengel); sadece birleşen işaretten oluşan parça önceki parçaya
-eklenir ve parça NFC'ye çevrilir. Profil sayımı ve uygulaması (profile.py) bu satırları kullanır.
+PROFILE_BOX_MAX_PAGE_SHARE kadarını kaplayan zemin de kutu sayılmaz. Bazı PDF'ler basılmayan
+(kırpılmış ya da üstü örtülmüş) dolgular taşır; bu yüzden sayfa düşük çözünürlükte basılır ve
+kenar ortalarına yakın noktalarının çoğu kutunun renginde görünen çizim kutu sayılır; yarı
+saydam dolgu karışık renkte basıldığı için kutu sayılmaz, iç kutu dış kutunun kenar ortalarını
+örtüyorsa dış kutu düşer. Aynı alanlı kutulardan en son çizilen (üstte kalan) seçilir. PyMuPDF
+birleşik harfin işaretini ayrı, çoğu zaman başka fontlu bir parça olarak verebilir (s ve
+çengel); sadece birleşen işaretten oluşan parça önceki parçaya eklenir ve parça NFC'ye çevrilir.
+Profil sayımı ve uygulaması (profile.py) bu satırları kullanır.
 """
 
 import unicodedata
@@ -16,7 +20,14 @@ from typing import Any
 
 import pymupdf
 
-from app.constants import PROFILE_BOX_MAX_PAGE_SHARE, PROFILE_SIZE_STEP
+from app.constants import (
+    PROFILE_BOX_CHECK_DPI,
+    PROFILE_BOX_COLOR_TOLERANCE,
+    PROFILE_BOX_MAX_PAGE_SHARE,
+    PROFILE_BOX_MIN_MATCHING_POINTS,
+    PROFILE_BOX_SAMPLE_INSET,
+    PROFILE_SIZE_STEP,
+)
 from app.schemas.profile import BoundingBox, StyledLine, StyledSpan, TextStyle
 from app.text.turkish import normalize_nfc
 
@@ -79,14 +90,55 @@ def to_span(span: dict[str, Any], boxes: list[Box]) -> StyledSpan:
 def filled_boxes(page: pymupdf.Page) -> list[Box]:
     """Sayfadaki görünür dolgulu kutuları alanı küçükten büyüğe, eşitse üstteki önce döner."""
     page_area = page.rect.get_area()
-    boxes = []
-    for order, drawing in enumerate(page.get_drawings()):
-        if not is_box(drawing):
-            continue
-        rect = pymupdf.Rect(drawing["rect"])
-        if rect.get_area() < PROFILE_BOX_MAX_PAGE_SHARE * page_area:
-            boxes.append((rect.get_area(), -order, rect, to_hex(drawing["fill"])))
+    candidates = [
+        (order, pymupdf.Rect(drawing["rect"]), drawing["fill"])
+        for order, drawing in enumerate(page.get_drawings())
+        if is_box(drawing)
+        and pymupdf.Rect(drawing["rect"]).get_area() < PROFILE_BOX_MAX_PAGE_SHARE * page_area
+    ]
+    if not candidates:
+        return []
+    rendered = page.get_pixmap(dpi=PROFILE_BOX_CHECK_DPI)
+    boxes = [
+        (rect.get_area(), -order, rect, to_hex(fill))
+        for order, rect, fill in candidates
+        if shows_color(rendered, page, rect, fill)
+    ]
     return [(rect, color) for _, _, rect, color in sorted(boxes, key=lambda box: box[:2])]
+
+
+def shows_color(
+    rendered: pymupdf.Pixmap, page: pymupdf.Page, rect: pymupdf.Rect, fill: tuple[float, ...]
+) -> bool:
+    """Kutunun kenar ortalarına yakın noktalarının çoğu basılı sayfada kutu rengindeyse doğru."""
+    inset_x, inset_y = rect.width * PROFILE_BOX_SAMPLE_INSET, rect.height * PROFILE_BOX_SAMPLE_INSET
+    middle_x, middle_y = (rect.x0 + rect.x1) / 2, (rect.y0 + rect.y1) / 2
+    points = [
+        (middle_x, rect.y0 + inset_y),
+        (middle_x, rect.y1 - inset_y),
+        (rect.x0 + inset_x, middle_y),
+        (rect.x1 - inset_x, middle_y),
+    ]
+    expected = [round(channel * 255) for channel in fill[:3]]
+    matching = sum(
+        all(
+            abs(actual - wanted) <= PROFILE_BOX_COLOR_TOLERANCE
+            for actual, wanted in zip(pixel_at(rendered, page, x, y), expected, strict=True)
+        )
+        for x, y in points
+    )
+    return matching >= PROFILE_BOX_MIN_MATCHING_POINTS
+
+
+def pixel_at(rendered: pymupdf.Pixmap, page: pymupdf.Page, x: float, y: float) -> list[int]:
+    """Çizim koordinatındaki noktanın basılı görüntüdeki rengini verir; sayfa dönüşünü uygular."""
+    point = pymupdf.Point(x, y) * page.rotation_matrix
+    column = int(point.x / page.rect.width * rendered.width)
+    row = int(point.y / page.rect.height * rendered.height)
+    pixel = rendered.pixel(
+        min(rendered.width - 1, max(0, column)), min(rendered.height - 1, max(0, row))
+    )
+    return list(pixel[:3])
 
 
 def is_box(drawing: dict[str, Any]) -> bool:

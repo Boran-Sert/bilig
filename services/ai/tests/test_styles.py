@@ -166,3 +166,87 @@ def test_blank_lines_are_skipped_and_page_no_starts_at_one() -> None:
     lines = list(styled_lines(page))
 
     assert [(line.page_no, line.spans[0].text) for line in lines] == [(2, "Metin")]
+
+
+def test_fill_hidden_under_another_fill_is_not_a_box() -> None:
+    """Üstü başka bir dolguyla örtülüp basılmayan koyu dolgu kutu sayılmaz."""
+    page = new_page()
+    page.draw_rect(pymupdf.Rect(40, 60, 300, 200), color=None, fill=(0.14, 0.12, 0.13))
+    page.draw_rect(pymupdf.Rect(30, 50, 310, 210), color=None, fill=(1, 1, 1))
+    page.insert_text((50, 100), "Metin", fontsize=10)
+
+    assert only_style(page).box == "#ffffff"
+
+
+BOX = pymupdf.Rect(40, 60, 300, 200)
+EDGE_MIDDLES = {
+    "top": (170, 65.6),
+    "bottom": (170, 194.4),
+    "left": (50.4, 130),
+    "right": (289.6, 130),
+}
+
+
+@pytest.mark.parametrize(
+    ("covered", "kept"),
+    [(["top", "bottom"], True), (["top", "bottom", "left"], False)],
+    ids=["two-visible", "one-visible"],
+)
+def test_box_needs_two_visible_edge_middles(covered: list[str], kept: bool) -> None:
+    """Kenar ortalarından en az ikisi kutunun renginde görünen kutu sayılır."""
+    page = new_page()
+    page.draw_rect(BOX, color=None, fill=BLUE)
+    for side in covered:
+        x, y = EDGE_MIDDLES[side]
+        page.draw_rect(pymupdf.Rect(x - 4, y - 4, x + 4, y + 4), color=None, fill=(1, 1, 1))
+
+    assert ("#d9ebff" in [color for _, color in filled_boxes(page)]) is kept
+
+
+@pytest.mark.parametrize(("difference", "kept"), [(20, True), (40, False)])
+def test_box_color_must_match_within_tolerance(difference: int, kept: bool) -> None:
+    """Basılı renk kutunun renginden tolerans kadar farklıysa kutu sayılır, fazlasıysa sayılmaz."""
+    page = new_page()
+    hidden = (0.5, 0.5, 0.5)
+    shown = tuple((127.5 + difference) / 255 for _ in range(3))
+    page.draw_rect(BOX, color=None, fill=hidden)
+    page.draw_rect(BOX, color=None, fill=shown)
+
+    colors = [color for _, color in filled_boxes(page)]
+
+    assert ("#808080" in colors) is kept
+
+
+@pytest.mark.parametrize("rotation", [90, 180, 270])
+def test_boxes_are_found_on_rotated_pages(rotation: int) -> None:
+    """Dönük sayfada da kutu basılı görüntüde doğru yerden denetlenir."""
+    page = new_page()
+    page.set_rotation(rotation)
+    page.draw_rect(BOX, color=None, fill=BLUE)
+    page.insert_text((50, 100), "Bilgi", fontsize=10)
+
+    assert only_style(page).box == "#d9ebff"
+
+
+def test_boxes_are_found_on_cropped_pages() -> None:
+    """Kırpılmış sayfada da kutu basılı görüntüde doğru yerden denetlenir."""
+    page = new_page()
+    page.draw_rect(BOX, color=None, fill=BLUE)
+    page.draw_rect(pymupdf.Rect(300, 60, 560, 200), color=None, fill=(1, 0.8, 0.8))
+    page.set_cropbox(pymupdf.Rect(30, 40, 580, 800))
+
+    assert sorted(color for _, color in filled_boxes(page)) == ["#d9ebff", "#ffcccc"]
+
+
+def test_page_without_box_candidates_is_not_rendered(monkeypatch: pytest.MonkeyPatch) -> None:
+    """Kutu adayı olmayan sayfa basılmaz."""
+    page = new_page()
+    page.insert_text((50, 100), "Metin", fontsize=10)
+
+    def fail_render(*arguments: object, **keywords: object) -> None:
+        """Basma çağrılırsa testi düşürür."""
+        raise AssertionError("page must not be rendered")
+
+    monkeypatch.setattr(pymupdf.Page, "get_pixmap", fail_render)
+
+    assert filled_boxes(page) == []
