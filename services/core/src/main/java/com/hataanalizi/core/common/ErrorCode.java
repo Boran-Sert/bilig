@@ -13,6 +13,7 @@ public enum ErrorCode {
     VALIDATION_FAILED(HttpStatus.BAD_REQUEST),
     NOT_FOUND(HttpStatus.NOT_FOUND),
     INTERNAL_ERROR(HttpStatus.INTERNAL_SERVER_ERROR),
+    AI_UNAVAILABLE(HttpStatus.SERVICE_UNAVAILABLE),
 
 // auth
 
