@@ -1,15 +1,15 @@
 """Ders kitabı okuyucusu: profil uygulanmış satırlardan bloklar (hazırlık hattı A5).
 
 Satırlar ingest/layout.py'nin okuma sırasıyla gelir; iki sayfalık açılımın her sayfası bir sütundur,
-sayfa içindeki iki sütunlu şiir sonraki adımda (#129, 2/2) sıraya konur. Gölge için iki kez basılmış
-aynı satır bir kez okunur. Blok, aynı türde ve aynı kutudaki ardışık satırlardır; tür, kutu ya da
-başlık boyutu değişince, satırlar arasında boşluk büyüyünce ya da önceki satır bitmişken madde
-("1.", "•") başlayınca yeni blok başlar. Blok içindeki satırlar layout.py'nin kurallarıyla birleşir;
-satırın dolu olup olmadığı bloğun kendi sağ kenarına göre ölçülür (resim yanında daralan paragraf,
-kutu), noktalamayla bitip büyük harfle süren satır (dize) ayrı kalır, italik *...* korunur. Sayfa
-sütununun sonunda noktalama olmadan kalan blok, aynı ya da sonraki sayfadaki bir sonraki sütunun
-başında küçük harfle süren aynı türden blokla birleşir (sayfa sonunda bölünen paragraf); blok ilk
-sayfasına yazılır. Başlıklar boyutuna göre düzey alır; başlık yolu kaynak adı ve üstteki daha büyük
+sayfa içindeki iki sütunlu şiiri subcolumns.py sıraya koyar. Gölge için iki kez basılmış aynı satır
+bir kez okunur. Blok, aynı türde ve aynı kutudaki ardışık satırlardır; tür, kutu ya da başlık boyutu
+değişince, satırlar arasında boşluk büyüyünce ya da önceki satır bitmişken madde ("1.", "•")
+başlayınca yeni blok başlar. Blok içindeki satırlar layout.py'nin kurallarıyla birleşir; satırın
+dolu olup olmadığı bloğun kendi sağ kenarına göre ölçülür (resim yanında daralan paragraf, kutu),
+noktalamayla bitip büyük harfle süren satır (dize) ayrı kalır, italik *...* korunur. Sayfa sütununun
+sonunda noktalama olmadan kalan blok, aynı ya da sonraki sayfadaki bir sonraki sütunun başında küçük
+harfle süren aynı türden blokla birleşir (sayfa sonunda bölünen paragraf); blok ilk sayfasına
+yazılır. Başlıklar boyutuna göre düzey alır; başlık yolu kaynak adı ve üstteki daha büyük
 başlıklardır ("TDE 12 Ders Kitabı › ŞİİR › Cumhuriyet Dönemi Halk Şiiri"). Arama metni başlık yolu
 ve markdown'dır; position, bloğun ilk sayfasındaki sırasıdır. Alıntının altındaki kaynak satırını
 alıntıya bağlama henüz yapılmadı (#129 izleme işi).
@@ -28,6 +28,7 @@ from app.constants import (
     TEXTBOOK_BLOCK_GAP,
 )
 from app.ingest.layout import TextPiece, column_pieces, join_pieces
+from app.ingest.readers.subcolumns import split_subcolumns
 from app.schemas.profile import BlockType, BoundingBox, ProfiledLine
 
 _LIST_START = re.compile(r"^(?:\*\*)?(?:\d{1,2}[.)]|•|-)\s")
@@ -63,7 +64,7 @@ def read_textbook(
     lines: Sequence[ProfiledLine], page_width: float, source_title: str
 ) -> list[TextbookBlock]:
     """Profil uygulanmış satırlardan kitabın bloklarını başlık yollarıyla okur."""
-    pieces = column_pieces(_unique_lines(lines), page_width)
+    pieces = split_subcolumns(list(column_pieces(_unique_lines(lines), page_width)))
     drafts = _merge_across_columns(_group_blocks(pieces), page_width / 2)
     levels = _heading_levels(drafts)
     headings: list[tuple[int, str]] = []
