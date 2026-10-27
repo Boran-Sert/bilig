@@ -13,22 +13,22 @@ public enum ErrorCode {
     VALIDATION_FAILED(HttpStatus.BAD_REQUEST),
     NOT_FOUND(HttpStatus.NOT_FOUND),
     INTERNAL_ERROR(HttpStatus.INTERNAL_SERVER_ERROR),
-
-    // auth
-
-    // sınav
-
-    // oturum
-
-    // kaynak
-
-    // iş
-
-    // inceleme
-
-    // sohbet
     AI_UNAVAILABLE(HttpStatus.SERVICE_UNAVAILABLE),
-    ;
+
+// auth
+
+// sınav
+
+// oturum
+
+// kaynak
+
+// iş
+
+// inceleme
+
+// sohbet
+;
 
     private final HttpStatus status;
 

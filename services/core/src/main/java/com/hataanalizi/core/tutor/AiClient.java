@@ -3,8 +3,6 @@ package com.hataanalizi.core.tutor;
 import com.hataanalizi.core.common.ApiException;
 import com.hataanalizi.core.common.ErrorCode;
 import java.util.function.Supplier;
-import org.slf4j.Logger;
-import org.slf4j.LoggerFactory;
 import org.springframework.beans.factory.annotation.Qualifier;
 import org.springframework.http.HttpStatusCode;
 import org.springframework.stereotype.Component;
@@ -18,8 +16,6 @@ import org.springframework.web.client.RestClient;
  */
 @Component
 public class AiClient {
-
-    private static final Logger log = LoggerFactory.getLogger(AiClient.class);
 
     private final RestClient restClient;
 
