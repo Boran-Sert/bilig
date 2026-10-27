@@ -1,7 +1,9 @@
-"""Ders kitabı okuyucusunun blok ve başlık yolu kurallarını test eder (hazırlık hattı A5).
+"""Ders kitabı okuyucusunun blok, başlık yolu ve sayfa sonu kurallarını test eder (A5).
 
 Satırlar elle kurulur: kitap sayfası sol sütunda (40-280), yazı boyutu 10, satır aralığı 14.
 """
+
+import pytest
 
 from app.ingest.readers.textbook import TextbookBlock, read_textbook
 from app.schemas.profile import BlockType, BoundingBox, ProfiledLine, TextStyle
@@ -110,6 +112,47 @@ def test_search_text_is_title_path_and_markdown() -> None:
     assert read(lines)[1].search_text == "TDE 12 Ders Kitabı › ŞİİR\nGövde."
 
 
+@pytest.mark.parametrize(
+    ("last", "next_line", "merged"),
+    [
+        ("sonra eve dön-", "dü ve uyudu.", True),
+        ("sonra eve döndü", "ve hemen uyudu.", True),
+        ("sonra eve döndü.", "ve hemen uyudu.", False),
+        ("sonra eve döndü", "Ertesi gün uyandı.", False),
+    ],
+    ids=["hyphen", "no-period", "finished", "capital-start"],
+)
+def test_paragraph_split_at_page_end_is_merged(last: str, next_line: str, merged: bool) -> None:
+    """Sayfa sonunda yarım kalan paragraf, sonraki sayfanın başındaki satırla birleşir."""
+    lines = [line(f"Ali okuldan çıktı, {last}", 700), line(next_line, 60, right=200, page_no=2)]
+
+    blocks = read(lines)
+
+    assert len(blocks) == (1 if merged else 2)
+    assert blocks[0].pages == ([1, 2] if merged else [1])
+    assert blocks[0].page_no == 1
+
+
+def test_heading_is_never_merged_across_pages() -> None:
+    """Sayfa sonundaki başlık, sonraki sayfanın başlığıyla birleşmez."""
+    lines = [
+        line("**METNE HAZIRLIK**", 700, "BASLIK", size=14, right=150),
+        line("**devamı**", 60, "BASLIK", size=14, right=150, page_no=2),
+    ]
+
+    assert len(read(lines)) == 2
+
+
+def test_boxed_text_is_not_merged_with_body_across_pages() -> None:
+    """Kutudaki yarım satır, sonraki sayfanın kutusuz gövdesiyle birleşmez."""
+    lines = [
+        line("Kutudaki bilgi devam", 700, "METIN", box=INFO_BOX),
+        line("ediyor gövdede.", 60, right=200, page_no=2),
+    ]
+
+    assert len(read(lines)) == 2
+
+
 def test_shadow_duplicates_are_read_once() -> None:
     """Gölge için aynı yere iki kez basılmış satır bir kez okunur."""
     heading = line("**BİLİNMEYEN KELİMELER**", 60, "BASLIK", size=13, right=200)
@@ -169,6 +212,13 @@ def test_position_counts_blocks_on_their_first_page() -> None:
     ]
 
     assert [(block.page_no, block.position) for block in read(lines)] == [(1, 0), (1, 1), (2, 0)]
+
+
+def test_page_end_merge_needs_the_next_page() -> None:
+    """Yarım paragraf iki sayfa sonrasındaki küçük harfli satırla birleşmez."""
+    lines = [line("Ali okuldan çıktı ve eve", 700), line("döndü.", 60, right=200, page_no=3)]
+
+    assert len(read(lines)) == 2
 
 
 def test_list_number_continuing_a_sentence_is_not_a_new_item() -> None:

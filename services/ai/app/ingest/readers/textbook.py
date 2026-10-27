@@ -1,16 +1,18 @@
 """Ders kitabı okuyucusu: profil uygulanmış satırlardan bloklar (hazırlık hattı A5).
 
-Satırlar ingest/layout.py'nin okuma sırasıyla gelir; iki sayfalık açılımın her sayfası bir sütundur.
-Gölge için iki kez basılmış aynı satır bir kez okunur. Blok, aynı türde ve aynı kutudaki ardışık
-satırlardır; tür, kutu ya da başlık boyutu değişince, satırlar arasında boşluk büyüyünce ya da
-önceki satır bitmişken madde ("1.", "•") başlayınca yeni blok başlar. Blok içindeki satırlar
-layout.py'nin kurallarıyla birleşir; satırın dolu olup olmadığı bloğun kendi sağ kenarına göre
-ölçülür (resim yanında daralan paragraf, kutu), noktalamayla bitip büyük harfle süren satır (dize)
-ayrı kalır, italik *...* korunur. Başlıklar boyutuna göre düzey alır; başlık yolu kaynak adı ve
-üstteki daha büyük başlıklardır ("TDE 12 Ders Kitabı › ŞİİR › Cumhuriyet Dönemi Halk Şiiri"). Arama
-metni başlık yolu ve markdown'dır; position, bloğun ilk sayfasındaki sırasıdır. Sayfa sonunda
-bölünen paragrafın birleşmesi ve sayfa içindeki iki sütunlu şiir sonraki adımda (#129, 2/2) gelir;
-alıntının altındaki kaynak satırını alıntıya bağlama henüz yapılmadı (#129 izleme işi).
+Satırlar ingest/layout.py'nin okuma sırasıyla gelir; iki sayfalık açılımın her sayfası bir sütundur,
+sayfa içindeki iki sütunlu şiir sonraki adımda (#129, 2/2) sıraya konur. Gölge için iki kez basılmış
+aynı satır bir kez okunur. Blok, aynı türde ve aynı kutudaki ardışık satırlardır; tür, kutu ya da
+başlık boyutu değişince, satırlar arasında boşluk büyüyünce ya da önceki satır bitmişken madde
+("1.", "•") başlayınca yeni blok başlar. Blok içindeki satırlar layout.py'nin kurallarıyla birleşir;
+satırın dolu olup olmadığı bloğun kendi sağ kenarına göre ölçülür (resim yanında daralan paragraf,
+kutu), noktalamayla bitip büyük harfle süren satır (dize) ayrı kalır, italik *...* korunur. Sayfa
+sütununun sonunda noktalama olmadan kalan blok, aynı ya da sonraki sayfadaki bir sonraki sütunun
+başında küçük harfle süren aynı türden blokla birleşir (sayfa sonunda bölünen paragraf); blok ilk
+sayfasına yazılır. Başlıklar boyutuna göre düzey alır; başlık yolu kaynak adı ve üstteki daha büyük
+başlıklardır ("TDE 12 Ders Kitabı › ŞİİR › Cumhuriyet Dönemi Halk Şiiri"). Arama metni başlık yolu
+ve markdown'dır; position, bloğun ilk sayfasındaki sırasıdır. Alıntının altındaki kaynak satırını
+alıntıya bağlama henüz yapılmadı (#129 izleme işi).
 """
 
 import re
@@ -61,7 +63,8 @@ def read_textbook(
     lines: Sequence[ProfiledLine], page_width: float, source_title: str
 ) -> list[TextbookBlock]:
     """Profil uygulanmış satırlardan kitabın bloklarını başlık yollarıyla okur."""
-    drafts = _group_blocks(column_pieces(_unique_lines(lines), page_width))
+    pieces = column_pieces(_unique_lines(lines), page_width)
+    drafts = _merge_across_columns(_group_blocks(pieces), page_width / 2)
     levels = _heading_levels(drafts)
     headings: list[tuple[int, str]] = []
     positions: Counter[int] = Counter()
@@ -134,6 +137,31 @@ def _line_finished(piece: TextPiece) -> bool:
     """Satır noktalamayla bitiyorsa ya da sütunun sağ kenarına varmıyorsa doğru döner."""
     short = piece.column_right - piece.right > LAYOUT_FULL_LINE_SLACK * piece.size
     return short or bool(_SENTENCE_END.search(piece.text))
+
+
+def _merge_across_columns(drafts: list[_Draft], middle: float) -> list[_Draft]:
+    """Sütun sonunda yarım kalan bloğu sonraki sütunun başındaki aynı türden blokla birleştirir."""
+    merged: list[_Draft] = []
+    for draft in drafts:
+        previous = merged[-1] if merged else None
+        if previous is not None and _continues(previous, draft, middle):
+            previous.pieces.extend(draft.pieces)
+        else:
+            merged.append(draft)
+    return merged
+
+
+def _continues(previous: _Draft, draft: _Draft, middle: float) -> bool:
+    """Blok, aynı ya da önceki sayfadaki bir önceki sayfa sütununun son bloğunun devamıysa doğru."""
+    last, first = previous.pieces[-1], draft.pieces[0]
+    last_column = (last.page_no, last.line.bbox[0] >= middle)
+    first_column = (first.page_no, first.line.bbox[0] >= middle)
+    next_column = first_column != last_column and 0 <= first.page_no - last.page_no <= 1
+    unfinished = not _SENTENCE_END.search(join_pieces(_fit_to_block(previous.pieces)))
+    same_kind = previous.block_type == draft.block_type and draft.block_type != "BASLIK"
+    same_box = (previous.box is None) == (draft.box is None)
+    starts_lower = first.text.lstrip("*")[:1].islower()
+    return next_column and unfinished and same_kind and same_box and starts_lower
 
 
 def _heading_levels(drafts: list[_Draft]) -> dict[float, int]:
