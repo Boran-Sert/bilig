@@ -1,14 +1,16 @@
-"""Test sayfalarının satır düzeni: okuma sırası ve satır birleştirme (hazırlık hattı A5).
+"""Sayfa düzeni: okuma sırası ve satır birleştirme (hazırlık hattı A5).
 
-Satırlar sayfa sayfa, sütun sütun (sol kenarın sayfa ortasına göre yeri), yukarıdan aşağı ve satır
-içinde soldan sağa okunur; birkaç puan farklı yükseklikteki parçalar aynı satır sayılır. Sütun
-kenarları bütün belgedeki o taraftaki satırlardan bulunur; sol kenar alt yüzdelikten alınır, tek
-bir taşkın satır kenarı kaydırmaz. Sağ yarısında en az TEST_TWO_COLUMN_MIN_LINES satır başlayan
-sayfa iki sütunludur; orada ortadan geçen satır (test adı) soruya ait değildir, atılır. Sütunun sağ
-kenarına kadar dolu satır sonrakiyle birleşir; satır sonu tiresiyle bölünen kelime tiresiz, büyük
-harfle süren birleşik kelime ("Türk-İslam") tireli birleşir; kısa biten satır (dize, diyalog) ve
-madde imi, çizgi ya da "I."-"VI." ile başlayan satır ayrı satırda kalır. Eşikler yazı boyutunun
-katıdır. Soruları bu parçalardan soru okuyucusu (#130) kurar.
+Profil uygulanmış satırlar sayfa sayfa, sütun sütun (sol kenarın sayfa ortasına göre yeri),
+yukarıdan aşağı ve satır içinde soldan sağa okunur; birkaç puan farklı yükseklikteki parçalar aynı
+satır sayılır. Sütun, iki sütunlu test sayfasının sütunu ya da iki sayfalık kitap açılımının bir
+sayfasıdır. Sütun kenarları bütün belgedeki o taraftaki satırlardan bulunur; sol kenar alt
+yüzdelikten alınır, tek bir taşkın satır kenarı kaydırmaz. Sağ yarısında en az
+LAYOUT_TWO_COLUMN_MIN_LINES satır başlayan sayfa iki sütunludur; orada ortadan geçen satır (test
+adı) atılır. Sütunun sağ kenarına kadar dolu satır sonrakiyle birleşir; satır sonu tiresiyle
+bölünen kelime tiresiz, büyük harfle süren birleşik kelime ("Türk-İslam") tireli birleşir; kısa
+biten satır (dize, diyalog) ve madde imi, çizgi ya da "I."-"VI." ile başlayan satır ayrı satırda
+kalır. Eşikler yazı boyutunun katıdır. Test (readers/test.py) ve kitap okuyucuları bu parçaları
+kullanır.
 """
 
 import re
@@ -18,11 +20,11 @@ from itertools import groupby
 from pydantic import BaseModel
 
 from app.constants import (
-    TEST_EDGE_PERCENTILE,
-    TEST_FULL_LINE_SLACK,
-    TEST_ROW_TOLERANCE,
-    TEST_SOFT_WRAP_SLACK,
-    TEST_TWO_COLUMN_MIN_LINES,
+    LAYOUT_EDGE_PERCENTILE,
+    LAYOUT_FULL_LINE_SLACK,
+    LAYOUT_ROW_TOLERANCE,
+    LAYOUT_SOFT_WRAP_SLACK,
+    LAYOUT_TWO_COLUMN_MIN_LINES,
 )
 from app.schemas.profile import ProfiledLine
 
@@ -33,8 +35,9 @@ _COMPOUND_START = re.compile(r"^[A-ZÇĞİÖŞÜ][a-zçğıöşüâîû]")
 
 
 class TextPiece(BaseModel):
-    """Sütundaki bir metin parçası, yazı boyutu, kenarları ve satırın ilk parçası olup olmadığı."""
+    """Sütundaki metin parçası, kaynak satırı, kenarları ve satırın ilk parçası olup olmadığı."""
 
+    line: ProfiledLine
     text: str
     size: float
     left: float
@@ -69,14 +72,14 @@ def column_pieces(lines: Sequence[ProfiledLine], page_width: float) -> Iterator[
 def column_edges(lines: list[ProfiledLine]) -> tuple[float, float]:
     """Sütunun sol kenarını satırların alt yüzdeliğinden, sağ kenarını en uzun satırdan bulur."""
     lefts = sorted(line.bbox[0] for line in lines)
-    left = lefts[int(TEST_EDGE_PERCENTILE * (len(lefts) - 1))]
+    left = lefts[int(LAYOUT_EDGE_PERCENTILE * (len(lefts) - 1))]
     return left, max(line.bbox[2] for line in lines)
 
 
 def drop_page_wide_lines(page_lines: list[ProfiledLine], middle: float) -> list[ProfiledLine]:
     """İki sütunlu sayfada ortadan geçen satırları (test adı, başlık) atar."""
     right_column = sum(line.bbox[0] >= middle for line in page_lines)
-    if right_column < TEST_TWO_COLUMN_MIN_LINES:
+    if right_column < LAYOUT_TWO_COLUMN_MIN_LINES:
         return page_lines
     return [line for line in page_lines if not line.bbox[0] < middle < line.bbox[2]]
 
@@ -87,7 +90,7 @@ def row_pieces(
     """Sütunun satırlarını hizalarına göre kümeleyip yukarıdan aşağı, soldan sağa verir."""
     rows: list[list[ProfiledLine]] = []
     for line in sorted(column, key=lambda line: line.bbox[1]):
-        tolerance = TEST_ROW_TOLERANCE * line.style.size
+        tolerance = LAYOUT_ROW_TOLERANCE * line.style.size
         if rows and line.bbox[1] - rows[-1][0].bbox[1] < tolerance:
             rows[-1].append(line)
         else:
@@ -95,6 +98,7 @@ def row_pieces(
     for row in rows:
         for index, line in enumerate(sorted(row, key=lambda line: line.bbox[0])):
             yield TextPiece(
+                line=line,
                 text=line.markdown,
                 size=line.style.size,
                 left=line.bbox[0],
@@ -130,7 +134,7 @@ def wrapped_word_mark(text: str, previous: TextPiece, piece: TextPiece, current:
     if not hyphen or not piece.row_start:
         return ""
     mark = hyphen[1]
-    full = previous.column_right - previous.right <= TEST_SOFT_WRAP_SLACK * previous.size
+    full = previous.column_right - previous.right <= LAYOUT_SOFT_WRAP_SLACK * previous.size
     continues = current.startswith(mark) and current[len(mark) : len(mark) + 1].islower()
     return "-" + mark if continues and full else ""
 
@@ -142,9 +146,9 @@ def line_separator(text: str, previous: TextPiece, piece: TextPiece, current: st
     if _HARD_START.match(current):
         return "\n"
     gap = previous.column_right - previous.right
-    if gap <= TEST_FULL_LINE_SLACK * previous.size:
+    if gap <= LAYOUT_FULL_LINE_SLACK * previous.size:
         compound = _LINE_END_HYPHEN.search(text) and _COMPOUND_START.match(current)
         return "" if compound else " "
-    if current[:1].islower() and gap <= TEST_SOFT_WRAP_SLACK * previous.size:
+    if current[:1].islower() and gap <= LAYOUT_SOFT_WRAP_SLACK * previous.size:
         return " "
     return "\n"

@@ -1,4 +1,4 @@
-"""Test sayfalarının okuma sırasını ve satır birleştirme kurallarını test eder (hazırlık hattı A5).
+"""Sayfa düzeninin okuma sırasını ve satır birleştirme kurallarını test eder (hazırlık hattı A5).
 
 Satırlar elle kurulur (tests/profiled_lines.py); son satır sütunun sağ kenarını belirleyen dolu
 satırdır.
@@ -6,7 +6,7 @@ satırdır.
 
 import pytest
 
-from app.ingest.readers.test_lines import column_pieces, join_pieces
+from app.ingest.layout import column_pieces, join_pieces
 from app.schemas.profile import ProfiledLine
 from tests.profiled_lines import PAGE_WIDTH, line
 
