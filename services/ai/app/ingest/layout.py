@@ -3,16 +3,18 @@
 Profil uygulanmış satırlar sayfa sayfa, sütun sütun (sol kenarın sayfa ortasına göre yeri),
 yukarıdan aşağı ve satır içinde soldan sağa okunur; birkaç puan farklı yükseklikteki parçalar aynı
 satır sayılır. Sütun, iki sütunlu test sayfasının sütunu ya da iki sayfalık kitap açılımının bir
-sayfasıdır. Sütun kenarları bütün belgedeki o taraftaki satırlardan bulunur; sol kenar alt
-yüzdelikten alınır, tek bir taşkın satır kenarı kaydırmaz. Sağ yarısında en az
-LAYOUT_TWO_COLUMN_MIN_LINES satır başlayan sayfa iki sütunludur; orada ortadan geçen satır (test
-adı) atılır. Sütunun sağ kenarına kadar dolu satır sonrakiyle birleşir; satır sonu tiresiyle
-bölünen kelime tiresiz, büyük harfle süren birleşik kelime ("Türk-İslam") tireli birleşir; kısa
-biten satır (dize, diyalog) ve madde imi, çizgi ya da "I."-"VI." ile başlayan satır ayrı satırda
-kalır. Eşikler yazı boyutunun katıdır. Test (readers/test.py) ve kitap okuyucuları bu parçaları
-kullanır.
+sayfasıdır. Sütun kenarları bütün belgedeki o taraftaki satırlardan bulunur; sol kenar alt, sağ
+kenar üst yüzdelikten alınır, tek tük taşkın satır (geniş kutu, tablo) kenarı kaydırmaz. Sağ
+yarısında en az LAYOUT_TWO_COLUMN_MIN_LINES satır başlayan sayfa iki sütunludur; orada ortadan geçen
+satır (test adı) atılır. Sütunun sağ kenarına kadar dolu satır sonrakiyle birleşir; istenirse
+(kitap) noktalamayla bitip büyük harfle süren dolu satır da dize sayılıp ayrı kalır; satır sonu
+tiresiyle bölünen kelime tiresiz, büyük harfle süren birleşik kelime ("Türk-İslam") tireli birleşir;
+kısa biten satır (dize, diyalog) ve madde imi, çizgi ya da "I."-"VI." ile başlayan satır ayrı
+satırda kalır. Eşikler yazı boyutunun katıdır. Test (readers/test.py) ve kitap okuyucuları bu
+parçaları kullanır.
 """
 
+import math
 import re
 from collections.abc import Iterator, Sequence
 from itertools import groupby
@@ -31,6 +33,7 @@ from app.schemas.profile import ProfiledLine
 ITEM_PATTERN = r"(?:I{1,3}|IV|VI?)\.\s"
 _HARD_START = re.compile(r"^(?:" + ITEM_PATTERN + r"|•|–|-\s)")
 _LINE_END_HYPHEN = re.compile(r"\w-(\**)$")
+_CLAUSE_END = re.compile(r"[.,;:!?…]\**$")
 _COMPOUND_START = re.compile(r"^[A-ZÇĞİÖŞÜ][a-zçğıöşüâîû]")
 
 
@@ -70,10 +73,13 @@ def column_pieces(lines: Sequence[ProfiledLine], page_width: float) -> Iterator[
 
 
 def column_edges(lines: list[ProfiledLine]) -> tuple[float, float]:
-    """Sütunun sol kenarını satırların alt yüzdeliğinden, sağ kenarını en uzun satırdan bulur."""
+    """Sütunun kenarlarını satırların alt ve üst yüzdeliğinden bulur; taşkın satır kaydırmaz."""
     lefts = sorted(line.bbox[0] for line in lines)
-    left = lefts[int(LAYOUT_EDGE_PERCENTILE * (len(lefts) - 1))]
-    return left, max(line.bbox[2] for line in lines)
+    rights = sorted(line.bbox[2] for line in lines)
+    last = len(lines) - 1
+    left = lefts[int(LAYOUT_EDGE_PERCENTILE * last)]
+    right = rights[math.ceil((1 - LAYOUT_EDGE_PERCENTILE) * last)]
+    return left, right
 
 
 def drop_page_wide_lines(page_lines: list[ProfiledLine], middle: float) -> list[ProfiledLine]:
@@ -110,8 +116,8 @@ def row_pieces(
             )
 
 
-def join_pieces(pieces: Sequence[TextPiece]) -> str:
-    """Parçaları satır sonu kurallarıyla tek metne birleştirir."""
+def join_pieces(pieces: Sequence[TextPiece], verse_breaks: bool = False) -> str:
+    """Parçaları satır sonu kurallarıyla tek metne birleştirir; istenirse dize sonlarını korur."""
     text = ""
     previous: TextPiece | None = None
     for piece in pieces:
@@ -123,7 +129,7 @@ def join_pieces(pieces: Sequence[TextPiece]) -> str:
         elif mark := wrapped_word_mark(text, previous, piece, current):
             text = text[: -len(mark)] + current[len(mark) - 1 :]
         else:
-            text += line_separator(text, previous, piece, current) + current
+            text += line_separator(text, previous, piece, current, verse_breaks) + current
         previous = piece
     return text
 
@@ -139,7 +145,9 @@ def wrapped_word_mark(text: str, previous: TextPiece, piece: TextPiece, current:
     return "-" + mark if continues and full else ""
 
 
-def line_separator(text: str, previous: TextPiece, piece: TextPiece, current: str) -> str:
+def line_separator(
+    text: str, previous: TextPiece, piece: TextPiece, current: str, verse_breaks: bool
+) -> str:
     """İki parça arasına boşluk, satır sonu ya da (tireli birleşik kelimede) hiçbir şey koyar."""
     if not piece.row_start:
         return " "
@@ -147,8 +155,10 @@ def line_separator(text: str, previous: TextPiece, piece: TextPiece, current: st
         return "\n"
     gap = previous.column_right - previous.right
     if gap <= LAYOUT_FULL_LINE_SLACK * previous.size:
-        compound = _LINE_END_HYPHEN.search(text) and _COMPOUND_START.match(current)
-        return "" if compound else " "
+        if _LINE_END_HYPHEN.search(text) and _COMPOUND_START.match(current):
+            return ""
+        verse = verse_breaks and _CLAUSE_END.search(text) and current[:1].isupper()
+        return "\n" if verse else " "
     if current[:1].islower() and gap <= LAYOUT_SOFT_WRAP_SLACK * previous.size:
         return " "
     return "\n"

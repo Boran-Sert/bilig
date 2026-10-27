@@ -13,9 +13,9 @@ from tests.profiled_lines import PAGE_WIDTH, line
 FULL = "Sağ kenara kadar dolu satır."
 
 
-def joined(lines: list[ProfiledLine]) -> str:
+def joined(lines: list[ProfiledLine], verse_breaks: bool = False) -> str:
     """Satırları okuma sırasıyla parçalara çevirip birleştirir."""
-    return join_pieces(list(column_pieces(lines, PAGE_WIDTH)))
+    return join_pieces(list(column_pieces(lines, PAGE_WIDTH)), verse_breaks)
 
 
 def with_full_line(lines: list[ProfiledLine]) -> list[ProfiledLine]:
@@ -141,3 +141,27 @@ def test_stray_line_left_of_margin_does_not_move_the_edge() -> None:
     pieces = list(column_pieces(lines, PAGE_WIDTH))
 
     assert {piece.column_left for piece in pieces} == {40}
+
+
+@pytest.mark.parametrize(("verse_breaks", "separator"), [(True, "\n"), (False, " ")])
+def test_verse_breaks_are_kept_only_when_asked(verse_breaks: bool, separator: str) -> None:
+    """Noktalamayla biten dolu satır ve büyük harfli devamı sadece istenirse (kitap) ayrı kalır."""
+    lines = [line("Korkma, sönmez bu şafaklarda yüzen al sancak;", 100)]
+    lines += [line("Sönmeden yurdumun üstünde tüten en son ocak.", 114)]
+
+    assert joined(lines, verse_breaks) == (
+        f"Korkma, sönmez bu şafaklarda yüzen al sancak;{separator}"
+        "Sönmeden yurdumun üstünde tüten en son ocak."
+    )
+
+
+def test_right_edge_ignores_a_few_overhanging_lines() -> None:
+    """Sağ kenar üst yüzdelikten alınır; tek bir taşkın satır dolu satırları kısa göstermez."""
+    lines = [
+        line(f"Satır {index} uzunca bir gövde satırı ve dev-", 100 + 14 * index)
+        for index in range(11)
+    ]
+    lines.append(line("am eder.", 254, right=120))
+    lines.append(line("Taşkın geniş tablo satırı", 300, right=400))
+
+    assert "devam eder." in joined(lines)
