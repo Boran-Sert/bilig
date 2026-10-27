@@ -33,11 +33,11 @@ public class AiClient {
                 .get()
                 .uri("/internal/health")
                 .retrieve()
-                .onStatus(HttpStatusCode::is5xxServerError, (request, response) -> {
-                    log.warn(
-                            "Ai service returned status {}",
-                            response.getStatusCode().value());
-                    throw new ApiException(ErrorCode.AI_UNAVAILABLE);
+                .onStatus(HttpStatusCode::isError, (request, response) -> {
+                    throw new ApiException(
+                            ErrorCode.AI_UNAVAILABLE,
+                            new IllegalStateException("AI service returned status "
+                                    + response.getStatusCode().value()));
                 })
                 .toBodilessEntity());
     }
@@ -47,8 +47,7 @@ public class AiClient {
         try {
             return call.get();
         } catch (ResourceAccessException exception) {
-            log.warn("Ai service is unreachable", exception);
-            throw new ApiException(ErrorCode.AI_UNAVAILABLE);
+            throw new ApiException(ErrorCode.AI_UNAVAILABLE, exception);
         }
     }
 }

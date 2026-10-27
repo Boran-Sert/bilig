@@ -20,6 +20,7 @@ import com.hataanalizi.core.common.RequestIdFilter;
 import com.hataanalizi.core.config.AiClientConfig;
 import java.io.IOException;
 import java.util.ResourceBundle;
+import java.util.UUID;
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
@@ -47,7 +48,21 @@ class AiClientTest {
     /** Gerçek config'ten RestClient kurar, sahte sunucuya bağlar ve log yakalayıcıyı açar. */
     @BeforeEach
     void setUp() {
-        RestClient.Builder builder = new AiClientConfig().aiRestClientBuilder(BASE_URL, TOKEN);
+        RestClient.Builder builder = RestClient.builder()
+                .baseUrl(BASE_URL)
+                .requestInterceptor((request, body, execution) -> {
+                    request.getHeaders().set(AiClientConfig.INTERNAL_TOKEN_HEADER, TOKEN);
+
+                    String requestId = RequestIdFilter.currentRequestId();
+                    request.getHeaders()
+                            .set(
+                                    RequestIdFilter.HEADER_NAME,
+                                    requestId != null
+                                            ? requestId
+                                            : UUID.randomUUID().toString());
+
+                    return execution.execute(request, body);
+                });
         server = MockRestServiceServer.bindTo(builder).build();
         client = new AiClient(builder.build());
 

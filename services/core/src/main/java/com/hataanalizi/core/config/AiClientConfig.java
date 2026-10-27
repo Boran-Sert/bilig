@@ -24,6 +24,7 @@ public class AiClientConfig {
     /** Zaman aşımlı, adresi ve iç başlıkları hazır RestClient bean'ini üretir. */
     @Bean
     public RestClient aiRestClient(
+            RestClient.Builder restClientBuilder,
             @Value("${AI_BASE_URL}") String baseUrl,
             @Value("${INTERNAL_TOKEN}") String internalToken,
             @Value("${app.ai.connect-timeout}") Duration connectTimeout,
@@ -34,14 +35,11 @@ public class AiClientConfig {
                 .build();
         JdkClientHttpRequestFactory requestFactory = new JdkClientHttpRequestFactory(httpClient);
         requestFactory.setReadTimeout(readTimeout);
-        return aiRestClientBuilder(baseUrl, internalToken)
+        return restClientBuilder
+                .baseUrl(baseUrl)
+                .requestInterceptor(internalHeaders(internalToken))
                 .requestFactory(requestFactory)
                 .build();
-    }
-
-    /** Adresi ve iç başlık ekleyicisini kurar; zaman aşımı eklemez, testte kullanılır. */
-    public RestClient.Builder aiRestClientBuilder(String baseUrl, String internalToken) {
-        return RestClient.builder().baseUrl(baseUrl).requestInterceptor(internalHeaders(internalToken));
     }
 
     /** Her isteğe token'ı ve o anki istek numarasını ekleyen ekleyiciyi döndürür. */

@@ -12,5 +12,14 @@ spring:
       ddl-auto: validate
     open-in-view: false
 
+# Placeholder
+AI_BASE_URL: http://localhost:8000
+INTERNAL_TOKEN: test-internal-token
+
+app:
+  ai:
+    connect-timeout: 2s
+    read-timeout: 5s
+
 server:
   port: 8081
