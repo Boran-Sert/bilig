@@ -9,6 +9,7 @@ ORTAK bölüm (kitap okuyucuda birebir aynısı vardır):
    Kalınlık: ailesinde adı kalın olan font varsa addan, yoksa geçerli ağırlıktan (600-900).
 2. Görünürlük: sayfa bir kez tam, bir kez metin (ve bir kez çizim) nesneleri kapalı çizilir;
    mürekkebi görünmeyen karakter ve çizim (gizli katman, örtülmüş, kırpılmış, beyaz) atılır.
+   Örtü yalnız sayfa düzeyindeki opak nesnedir (form içindeki şekil saydam grupta olabilir).
 3. Bozuk ya da şüpheli (Türkçede olmayan "Ġ", "Ģ" gibi) eşlemeli metin tek başına siyah çizilip
    Tesseract'la okunur; her (font, kod) için oy sayılır, yeterli oy toplanınca oylama durur.
    Kod oy çokluğuyla, oyu yoksa fontun kod kaymasıyla çözülür.
@@ -16,8 +17,9 @@ ORTAK bölüm (kitap okuyucuda birebir aynısı vardır):
    çizgisinin kalınlığından tahmin edilir. Metinli sayfada metin katmanının kapsamadığı büyük
    resimler de (metin nesneleri gizli çizilip) okunur; OCR güveni düşük resim yazısız sayılır.
 5. Düzen: kenarda aynen tekrarlayan satır, gövdede kullanılmayan stilde koşu başlığı, sırasında
-   yalnız duran sayı ve kenardaki küçük alt yazıya bitişik kısa satırlar (logo) üst ya da alt
-   bilgidir. Okuma sırası XY-cut ile bulunur (kutular bölünmez).
+   yalnız duran sayı, kenardaki küçük alt yazıya bitişik kısa satırlar (logo) ve karekod
+   yönlendirmeleri içerik dışıdır. Okuma sırası XY-cut ile bulunur; kutular bölünmez, satır
+   kutuya yatayda tümüyle içindeyse aittir.
    İsteğe bağlı düzen modeli (PP-DocLayoutV3, LAYOUT=1) açıksa kelimeler modelin iç içe
    olmayan en dış bölgelerine dağıtılır; bloklar arasındaki sıra yine XY-cut'tır.
 6. Satır birleştirme: tireyle bölünen kelime birleşir. Paragraf eşiği belgeden öğrenilir: sıra
@@ -138,6 +140,7 @@ UNDERLINE_EXTRA_EM = 2.0
 CLOSED = re.compile(r"[.!?:…\"”’)]\**$")
 TINY_PRINT_RATIO = 0.7
 BRAND_MAX_WORDS = 3
+QR_NOTE = re.compile(r"karekod", re.IGNORECASE)
 BOLD_SEAM = re.compile(r"\*\*(\s+)\*\*")
 STRIP_GAP_EM = 1.5
 DIGITS = re.compile(r"\d+")
@@ -546,7 +549,11 @@ def stacking(page: pdfium.PdfPage) -> Stacking:
             clip = clip_box(obj, height)
             if clip:
                 clips[address] = clip
-        elif obj.type in (pdfium_c.FPDF_PAGEOBJ_PATH, pdfium_c.FPDF_PAGEOBJ_IMAGE) and opaque(obj):
+        elif (
+            obj.type in (pdfium_c.FPDF_PAGEOBJ_PATH, pdfium_c.FPDF_PAGEOBJ_IMAGE)
+            and obj.level == 0
+            and opaque(obj)
+        ):
             left, bottom, right, top = obj.get_bounds()
             covers.append((z, left, height - top, right, height - bottom))
     return Stacking(order, clips, covers)
@@ -1299,7 +1306,23 @@ def find_furniture(pages: list[PageIR], body_style: tuple[str, float, bool, str]
             if repeated or running or lone_number or tiny:
                 furniture.add(id(line))
         furniture |= brand_lines(page, furniture, body_style[1])
+        furniture |= note_lines(page)
     return furniture
+
+
+def note_lines(page: PageIR) -> set[int]:
+    """Karekod yönlendirmesi ("karekodu okutunuz") ve ona bitişik kısa satırlar."""
+    marked = {id(line) for line in page.lines if QR_NOTE.search(line.text)}
+    grew = bool(marked)
+    while grew:
+        grew = False
+        anchors = [line for line in page.lines if id(line) in marked]
+        for line in page.lines:
+            short = len(line.words) <= BRAND_MAX_WORDS
+            if id(line) not in marked and short and any(stacked(line, a) for a in anchors):
+                marked.add(id(line))
+                grew = True
+    return marked
 
 
 def brand_lines(page: PageIR, furniture: set[int], body_size: float) -> set[int]:
@@ -1644,9 +1667,10 @@ def make_items(lines: list[Line], boxes: list[Shape]) -> list[Item]:
 
 
 def inside(line: Line, box: Shape) -> bool:
-    """Satırın ortası kutunun içinde mi."""
-    cx, cy = (line.x0 + line.x1) / 2, (line.y0 + line.y1) / 2
-    return box.x0 <= cx <= box.x1 and box.y0 <= cy <= box.y1
+    """Satır yatayda tümüyle (bir em payla), dikeyde ortasıyla kutunun içinde mi."""
+    cy = (line.y0 + line.y1) / 2
+    pad = line.size
+    return box.x0 - pad <= line.x0 and line.x1 <= box.x1 + pad and box.y0 <= cy <= box.y1
 
 
 def contains(outer_box: Shape, inner_box: Shape) -> bool:
@@ -2312,7 +2336,7 @@ def choose_marker(
             for d in candidates
         )
     ]
-    usual_ones = [c for c in eligible if c.signature == usual]
+    usual_ones = [c for c in eligible if usual is not None and c.signature[:5] == usual[:5]]
     for group in (
         [c for c in usual_ones if previous is not None and c.number == previous + 1],
         [c for c in eligible if previous is not None and c.number == previous + 1],

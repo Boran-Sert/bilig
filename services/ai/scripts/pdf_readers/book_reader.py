@@ -9,8 +9,10 @@ KİTAP bölümü:
 1. Başlık: bölgedeki satırlar aynı stil, aynı hizalama ve belgeden öğrenilen paragraf adımından
    sıkı aralıkla öbeklenir. Öbek gövdeden belirgin büyük ya da kalın/renkli/büyük harfliyse, en
    çok üç satırsa, cümle gibi bitmiyorsa (iki noktayla bitip ardından madde gelen hariç), küçük
-   harfle ya da açık tırnakla başlamıyorsa, sağa yaslı imza ya da çizgili tablo hücresi değilse
+   harfle ya da açık tırnakla başlamıyorsa, biten metnin ardından sağ yarıda başlayan imza,
+   çizgili tablo hücresi, yalnız numara/şık etiketi ("II", "B) II") ya da virgüllü liste değilse
    ve ardından cümle sürmüyorsa başlıktır. Numaralı başlık büyük harfli ya da büyük olmalıdır.
+   Aynı stil ve sol kenarla art arda üçten çok gelen aday (etiketsiz şıklar) liste sayılır.
    Düzey boyut, kalınlık ve ortalanmışlığa göredir (büyük, kalın, ortalı önce).
 2. Başlık yolu: üstteki daha büyük başlıklar. Kutudaki ilk başlık kutunun adıdır; kutudan
    çıkınca kutu içinde açılan başlıklar yoldan düşer.
@@ -119,6 +121,7 @@ UNDERLINE_EXTRA_EM = 2.0
 CLOSED = re.compile(r"[.!?:…\"”’)]\**$")
 TINY_PRINT_RATIO = 0.7
 BRAND_MAX_WORDS = 3
+QR_NOTE = re.compile(r"karekod", re.IGNORECASE)
 BOLD_SEAM = re.compile(r"\*\*(\s+)\*\*")
 STRIP_GAP_EM = 1.5
 DIGITS = re.compile(r"\d+")
@@ -527,7 +530,11 @@ def stacking(page: pdfium.PdfPage) -> Stacking:
             clip = clip_box(obj, height)
             if clip:
                 clips[address] = clip
-        elif obj.type in (pdfium_c.FPDF_PAGEOBJ_PATH, pdfium_c.FPDF_PAGEOBJ_IMAGE) and opaque(obj):
+        elif (
+            obj.type in (pdfium_c.FPDF_PAGEOBJ_PATH, pdfium_c.FPDF_PAGEOBJ_IMAGE)
+            and obj.level == 0
+            and opaque(obj)
+        ):
             left, bottom, right, top = obj.get_bounds()
             covers.append((z, left, height - top, right, height - bottom))
     return Stacking(order, clips, covers)
@@ -1280,7 +1287,23 @@ def find_furniture(pages: list[PageIR], body_style: tuple[str, float, bool, str]
             if repeated or running or lone_number or tiny:
                 furniture.add(id(line))
         furniture |= brand_lines(page, furniture, body_style[1])
+        furniture |= note_lines(page)
     return furniture
+
+
+def note_lines(page: PageIR) -> set[int]:
+    """Karekod yönlendirmesi ("karekodu okutunuz") ve ona bitişik kısa satırlar."""
+    marked = {id(line) for line in page.lines if QR_NOTE.search(line.text)}
+    grew = bool(marked)
+    while grew:
+        grew = False
+        anchors = [line for line in page.lines if id(line) in marked]
+        for line in page.lines:
+            short = len(line.words) <= BRAND_MAX_WORDS
+            if id(line) not in marked and short and any(stacked(line, a) for a in anchors):
+                marked.add(id(line))
+                grew = True
+    return marked
 
 
 def brand_lines(page: PageIR, furniture: set[int], body_size: float) -> set[int]:
@@ -1625,9 +1648,10 @@ def make_items(lines: list[Line], boxes: list[Shape]) -> list[Item]:
 
 
 def inside(line: Line, box: Shape) -> bool:
-    """Satırın ortası kutunun içinde mi."""
-    cx, cy = (line.x0 + line.x1) / 2, (line.y0 + line.y1) / 2
-    return box.x0 <= cx <= box.x1 and box.y0 <= cy <= box.y1
+    """Satır yatayda tümüyle (bir em payla), dikeyde ortasıyla kutunun içinde mi."""
+    cy = (line.y0 + line.y1) / 2
+    pad = line.size
+    return box.x0 - pad <= line.x0 and line.x1 <= box.x1 + pad and box.y0 <= cy <= box.y1
 
 
 def contains(outer_box: Shape, inner_box: Shape) -> bool:
@@ -2131,6 +2155,8 @@ HEADING_SIZE_RATIO = 1.15
 HEADING_MAX_WIDTH_SHARE = 0.75
 HEADING_MAX_CHARS = 90
 HEADING_MAX_LINES = 3
+HEADING_MAX_COMMAS = 3
+HEADING_RUN_MAX = 2
 CENTER_TOLERANCE_EM = 2.0
 TABLE_CELL_MAX_LINES = 3
 TOC_MIN_SHARE = 0.5
@@ -2139,6 +2165,8 @@ ITEM_MARK = re.compile(r"^(?:\*\*)?(\d{1,2}[.)]|[a-zçğıöşü]\)|[•▪●�
 ITEM_START = re.compile(r"^(?:\d{1,2}[.)]|[a-zçğıöşü]\)|[•▪●■])$")
 HEADING_END = re.compile(r"[.!?…;:,\"”’]$")
 WORDLIKE = re.compile(r"[^\W\d_]{2}")
+LABEL_ONLY = re.compile(r"^(?:\(?[IVX]+[.)]?|\(?[A-E]\))$")
+OPTION_MARK = re.compile(r"^\(?[A-E]\)$")
 TOC_LEADER = re.compile(r"(?:\.{4,}|…{2,})\s*\d{0,3}\s*$")
 ANSWER_LINE = re.compile(r"^(?:Doğru\s+)?(?:Cevap|Yanıt)\s*:", re.IGNORECASE)
 
@@ -2261,11 +2289,42 @@ def heading_lines(body: Body) -> dict[int, int]:
                 groups[-1].append(line)
             else:
                 groups.append([line])
-        for index, group in enumerate(groups):
-            following = groups[index + 1][0] if index + 1 < len(groups) else None
-            if is_heading(group, following, region, body, body_style):
-                result.update({id(line): id(group[0]) for line in group})
+        flags = [
+            is_heading(
+                group, groups[k + 1][0] if k + 1 < len(groups) else None, region, body, body_style
+            )
+            and not (k and signature_line(group[0], groups[k - 1][-1], region))
+            for k, group in enumerate(groups)
+        ]
+        for group in kept_headings(groups, flags):
+            result.update({id(line): id(group[0]) for line in group})
     return result
+
+
+def kept_headings(groups: list[list[Line]], flags: list[bool]) -> list[list[Line]]:
+    """Başlık öbekleri; aynı stil ve sol kenarla art arda çok sayıda gelenler liste sayılır."""
+    kept: list[list[Line]] = []
+    run: list[list[Line]] = []
+    for group, flag in [*zip(groups, flags, strict=True), ([], False)]:
+        if flag and run and listed(run[-1][0], group[0]):
+            run.append(group)
+            continue
+        if len(run) <= HEADING_RUN_MAX or all(capitals(g[0].text) for g in run):
+            kept.extend(run)
+        run = [group] if flag else []
+    return kept
+
+
+def listed(a: Line, b: Line) -> bool:
+    """İki başlık adayı aynı listenin öğeleri gibi mi: aynı stil ve aynı sol kenar."""
+    same_left = abs(a.x0 - b.x0) < CENTER_TOLERANCE_EM * max(a.size, b.size)
+    return line_style(a) == line_style(b) and same_left
+
+
+def capitals(text: str) -> bool:
+    """Metnin harflerinin hepsi büyük mü."""
+    letters = [c for c in text if c.isalpha()]
+    return len(letters) >= 3 and all(c.isupper() for c in letters)
 
 
 def is_heading(
@@ -2286,13 +2345,16 @@ def is_heading(
     caps = len(letters) >= 3 and all(c.isupper() for c in letters)
     if len(group) > HEADING_MAX_LINES or len(text) > HEADING_MAX_CHARS:
         return False
+    labels = all(LABEL_ONLY.match(w.text) for w in words)
+    if text.count(",") >= HEADING_MAX_COMMAS or labels or OPTION_MARK.match(first.words[0].text):
+        return False
     if not WORDLIKE.search(text) or TOC_LEADER.search(text):
         return False
     if HEADING_END.search(text) and not introduces_list(text, following):
         return False
     if not words or (numbered and not (big or caps)) or fragment(words):
         return False
-    if any(right_aligned(line, region) for line in group) or in_table(first, body):
+    if in_table(first, body):
         return False
     strong = mostly_bold(words) or caps or style[3] != body_style[3]
     return (big or strong) and (following is None or not continues_sentence(following))
@@ -2328,10 +2390,10 @@ def centered(line: Line, region: Region) -> bool:
     return line.x0 > region.left + tolerance and abs((line.x0 + line.x1) / 2 - middle) < tolerance
 
 
-def right_aligned(line: Line, region: Region) -> bool:
-    """Satır sağ yarıda başlayıp sağ kenarda bitiyor mu (imza, kaynak adı)."""
+def signature_line(line: Line, previous: Line, region: Region) -> bool:
+    """Satır, biten bir metnin ardından sağ yarıda mı başlıyor (imza, kaynak adı)."""
     middle = (region.left + region.right) / 2
-    return line.x0 > middle and region.right - line.x1 < CENTER_TOLERANCE_EM * line.size
+    return line.x0 > middle and bool(CLOSED.search(previous.words[-1].text))
 
 
 def continues_sentence(line: Line) -> bool:
