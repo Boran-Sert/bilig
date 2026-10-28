@@ -14,12 +14,14 @@ ORTAK bölüm (kitap okuyucuda birebir aynısı vardır):
    Kod oy çokluğuyla, oyu yoksa fontun kod kaymasıyla çözülür.
 4. Metin katmanı olmayan sayfa (harfleri çizim, tarama) Tesseract'la okunur; kalınlık harf
    çizgisinin kalınlığından tahmin edilir.
-5. Düzen: kenarda aynen tekrarlayan satır, gövdede kullanılmayan stilde koşu başlığı ve sırasında
-   yalnız duran sayı üst ya da alt bilgidir. Okuma sırası XY-cut ile bulunur (kutular bölünmez).
+5. Düzen: kenarda aynen tekrarlayan satır, gövdede kullanılmayan stilde koşu başlığı, sırasında
+   yalnız duran sayı ve kenardaki küçük alt yazıya bitişik kısa satırlar (logo) üst ya da alt
+   bilgidir. Okuma sırası XY-cut ile bulunur (kutular bölünmez).
    İsteğe bağlı düzen modeli (PP-DocLayoutV3) açıksa kelimeler modelin bölgelerine dağıtılır.
 6. Satır birleştirme: tireyle bölünen kelime birleşir. Paragraf eşiği belgeden öğrenilir: sıra
    adımları log ölçekte kümelenir (Otsu) ve cümlesi süren satırların adımının üstündeki ilk
-   ayrık küme sınırı paragraf arasıdır. Dize düzeni paragrafın kendi oranlarından bulunur.
+   ayrık küme sınırı paragraf arasıdır. Dize düzeni paragrafın kendi oranlarından bulunur:
+   satırlar erken bitiyor ya da cümle bitmeden büyük harfle sürüyor.
    İtalik, kalın ve altı çizili markdown olarak korunur.
 
 TEST bölümü:
@@ -80,6 +82,7 @@ SAME_ROW_PITCH = 0.3
 VERSE_FIT_SHARE = 0.5
 VERSE_UPPER_SHARE = 0.6
 VERSE_FIT_ONLY_SHARE = 0.75
+VERSE_OPEN_UPPER_SHARE = 0.8
 VISIBILITY_SCALE = 2.0
 VISIBILITY_TEXT_DIFF = 24
 VISIBILITY_PATH_DIFF = 6
@@ -128,6 +131,7 @@ PARAGRAPH_INDENT_EM = 0.8
 UNDERLINE_EXTRA_EM = 2.0
 CLOSED = re.compile(r"[.!?:…\"”’)]\**$")
 TINY_PRINT_RATIO = 0.7
+BRAND_MAX_WORDS = 3
 BOLD_SEAM = re.compile(r"\*\*(\s+)\*\*")
 STRIP_GAP_EM = 1.5
 DIGITS = re.compile(r"\d+")
@@ -1208,7 +1212,34 @@ def find_furniture(pages: list[PageIR], body_style: tuple[str, float, bool, str]
             tiny = outer(line, page) and line.size < TINY_PRINT_RATIO * body_style[1]
             if repeated or running or lone_number or tiny:
                 furniture.add(id(line))
+        furniture |= brand_lines(page, furniture, body_style[1])
     return furniture
+
+
+def brand_lines(page: PageIR, furniture: set[int], body_size: float) -> set[int]:
+    """Kenardaki küçük yazıya (logo alt yazısı) üst üste bitişen kısa satırlar."""
+    marked = {
+        id(line)
+        for line in page.lines
+        if id(line) in furniture and line.size < TINY_PRINT_RATIO * body_size
+    }
+    grew = True
+    while grew:
+        grew = False
+        anchors = [line for line in page.lines if id(line) in marked]
+        for line in page.lines:
+            if id(line) in marked or not outer(line, page) or len(line.words) > BRAND_MAX_WORDS:
+                continue
+            if any(stacked(line, anchor) for anchor in anchors):
+                marked.add(id(line))
+                grew = True
+    return marked
+
+
+def stacked(a: Line, b: Line) -> bool:
+    """İki satır yatayda örtüşüp dikeyde bitişik mi (aynı öbek)."""
+    gap = max(a.y0 - b.y1, b.y0 - a.y1)
+    return a.x0 < b.x1 and b.x0 < a.x1 and gap < min(a.size, b.size)
 
 
 def alone_in_row(line: Line, page: PageIR, reach: float = ROW_MERGE_GAP_EM) -> bool:
@@ -1976,7 +2007,7 @@ def next_word_fits(previous: Row, current: Row, body: Body, right: float | None)
 
 
 def verse_like(rows: list[Row], body: Body, right: float | None) -> bool:
-    """Paragraf dize düzeninde mi: satırlar çoğunlukla erken bitiyor ve büyük harfle başlıyor."""
+    """Paragraf dize mi: satırlar erken bitiyor ya da cümle bitmeden büyük harfle sürüyor."""
     pairs = [
         (a, b)
         for a, b in zip(rows, rows[1:], strict=False)
@@ -1986,7 +2017,13 @@ def verse_like(rows: list[Row], body: Body, right: float | None) -> bool:
         return False
     fits = sum(next_word_fits(a, b, body, right) for a, b in pairs) / len(pairs)
     upper = sum(b.words[0].text[:1].isupper() for _, b in pairs) / len(pairs)
-    return (fits >= VERSE_FIT_SHARE and upper >= VERSE_UPPER_SHARE) or fits >= VERSE_FIT_ONLY_SHARE
+    if (fits >= VERSE_FIT_SHARE and upper >= VERSE_UPPER_SHARE) or fits >= VERSE_FIT_ONLY_SHARE:
+        return True
+    open_pairs = [(a, b) for a, b in pairs if not CLOSED.search(a.words[-1].text)]
+    if len(open_pairs) < 2:
+        return False
+    capital = sum(b.words[0].text[:1].isupper() for _, b in open_pairs) / len(open_pairs)
+    return capital >= VERSE_OPEN_UPPER_SHARE
 
 
 # ================================================================== ORTAK SONU

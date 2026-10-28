@@ -6,12 +6,17 @@ ORTAK bölüm test okuyucuyla birebir aynıdır (PDF okuma, görünürlük, bozu
 üst/alt bilgi, XY-cut okuma sırası, satır birleştirme); açıklaması test_reader.py'dedir.
 
 KİTAP bölümü:
-1. Başlık: gövdeden belirgin büyük ya da kalın/renkli/büyük harfli, kısa, cümle gibi bitmeyen ve
-   üstünden/altından boşlukla ya da stil değişimiyle ayrılan satır. Aynı stilde ardışık satırlar
-   tek başlıktır. Düzey boyuta göredir (büyük önce, aynı boyutta kalın önce).
+1. Başlık: bölgedeki satırlar aynı stil, aynı hizalama ve belgeden öğrenilen paragraf adımından
+   sıkı aralıkla öbeklenir. Öbek gövdeden belirgin büyük ya da kalın/renkli/büyük harfliyse, en
+   çok üç satırsa, cümle gibi bitmiyorsa (iki noktayla bitip ardından madde gelen hariç), küçük
+   harfle ya da açık tırnakla başlamıyorsa, sağa yaslı imza ya da çizgili tablo hücresi değilse
+   ve ardından cümle sürmüyorsa başlıktır. Numaralı başlık büyük harfli ya da büyük olmalıdır.
+   Düzey boyut, kalınlık ve ortalanmışlığa göredir (büyük, kalın, ortalı önce).
 2. Başlık yolu: üstteki daha büyük başlıklar. Kutudaki ilk başlık kutunun adıdır; kutudan
    çıkınca kutu içinde açılan başlıklar yoldan düşer.
-3. Metin: başlıklar arasındaki satırlar ortak satır birleştirmeyle paragraflara ayrılır; sütun
+3. İçindekiler: satırlarının çoğu noktalı sayfa yönlendirmesi ya da sayı olan parça tek blok
+   olur; başlığı ("İçindekiler") sonraki içeriğin yoluna girmez.
+4. Metin: başlıklar arasındaki satırlar ortak satır birleştirmeyle paragraflara ayrılır; sütun
    ve sayfa geçişinde yarım kalan paragraf sürer. "1.", "a)", "•" ile başlayan satırlar madde,
    ardışık maddeler tek listedir. Kalın ve iki noktayla biten kısa etiket ("**Modernizm:**")
    sonraki paragrafın başına bağlanır.
@@ -60,6 +65,7 @@ SAME_ROW_PITCH = 0.3
 VERSE_FIT_SHARE = 0.5
 VERSE_UPPER_SHARE = 0.6
 VERSE_FIT_ONLY_SHARE = 0.75
+VERSE_OPEN_UPPER_SHARE = 0.8
 VISIBILITY_SCALE = 2.0
 VISIBILITY_TEXT_DIFF = 24
 VISIBILITY_PATH_DIFF = 6
@@ -108,6 +114,7 @@ PARAGRAPH_INDENT_EM = 0.8
 UNDERLINE_EXTRA_EM = 2.0
 CLOSED = re.compile(r"[.!?:…\"”’)]\**$")
 TINY_PRINT_RATIO = 0.7
+BRAND_MAX_WORDS = 3
 BOLD_SEAM = re.compile(r"\*\*(\s+)\*\*")
 STRIP_GAP_EM = 1.5
 DIGITS = re.compile(r"\d+")
@@ -1188,7 +1195,34 @@ def find_furniture(pages: list[PageIR], body_style: tuple[str, float, bool, str]
             tiny = outer(line, page) and line.size < TINY_PRINT_RATIO * body_style[1]
             if repeated or running or lone_number or tiny:
                 furniture.add(id(line))
+        furniture |= brand_lines(page, furniture, body_style[1])
     return furniture
+
+
+def brand_lines(page: PageIR, furniture: set[int], body_size: float) -> set[int]:
+    """Kenardaki küçük yazıya (logo alt yazısı) üst üste bitişen kısa satırlar."""
+    marked = {
+        id(line)
+        for line in page.lines
+        if id(line) in furniture and line.size < TINY_PRINT_RATIO * body_size
+    }
+    grew = True
+    while grew:
+        grew = False
+        anchors = [line for line in page.lines if id(line) in marked]
+        for line in page.lines:
+            if id(line) in marked or not outer(line, page) or len(line.words) > BRAND_MAX_WORDS:
+                continue
+            if any(stacked(line, anchor) for anchor in anchors):
+                marked.add(id(line))
+                grew = True
+    return marked
+
+
+def stacked(a: Line, b: Line) -> bool:
+    """İki satır yatayda örtüşüp dikeyde bitişik mi (aynı öbek)."""
+    gap = max(a.y0 - b.y1, b.y0 - a.y1)
+    return a.x0 < b.x1 and b.x0 < a.x1 and gap < min(a.size, b.size)
 
 
 def alone_in_row(line: Line, page: PageIR, reach: float = ROW_MERGE_GAP_EM) -> bool:
@@ -1956,7 +1990,7 @@ def next_word_fits(previous: Row, current: Row, body: Body, right: float | None)
 
 
 def verse_like(rows: list[Row], body: Body, right: float | None) -> bool:
-    """Paragraf dize düzeninde mi: satırlar çoğunlukla erken bitiyor ve büyük harfle başlıyor."""
+    """Paragraf dize mi: satırlar erken bitiyor ya da cümle bitmeden büyük harfle sürüyor."""
     pairs = [
         (a, b)
         for a, b in zip(rows, rows[1:], strict=False)
@@ -1966,7 +2000,13 @@ def verse_like(rows: list[Row], body: Body, right: float | None) -> bool:
         return False
     fits = sum(next_word_fits(a, b, body, right) for a, b in pairs) / len(pairs)
     upper = sum(b.words[0].text[:1].isupper() for _, b in pairs) / len(pairs)
-    return (fits >= VERSE_FIT_SHARE and upper >= VERSE_UPPER_SHARE) or fits >= VERSE_FIT_ONLY_SHARE
+    if (fits >= VERSE_FIT_SHARE and upper >= VERSE_UPPER_SHARE) or fits >= VERSE_FIT_ONLY_SHARE:
+        return True
+    open_pairs = [(a, b) for a, b in pairs if not CLOSED.search(a.words[-1].text)]
+    if len(open_pairs) < 2:
+        return False
+    capital = sum(b.words[0].text[:1].isupper() for _, b in open_pairs) / len(open_pairs)
+    return capital >= VERSE_OPEN_UPPER_SHARE
 
 
 # ================================================================== ORTAK SONU
@@ -1976,11 +2016,16 @@ def verse_like(rows: list[Row], body: Body, right: float | None) -> bool:
 HEADING_SIZE_RATIO = 1.15
 HEADING_MAX_WIDTH_SHARE = 0.75
 HEADING_MAX_CHARS = 90
-HEADING_GAP_EM = 0.4
+HEADING_MAX_LINES = 3
+CENTER_TOLERANCE_EM = 2.0
+TABLE_CELL_MAX_LINES = 3
+TOC_MIN_SHARE = 0.5
 RUN_IN_MAX_CHARS = 60
 ITEM_MARK = re.compile(r"^(?:\*\*)?(\d{1,2}[.)]|[a-zçğıöşü]\)|[•▪●■])(?:\*\*)?\s+")
 ITEM_START = re.compile(r"^(?:\d{1,2}[.)]|[a-zçğıöşü]\)|[•▪●■])$")
 HEADING_END = re.compile(r"[.!?…;:,\"”’]$")
+WORDLIKE = re.compile(r"[^\W\d_]{2}")
+TOC_LEADER = re.compile(r"(?:\.{4,}|…{2,})\s*\d{0,3}\s*$")
 ANSWER_LINE = re.compile(r"^(?:Doğru\s+)?(?:Cevap|Yanıt)\s*:", re.IGNORECASE)
 
 
@@ -2009,7 +2054,7 @@ def read_book(pages: list[PageIR]) -> list[Block]:
     """Sayfalardan başlık yolu, paragraf ve madde bloklarını okuma sırasıyla çıkarır."""
     body = reading_order(pages)
     headings = heading_lines(body)
-    levels = heading_levels([line for line in body.lines if id(line) in headings])
+    levels = heading_levels([line for line in body.lines if id(line) in headings], body)
     blocks: list[Block] = []
     path: list[tuple[int, str, int | None]] = []
     titles: dict[int, str] = {}
@@ -2022,7 +2067,7 @@ def read_book(pages: list[PageIR]) -> list[Block]:
             current_box = box_id
         if segment.kind == "HEADING":
             text = heading_text(segment.lines, body)
-            level = levels[heading_key(segment.lines[0])]
+            level = levels[heading_key(segment.lines[0], body)]
             path = [entry for entry in path if entry[0] < level]
             if box_id is not None:
                 titles.setdefault(box_id, text)
@@ -2040,8 +2085,21 @@ def read_book(pages: list[PageIR]) -> list[Block]:
             continue
         trail = [t for _, t, _ in path]
         box = titles.get(box_id) if box_id is not None else None
+        if is_contents(segment):
+            if blocks and blocks[-1].kind == "HEADING" and path:
+                path.pop()
+            text = "\n".join(line.text for line in segment.lines)
+            blocks.append(Block("CONTENTS", text, None, trail[:-1], pages_of(segment.lines)))
+            continue
         blocks.extend(text_blocks(segment, body, trail, box))
     return blocks
+
+
+def is_contents(segment: Segment) -> bool:
+    """Metin parçası içindekiler mi: satırlarının çoğu noktalı sayfa yönlendirmesi ya da sayı."""
+    lines = segment.lines
+    guides = sum(1 for line in lines if TOC_LEADER.search(line.text) or line.text.isdigit())
+    return len(lines) >= 3 and guides >= TOC_MIN_SHARE * len(lines)
 
 
 def box_contexts(parts: list[Segment]) -> dict[int, int | None]:
@@ -2074,72 +2132,151 @@ def same_place(a: Shape, b: Shape) -> bool:
     return a.kind == b.kind and abs(a.x0 - b.x0) < 3 and abs(a.x1 - b.x1) < 3
 
 
-def heading_lines(body: Body) -> set[int]:
-    """Başlık satırları: belirgin büyük ya da vurgulu, kısa, ayrık ve cümle gibi bitmeyen."""
+def heading_lines(body: Body) -> dict[int, int]:
+    """Başlık satırlarının öbeği: belirgin büyük ya da vurgulu, cümle gibi bitmeyen ayrık öbek."""
     styles: Counter[tuple[str, float, bool, str]] = Counter()
     for line in body.lines:
         styles[line_style(line)] += len(line.text)
     body_style = styles.most_common(1)[0][0] if styles else ("", 0.0, False, "")
-    result = set()
+    result: dict[int, int] = {}
     for region in body.regions:
         lines = [line for line in region.lines if not ANSWER_LINE.match(line.text)]
-        gaps = sorted(b.y0 - a.y1 for a, b in zip(lines, lines[1:], strict=False) if b.y0 > a.y1)
-        usual = gaps[len(gaps) // 2] if gaps else 0.0
-        width = max(region.right - region.left, 1.0)
-        for index, line in enumerate(lines):
-            if is_heading(line, index, lines, usual, width, body_style, body.body_size):
-                result.add(id(line))
+        groups: list[list[Line]] = []
+        for line in lines:
+            if groups and not apart(groups[-1][-1], line, body):
+                groups[-1].append(line)
+            else:
+                groups.append([line])
+        for index, group in enumerate(groups):
+            following = groups[index + 1][0] if index + 1 < len(groups) else None
+            if is_heading(group, following, region, body, body_style):
+                result.update({id(line): id(group[0]) for line in group})
     return result
 
 
 def is_heading(
-    line: Line,
-    index: int,
-    lines: list[Line],
-    usual: float,
-    width: float,
+    group: list[Line],
+    following: Line | None,
+    region: Region,
+    body: Body,
     body_style: tuple[str, float, bool, str],
-    body_size: float,
 ) -> bool:
-    """Satır başlık mı (bkz. heading_lines)."""
-    text = line.text
-    style = line_style(line)
-    big = style[1] >= body_size * HEADING_SIZE_RATIO
-    if (
-        len(text) > HEADING_MAX_CHARS
-        or HEADING_END.search(text)
-        or not any(c.isalpha() for c in text)
-    ):
-        return False
-    if ITEM_START.match(line.words[0].text) and not big:
-        return False
-    short = line.x1 - line.x0 <= HEADING_MAX_WIDTH_SHARE * width or len(lines) <= 2
-    letters = [c for c in text if c.isalpha()]
+    """Öbek başlık mı (bkz. heading_lines); numaralıysa büyük ya da büyük harfli olmalı."""
+    first = group[0]
+    text = " ".join(line.text for line in group)
+    style = line_style(first)
+    big = style[1] >= body.body_size * HEADING_SIZE_RATIO
+    numbered = ITEM_START.match(first.words[0].text) is not None
+    words = [w for line in group for w in line.words][1 if numbered else 0 :]
+    letters = [c for w in words for c in w.text if c.isalpha()]
     caps = len(letters) >= 3 and all(c.isupper() for c in letters)
-    strong = mostly_bold(line.words) or caps or style[3] != body_style[3]
-    margin = HEADING_GAP_EM * line.size
-    above = index == 0 or (
-        line.y0 - lines[index - 1].y1 > usual + margin or line_style(lines[index - 1]) != style
-    )
-    below = index == len(lines) - 1 or (
-        lines[index + 1].y0 - line.y1 > usual + margin or line_style(lines[index + 1]) != style
-    )
-    return short and (big or strong) and above and below
+    if len(group) > HEADING_MAX_LINES or len(text) > HEADING_MAX_CHARS:
+        return False
+    if not WORDLIKE.search(text) or TOC_LEADER.search(text):
+        return False
+    if HEADING_END.search(text) and not introduces_list(text, following):
+        return False
+    if not words or (numbered and not (big or caps)) or fragment(words):
+        return False
+    if any(right_aligned(line, region) for line in group) or in_table(first, body):
+        return False
+    strong = mostly_bold(words) or caps or style[3] != body_style[3]
+    return (big or strong) and (following is None or not continues_sentence(following))
 
 
-def heading_key(line: Line) -> tuple[float, bool]:
-    """Başlık düzeyini belirleyen stil: yuvarlanmış boyut ve kalınlık."""
+def apart(upper: Line, lower: Line, body: Body) -> bool:
+    """İki satır ayrık mı: stil, belgeden öğrenilen paragraf adımı ya da hizalama farkı."""
+    if line_style(upper) != line_style(lower):
+        return True
+    if body.pitch_of.get(id(lower), 0.0) > body.break_ratio:
+        return True
+    return not same_alignment(upper, lower)
+
+
+def same_alignment(a: Line, b: Line) -> bool:
+    """İki satır aynı hizada mı: ortaları ya da sol kenarları yakın."""
+    tolerance = CENTER_TOLERANCE_EM * max(a.size, b.size)
+    middles = abs((a.x0 + a.x1) / 2 - (b.x0 + b.x1) / 2) < tolerance
+    return middles or abs(a.x0 - b.x0) < tolerance
+
+
+def fragment(words: list[Word]) -> bool:
+    """Kelimeler cümle parçası mı: küçük harfle başlıyor ya da tırnağı açık kalıyor."""
+    text = " ".join(w.text for w in words)
+    unbalanced = text.count("“") != text.count("”") or text.count('"') % 2 == 1
+    return text[:1].islower() or unbalanced
+
+
+def centered(line: Line, region: Region) -> bool:
+    """Satır bölgede ortalanmış mı: soldan içeride başlıyor, ortası bölgenin ortasında."""
+    tolerance = CENTER_TOLERANCE_EM * line.size
+    middle = (region.left + region.right) / 2
+    return line.x0 > region.left + tolerance and abs((line.x0 + line.x1) / 2 - middle) < tolerance
+
+
+def right_aligned(line: Line, region: Region) -> bool:
+    """Satır sağ yarıda başlayıp sağ kenarda bitiyor mu (imza, kaynak adı)."""
+    middle = (region.left + region.right) / 2
+    return line.x0 > middle and region.right - line.x1 < CENTER_TOLERANCE_EM * line.size
+
+
+def continues_sentence(line: Line) -> bool:
+    """Satır küçük harfle sürüyor mu (madde işareti değil)."""
+    first = line.words[0].text
+    return first[:1].islower() and not ITEM_START.match(first)
+
+
+def introduces_list(text: str, following: Line | None) -> bool:
+    """İki noktayla biten satırın ardından madde mi geliyor (liste başlığı)."""
+    return (
+        text.endswith(":")
+        and following is not None
+        and bool(ITEM_START.match(following.words[0].text))
+    )
+
+
+def in_table(line: Line, body: Body) -> bool:
+    """Satır çizgili tablo hücresinde mi: dört yanı çizgili, az satırlı, üst/alt çizgisi taşan."""
+    shapes = body.shapes[line.page_no]
+    cx, cy = (line.x0 + line.x1) / 2, (line.y0 + line.y1) / 2
+    walls = [s for s in shapes if s.kind == "VLINE" and s.y0 <= cy <= s.y1]
+    every = [s for s in shapes if s.kind == "HLINE"]
+    rules = [s for s in every if s.x0 <= cx <= s.x1]
+    lefts = [s.x1 for s in walls if s.x1 <= line.x0 + 1]
+    rights = [s.x0 for s in walls if s.x0 >= line.x1 - 1]
+    tops = [s for s in rules if s.y1 <= line.y0 + 1]
+    bottoms = [s for s in rules if s.y0 >= line.y1 - 1]
+    if not (lefts and rights and tops and bottoms):
+        return False
+    left, right = max(lefts), min(rights)
+    top, bottom = max(tops, key=lambda s: s.y1), min(bottoms, key=lambda s: s.y0)
+    inside = sum(
+        1
+        for other in body.pages[line.page_no].lines
+        if left <= other.x0 and other.x1 <= right and top.y1 <= other.y0 and other.y1 <= bottom.y0
+    )
+    spill = any(
+        min(r.x0 for r in level) < left - line.size or max(r.x1 for r in level) > right + line.size
+        for level in ([r for r in every if abs(r.y0 - s.y0) < 1.5] for s in (top, bottom))
+    )
+    return inside <= TABLE_CELL_MAX_LINES and spill
+
+
+def heading_key(line: Line, body: Body) -> tuple[float, bool, bool]:
+    """Başlık düzeyini belirleyen stil: yuvarlanmış boyut, kalınlık ve ortalanmışlık."""
     style = line_style(line)
-    return round(style[1]), style[2]
+    return round(style[1]), style[2], centered(line, body.region_of[id(line)])
 
 
-def heading_levels(lines: list[Line]) -> dict[tuple[float, bool], int]:
-    """Başlık stillerini büyükten küçüğe (kalın önce) düzeylere çevirir (en büyük 1)."""
-    keys = sorted({heading_key(line) for line in lines}, key=lambda k: (-k[0], not k[1]))
+def heading_levels(lines: list[Line], body: Body) -> dict[tuple[float, bool, bool], int]:
+    """Başlık stillerini düzeylere çevirir: büyük, kalın ve ortalı önce (en üst 1)."""
+    keys = sorted(
+        {heading_key(line, body) for line in lines}, key=lambda k: (-k[0], not k[1], not k[2])
+    )
     return {key: level for level, key in enumerate(keys, start=1)}
 
 
-def segments(body: Body, headings: set[int]) -> list[Segment]:
+def segments(body: Body, headings: dict[int, int]) -> list[Segment]:
     """Okuma sırasındaki satırları başlık ve metin parçalarına böler (kutu değişince de)."""
     result: list[Segment] = []
     for line in body.lines:
@@ -2150,20 +2287,13 @@ def segments(body: Body, headings: set[int]) -> list[Segment]:
             last is not None
             and last.kind == kind
             and last.box is region.box
-            and (kind == "TEXT" or continues_heading(last.lines[-1], line))
+            and (kind == "TEXT" or headings[id(last.lines[-1])] == headings[id(line)])
         )
         if same and last is not None:
             last.lines.append(line)
         else:
             result.append(Segment(kind, [line], region.box))
     return result
-
-
-def continues_heading(previous: Line, line: Line) -> bool:
-    """Başlık satırı bir önceki başlık satırının devamı mı (aynı stil, yakın)."""
-    gap = line.y0 - previous.y1
-    same_page = previous.page_no == line.page_no
-    return same_page and line_style(previous) == line_style(line) and -2 < gap < 0.8 * line.size
 
 
 def heading_text(lines: list[Line], body: Body) -> str:
