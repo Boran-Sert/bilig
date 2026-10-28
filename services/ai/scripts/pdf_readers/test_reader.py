@@ -17,7 +17,8 @@ ORTAK bölüm (kitap okuyucuda birebir aynısı vardır):
 5. Düzen: kenarda aynen tekrarlayan satır, gövdede kullanılmayan stilde koşu başlığı, sırasında
    yalnız duran sayı ve kenardaki küçük alt yazıya bitişik kısa satırlar (logo) üst ya da alt
    bilgidir. Okuma sırası XY-cut ile bulunur (kutular bölünmez).
-   İsteğe bağlı düzen modeli (PP-DocLayoutV3) açıksa kelimeler modelin bölgelerine dağıtılır.
+   İsteğe bağlı düzen modeli (PP-DocLayoutV3, LAYOUT=1) açıksa kelimeler modelin iç içe
+   olmayan en dış bölgelerine dağıtılır; bloklar arasındaki sıra yine XY-cut'tır.
 6. Satır birleştirme: tireyle bölünen kelime birleşir. Paragraf eşiği belgeden öğrenilir: sıra
    adımları log ölçekte kümelenir (Otsu) ve cümlesi süren satırların adımının üstündeki ilk
    ayrık küme sınırı paragraf arasıdır. Dize düzeni paragrafın kendi oranlarından bulunur:
@@ -67,13 +68,14 @@ from PIL import Image
 # ================================================================== ORTAK BAŞLANGIÇ
 
 TEXT_LAYER_MIN_CHARS = 20
-LAYOUT_ENABLED = os.environ.get("LAYOUT", "1") != "0"
-LAYOUT_MODEL = os.environ.get("LAYOUT_MODEL", "PaddlePaddle/PP-DocLayoutV3_safetensors")
+LAYOUT_ENABLED = os.environ.get("LAYOUT", "0") == "1"
+LAYOUT_MODEL = os.environ.get("LAYOUT_MODEL", "")
 LAYOUT_CACHE_DIR = os.environ.get("LAYOUT_CACHE_DIR")
 LAYOUT_DPI = 150
 LAYOUT_MIN_SCORE = 0.3
 LAYOUT_DUPLICATE_IOU = 0.7
 LAYOUT_WORD_TOLERANCE = 0.25
+LAYOUT_CONTAIN_SHARE = 0.8
 FURNITURE_LABELS = frozenset({"header", "footer", "number", "seal", "header_image", "footer_image"})
 GAP_BREAK_MIN_JUMP = 1.25
 GAP_MIN_STEP = 1.08
@@ -358,6 +360,8 @@ def layout_model() -> tuple[Any, Any] | None:
     """Düzen modelini (PP-DocLayoutV3) bir kez yükler; kütüphane kurulu değilse kural yolu kalır."""
     if not LAYOUT_ENABLED:
         return None
+    if not LAYOUT_MODEL:
+        raise RuntimeError("LAYOUT=1 requires LAYOUT_MODEL")
     try:
         from transformers import AutoImageProcessor, AutoModelForObjectDetection
     except ImportError:
@@ -1378,9 +1382,10 @@ def layout_blocks(
     """Kelimeleri düzen bölgelerine, kutusuzları kural bloklarına dağıtıp okuma sırasına koyar."""
     holders: dict[int, list[Word]] = defaultdict(list)
     orphans: list[Word] = []
+    boxes = outermost(page.layout)
     for text_line in lines:
         for word in text_line.words:
-            box = holding_box(word, page.layout)
+            box = holding_box(word, boxes)
             if box is None:
                 orphans.append(word)
             else:
@@ -1399,9 +1404,38 @@ def layout_blocks(
     blocks.extend(orphan_blocks(orphans, page, blocks, size))
     blocks.sort(key=lambda block: block[0])
     shaped = [
-        (label, block_lines, enclosing_box(block_lines, page)) for _, label, block_lines in blocks
+        (label, block_lines, enclosing_box(block_lines, page))
+        for _, label, block_lines in order_blocks(blocks, size)
     ]
     return shaped, dropped
+
+
+def order_blocks(
+    blocks: list[tuple[float, str, list[Line]]], size: float
+) -> list[tuple[float, str, list[Line]]]:
+    """Blokları bölünmez öğe olarak XY-cut'la sıralar; model sırası yalnız eşit konumda kalır."""
+    items = []
+    for _, _, block_lines in blocks:
+        x0, y0, x1, y1 = bounds(block_lines)
+        items.append(Item(x0, y0, x1, y1, sum(len(text_line.text) for text_line in block_lines)))
+    index_of = {id(item): k for k, item in enumerate(items)}
+    return [blocks[index_of[id(item)]] for group in xy_cut(items, size) for item in group]
+
+
+def outermost(boxes: list[LayoutBox]) -> list[LayoutBox]:
+    """Daha büyük bir kutunun içinde kalmayan düzen kutuları (iç içe kutular tek blok olur)."""
+    return [
+        box for box in boxes if not any(other is not box and within(box, other) for other in boxes)
+    ]
+
+
+def within(inner: LayoutBox, outer_box: LayoutBox) -> bool:
+    """Kutunun alanının çoğu daha büyük kutunun içinde mi."""
+    width = min(inner.x1, outer_box.x1) - max(inner.x0, outer_box.x0)
+    height = min(inner.y1, outer_box.y1) - max(inner.y0, outer_box.y0)
+    area = (inner.x1 - inner.x0) * (inner.y1 - inner.y0)
+    larger = (outer_box.x1 - outer_box.x0) * (outer_box.y1 - outer_box.y0) > area
+    return larger and width > 0 and height > 0 and width * height >= LAYOUT_CONTAIN_SHARE * area
 
 
 def holding_box(word: Word, boxes: list[LayoutBox]) -> LayoutBox | None:
