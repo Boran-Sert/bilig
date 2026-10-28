@@ -1,32 +1,39 @@
 """Test okuyucu: çoktan seçmeli test PDF'lerinden soruları çıkarır (tek dosya, doğruluk sürümü).
 
-Yayınevine özel profil yoktur; kurallar her belgeden yeniden çıkarılır. Dosya iki bölümdür.
+Yayınevine özel profil ve sabit piksel eşiği yoktur; ölçüler her belgeden öğrenilir. Dosya iki
+bölümdür.
 
 ORTAK bölüm (kitap okuyucuda birebir aynısı vardır):
-1. PDFium karakterleri font, gerçek boyut (metin matrisiyle), kalınlık, italik, renk ve konumla
-   verir; döndürülmüş süs yazısı atılır, satır sonu tiresi yumuşak tire olur.
+1. PDFium karakterleri font, gerçek boyut (metin matrisiyle), renk ve konumla verir; döndürülmüş
+   süs yazısı atılır, satır sonu tiresi yumuşak tire, özel alan simgesi madde işareti olur.
+   Kalınlık: ailesinde adı kalın olan font varsa addan, yoksa geçerli ağırlıktan (600-900).
 2. Görünürlük: sayfa bir kez tam, bir kez metin (ve bir kez çizim) nesneleri kapalı çizilir;
    mürekkebi görünmeyen karakter ve çizim (gizli katman, örtülmüş, kırpılmış, beyaz) atılır.
-3. Bozuk font eşlemesi: bozuk metin nesneleri tek başına siyah çizilip Tesseract'la okunur; OCR
-   kelimesi karakter kutularıyla eşlenir ve her (font, kod) için oy sayılır. Kod oy çokluğuyla,
-   oyu yoksa fontun kod kaymasıyla çözülür; mürekkepsiz bozuk kod boşluktur.
+3. Bozuk ya da şüpheli (Türkçede olmayan "Ġ", "Ģ" gibi) eşlemeli metin tek başına siyah çizilip
+   Tesseract'la okunur; her (font, kod) için oy sayılır, yeterli oy toplanınca oylama durur.
+   Kod oy çokluğuyla, oyu yoksa fontun kod kaymasıyla çözülür.
 4. Metin katmanı olmayan sayfa (harfleri çizim, tarama) Tesseract'la okunur; kalınlık harf
    çizgisinin kalınlığından tahmin edilir.
-5. Düzen: kenar bandında tekrarlayan satır, aynı stilde koşu başlığı ve kenardaki yalnız sayı üst
-   ya da alt bilgidir. Okuma sırası XY-cut ile bulunur: kutular bölünmez; dar satırlar arasında
-   oluk varsa sütunlara, oluğu kesen satırların üstünden ve altından bantlara bölünür.
-6. Satır birleştirme: tireyle bölünen kelime birleşir; sığacakken bitmiş satır (şiir, diyalog),
-   kısa satırdan sonra büyük harf ve madde başı yeni satırdır; büyük boşluk, kalınlığın değişmesi
-   ve girintili ilk satır yeni paragraftır. İtalik, kalın ve altı çizili markdown olarak korunur.
+5. Düzen: kenarda aynen tekrarlayan satır, gövdede kullanılmayan stilde koşu başlığı ve sırasında
+   yalnız duran sayı üst ya da alt bilgidir. Okuma sırası XY-cut ile bulunur (kutular bölünmez).
+   İsteğe bağlı düzen modeli (PP-DocLayoutV3) açıksa kelimeler modelin bölgelerine dağıtılır.
+6. Satır birleştirme: tireyle bölünen kelime birleşir. Paragraf eşiği belgeden öğrenilir: sıra
+   adımları log ölçekte kümelenir (Otsu) ve cümlesi süren satırların adımının üstündeki ilk
+   ayrık küme sınırı paragraf arasıdır. Dize düzeni paragrafın kendi oranlarından bulunur.
+   İtalik, kalın ve altı çizili markdown olarak korunur.
 
 TEST bölümü:
-7. Soru numarası: satır başındaki "12.", "12)", "Soru 12:", "12. Soru" adayları imzaya
-   (etiket, noktalama, kalın, renk, şekil içinde mi, sütun soluna göre yer) göre gruplanır;
-   ardışık zincir (testte yeniden başlayabilir) ve tam A-E şık takımıyla puanlanır.
-8. Şıklar geometriyle bulunur; işaretsiz satır x'ine göre bir şıkkın devamıdır.
-9. Ortak parça iki soru arasında kalan metindir ("3-4. soruları" ipucu); cevap "Cevap: C"
-   satırından, "1-D 2-E" çiftlerinden ya da alt alta sayı/harf ızgarasından okunur.
-10. OCR'la okunan sorularda Roma rakamları (I, II, III...) sıralarına göre düzeltilir.
+7. Her eksiksiz A-E şık kümesi (aynı imza; F ile süren liste ya da eksik küme değil) bir sorunun
+   şık alanıdır. Yapışık "8.Biçim" ve "A)Eleştiri" önce ayrılır.
+8. Kök, önceki şık alanının bittiği yerle kümenin arasındadır. Numara: alıştırma (ardından şıklı
+   satır gelen) ve liste (aynı biçimli ardılı olan) olmayan adaylardan sırayı süren, olağan
+   imzalı ya da son aday; yoksa soru numarasızdır ("ÖSS - 2008:" etiketiyle son paragraf).
+   Kökte "?" ya da "hangi" yoksa çoktan seçmeli sayılmaz.
+9. Ortak parça: "1-3. soruları" yönergesinden sonraki metin aralıktaki sorulara; kök yalnız soru
+   cümlesiyken "bu parça" ya da "yukarıdaki" diyorsa kökün hemen üstündeki blok o soruya.
+10. Cevap: "Cevap: C" satırı ya da sorudan sonraki ilk anahtar ("1-D", "3E-4B", sayı/harf
+    ızgarası). Altı çizili sözlerin altındaki I-V numaraları çizgi parçasına göre bağlanır;
+    OCR'la okunan Roma rakamları harf bileşenlerinden düzeltilir.
 """
 
 from __future__ import annotations
@@ -44,9 +51,11 @@ from collections import Counter, defaultdict
 from collections.abc import Callable, Iterator
 from contextlib import contextmanager
 from dataclasses import dataclass, field, replace
+from functools import cache
 from itertools import combinations
 from pathlib import Path
 from statistics import median
+from typing import Any
 
 import numpy as np
 import pypdfium2 as pdfium
@@ -56,6 +65,21 @@ from PIL import Image
 # ================================================================== ORTAK BAŞLANGIÇ
 
 TEXT_LAYER_MIN_CHARS = 20
+LAYOUT_ENABLED = os.environ.get("LAYOUT", "1") != "0"
+LAYOUT_MODEL = os.environ.get("LAYOUT_MODEL", "PaddlePaddle/PP-DocLayoutV3_safetensors")
+LAYOUT_CACHE_DIR = os.environ.get("LAYOUT_CACHE_DIR")
+LAYOUT_DPI = 150
+LAYOUT_MIN_SCORE = 0.3
+LAYOUT_DUPLICATE_IOU = 0.7
+LAYOUT_WORD_TOLERANCE = 0.25
+FURNITURE_LABELS = frozenset({"header", "footer", "number", "seal", "header_image", "footer_image"})
+GAP_BREAK_MIN_JUMP = 1.25
+GAP_MIN_STEP = 1.08
+GAP_NOISE_FACTOR = 2.0
+SAME_ROW_PITCH = 0.3
+VERSE_FIT_SHARE = 0.5
+VERSE_UPPER_SHARE = 0.6
+VERSE_FIT_ONLY_SHARE = 0.75
 VISIBILITY_SCALE = 2.0
 VISIBILITY_TEXT_DIFF = 24
 VISIBILITY_PATH_DIFF = 6
@@ -71,10 +95,18 @@ OCR_HEIGHT_PER_SIZE = 0.93
 OCR_FIT_MARGIN_EM = 1.0
 ITALIC_FLAG = 1 << 6
 FORCE_BOLD_FLAG = 1 << 18
+BOLD_NAME = re.compile(r"bold|black|heavy|demi", re.IGNORECASE)
+BOLD_WEIGHTS = range(600, 901)
+ITALIC_NAME = re.compile(r"italic|oblique", re.IGNORECASE)
 SOFT_HYPHEN = "\u00ad"
 TRUETYPE_SPACE_GLYPH = 3
 OCR_VOTE_MIN_PUNCT_CONFIDENCE = 20.0
 UNKNOWN_GLYPH = "\ufffd"
+BULLET = "•"
+TURKISH_EXTENDED = frozenset("ĞğİıŞş")
+PRIVATE_USE = range(0xE000, 0xF900)
+LATIN_EXTENDED_A = range(0x100, 0x180)
+OCR_VOTES_ENOUGH = 5
 SPACES = frozenset(" \r\n\t\xa0   ")
 WORD_GAP_EM = 0.25
 ROW_TOLERANCE_EM = 0.45
@@ -97,8 +129,6 @@ UNDERLINE_EXTRA_EM = 2.0
 CLOSED = re.compile(r"[.!?:…\"”’)]\**$")
 TINY_PRINT_RATIO = 0.7
 BOLD_SEAM = re.compile(r"\*\*(\s+)\*\*")
-PROSE_FULL_SHARE = 0.6
-PROSE_LINE_SHARE = 0.8
 STRIP_GAP_EM = 1.5
 DIGITS = re.compile(r"\d+")
 HARD_START = re.compile(r"^(?:[–—•▪●-]|(?:I{1,3}|IV|VI{0,3})\.)$")
@@ -127,6 +157,8 @@ class Char:
     code: int = 0
     broken: bool = False
     ink: bool = True
+    weight: int = 0
+    suspect: bool = False
 
 
 @dataclass
@@ -213,6 +245,20 @@ class PageIR:
     source: str = "TEXT"
     notes: list[str] = field(default_factory=list)
     document: str = ""
+    layout: list[LayoutBox] = field(default_factory=list)
+
+
+@dataclass
+class LayoutBox:
+    """Düzen modelinin bölgesi: etiket, güven, okuma sırası ve kutu (punto, üst-sol orijin)."""
+
+    label: str
+    score: float
+    order: int
+    x0: float
+    y0: float
+    x1: float
+    y1: float
 
 
 @dataclass
@@ -240,18 +286,21 @@ class RawPage:
     shapes: list[Shape]
     ocr_words: list[Word]
     votes: Counter[tuple[str, int, str]]
+    layout: list[LayoutBox] = field(default_factory=list)
 
 
 def read_document(path: str) -> list[PageIR]:
     """PDF'i sayfa ara temsiline çevirir; bozuk fontları belge düzeyinde çözer."""
     document = pdfium.PdfDocument(path)
+    votes: Counter[tuple[str, int, str]] = Counter()
+    raws = []
     try:
-        raws = [read_raw_page(document, index) for index in range(len(document))]
+        for index in range(len(document)):
+            raws.append(read_raw_page(document, index, settled_codes(votes)))
+            votes.update(raws[-1].votes)
     finally:
         document.close()
-    votes: Counter[tuple[str, int, str]] = Counter()
-    for raw in raws:
-        votes.update(raw.votes)
+    resolve_weights([char for raw in raws for char in raw.chars])
     decoder = GlyphDecoder(votes)
     pages = [finish_page(raw, decoder) for raw in raws]
     for page in pages:
@@ -259,7 +308,23 @@ def read_document(path: str) -> list[PageIR]:
     return pages
 
 
-def read_raw_page(document: pdfium.PdfDocument, index: int) -> RawPage:
+def font_family(font: str) -> str:
+    """Fontun ailesi: alt küme öneki, stil eki ve MT/PS ekleri atılmış ad."""
+    base = re.split(r"[,-]", font.split("+", 1)[-1])[0]
+    return re.sub(r"(?:PS)?(?:MT)?$", "", base)
+
+
+def resolve_weights(chars: list[Char]) -> None:
+    """Adında kalın üyesi olan ailede kalınlığı ad, öbürlerinde geçerli ağırlık belirler."""
+    named = {font_family(c.font) for c in chars if BOLD_NAME.search(c.font)}
+    for char in chars:
+        if not char.bold and font_family(char.font) not in named:
+            char.bold = char.weight in BOLD_WEIGHTS
+
+
+def read_raw_page(
+    document: pdfium.PdfDocument, index: int, settled: set[tuple[str, int]]
+) -> RawPage:
     """Sayfanın görünen karakterlerini ve çizimlerini okur; gerekirse OCR'a başvurur."""
     page = document[index]
     textpage = page.get_textpage()
@@ -273,14 +338,87 @@ def read_raw_page(document: pdfium.PdfDocument, index: int) -> RawPage:
         if visible < TEXT_LAYER_MIN_CHARS and path_ink.any():
             ocr_words = read_page_by_ocr(page)
             shapes = drop_glyph_shapes(shapes, ocr_words)
-        elif any(c.broken and c.ink for c in chars):
-            votes = vote_broken_glyphs(page, chars)
+        elif any((c.broken or c.suspect) and c.ink for c in chars):
+            votes = vote_broken_glyphs(page, chars, settled)
+        layout = detect_layout(page)
         return RawPage(
-            index + 1, page.get_width(), page.get_height(), chars, shapes, ocr_words, votes
+            index + 1, page.get_width(), page.get_height(), chars, shapes, ocr_words, votes, layout
         )
     finally:
         textpage.close()
         page.close()
+
+
+@cache
+def layout_model() -> tuple[Any, Any] | None:
+    """Düzen modelini (PP-DocLayoutV3) bir kez yükler; kütüphane kurulu değilse kural yolu kalır."""
+    if not LAYOUT_ENABLED:
+        return None
+    try:
+        from transformers import AutoImageProcessor, AutoModelForObjectDetection
+    except ImportError:
+        return None
+    processor = AutoImageProcessor.from_pretrained(LAYOUT_MODEL)
+    model = AutoModelForObjectDetection.from_pretrained(LAYOUT_MODEL).eval()
+    return processor, model
+
+
+def detect_layout(page: pdfium.PdfPage) -> list[LayoutBox]:
+    """Sayfa görüntüsünde düzen bölgelerini ve okuma sırasını bulur (model yoksa boş liste)."""
+    if not LAYOUT_ENABLED:
+        return []
+    scale = LAYOUT_DPI / 72
+    image = page.render(scale=scale).to_pil().convert("RGB")
+    cached = None
+    if LAYOUT_CACHE_DIR:
+        folder = Path(LAYOUT_CACHE_DIR)
+        folder.mkdir(parents=True, exist_ok=True)
+        cached = folder / f"{hashlib.sha1(image.tobytes()).hexdigest()}.json"
+        if cached.exists():
+            return [LayoutBox(**row) for row in json.loads(cached.read_text(encoding="utf-8"))]
+    loaded = layout_model()
+    if loaded is None:
+        return []
+    boxes = run_layout(loaded, image, scale)
+    if cached:
+        cached.write_text(json.dumps([box.__dict__ for box in boxes]), encoding="utf-8")
+    return boxes
+
+
+def run_layout(loaded: tuple[Any, Any], image: Image.Image, scale: float) -> list[LayoutBox]:
+    """Modeli görüntüde çalıştırır; kutuları puntoya çevirir, örtüşen kopyaları atar."""
+    import torch
+
+    processor, model = loaded
+    inputs = processor(images=image, return_tensors="pt")
+    with torch.no_grad():
+        outputs = model(**inputs)
+    result = processor.post_process_object_detection(
+        outputs, threshold=LAYOUT_MIN_SCORE, target_sizes=[image.size[::-1]]
+    )[0]
+    boxes = []
+    found = zip(result["scores"], result["labels"], result["boxes"], strict=True)
+    for order, (score, label, box) in enumerate(found):
+        x0, y0, x1, y1 = (float(v) / scale for v in box.tolist())
+        name = model.config.id2label[int(label)]
+        boxes.append(LayoutBox(name, round(float(score), 3), order, x0, y0, x1, y1))
+    kept: list[LayoutBox] = []
+    for box in sorted(boxes, key=lambda b: -b.score):
+        if all(overlap_ratio(box, other) < LAYOUT_DUPLICATE_IOU for other in kept):
+            kept.append(box)
+    return sorted(kept, key=lambda b: b.order)
+
+
+def overlap_ratio(a: LayoutBox, b: LayoutBox) -> float:
+    """İki kutunun kesişiminin birleşimine oranı (IoU)."""
+    width = min(a.x1, b.x1) - max(a.x0, b.x0)
+    height = min(a.y1, b.y1) - max(a.y0, b.y0)
+    if width <= 0 or height <= 0:
+        return 0.0
+    inter = width * height
+    area_a = (a.x1 - a.x0) * (a.y1 - a.y0)
+    area_b = (b.x1 - b.x0) * (b.y1 - b.y0)
+    return inter / (area_a + area_b - inter)
 
 
 def render_gray(page: pdfium.PdfPage, scale: float) -> Image.Image:
@@ -446,14 +584,13 @@ def read_chars(page: pdfium.PdfPage, textpage: pdfium.PdfTextPage, ink: np.ndarr
         if rotated:
             continue
         code = pdfium_c.FPDFText_GetUnicode(textpage, index)
-        text = chr(code) if code else ""
+        text = BULLET if code in PRIVATE_USE else chr(code) if code else ""
         if pdfium_c.FPDFText_IsHyphen(textpage, index) == 1 or code == 2:
             text = SOFT_HYPHEN
         left, bottom, right, top = textpage.get_charbox(index, loose=True)
         tight = textpage.get_charbox(index)
         font, flags = font_info(textpage, index)
         weight = pdfium_c.FPDFText_GetFontWeight(textpage, index)
-        name = font.lower()
         chars.append(
             Char(
                 text=text,
@@ -463,8 +600,8 @@ def read_chars(page: pdfium.PdfPage, textpage: pdfium.PdfTextPage, ink: np.ndarr
                 y1=height - bottom,
                 size=round(pdfium_c.FPDFText_GetFontSize(textpage, index) * scale, 1),
                 font=font,
-                bold=weight >= 600 or bool(flags & FORCE_BOLD_FLAG) or "bold" in name,
-                italic=bool(flags & ITALIC_FLAG) or "italic" in name or "oblique" in name,
+                bold=bool(flags & FORCE_BOLD_FLAG) or bool(BOLD_NAME.search(font)),
+                italic=bool(flags & ITALIC_FLAG) or bool(ITALIC_NAME.search(font)),
                 color=fill_color(textpage, index),
                 code=code,
                 broken=pdfium_c.FPDFText_HasUnicodeMapError(textpage, index) == 1,
@@ -472,6 +609,8 @@ def read_chars(page: pdfium.PdfPage, textpage: pdfium.PdfTextPage, ink: np.ndarr
                 and not hidden_char(
                     textpage, index, layers, (left, height - top, right, height - bottom)
                 ),
+                weight=weight,
+                suspect=code in LATIN_EXTENDED_A and text not in TURKISH_EXTENDED,
             )
         )
     return chars
@@ -513,9 +652,14 @@ def blackened(objects: list[pdfium.PdfObject]) -> Iterator[None]:
             pdfium_c.FPDFPageObj_SetFillColor(obj.raw, r, g, b, a)
 
 
-def vote_broken_glyphs(page: pdfium.PdfPage, chars: list[Char]) -> Counter[tuple[str, int, str]]:
-    """Bozuk fontlu metni tek başına çizip OCR'la okur; (font, kod, harf) oylarını sayar."""
-    fonts = {c.font for c in chars if c.broken and c.ink}
+def vote_broken_glyphs(
+    page: pdfium.PdfPage, chars: list[Char], settled: set[tuple[str, int]]
+) -> Counter[tuple[str, int, str]]:
+    """Bozuk ya da şüpheli fontlu metni tek başına çizip OCR'la okur; (font, kod, harf) oyları."""
+    doubtful = [c for c in chars if (c.broken or c.suspect) and c.ink]
+    if all((c.font, c.code) in settled for c in doubtful):
+        return Counter()
+    fonts = {c.font for c in doubtful}
     texts = [
         obj
         for obj in page.get_objects(filter=[pdfium_c.FPDF_PAGEOBJ_TEXT])
@@ -540,9 +684,23 @@ def vote_broken_glyphs(page: pdfium.PdfPage, chars: list[Char]) -> Counter[tuple
         if len(inside) != len(word.text):
             continue
         for char, letter in zip(inside, word.text, strict=True):
-            if char.broken:
+            if char.broken or char.suspect:
                 votes[(char.font, char.code, letter)] += 1
     return votes
+
+
+def settled_codes(votes: Counter[tuple[str, int, str]]) -> set[tuple[str, int]]:
+    """Yeterince ve açık farkla oylanmış (font, kod) çiftleri."""
+    tallies: dict[tuple[str, int], Counter[str]] = defaultdict(Counter)
+    for (font, code, letter), count in votes.items():
+        tallies[(font, code)][letter] += count
+    settled = set()
+    for key, tally in tallies.items():
+        ranked = tally.most_common(2)
+        lead = ranked[0][1] - (ranked[1][1] if len(ranked) > 1 else 0)
+        if lead >= OCR_VOTES_ENOUGH:
+            settled.add(key)
+    return settled
 
 
 def center_in(char: Char, box: tuple[float, float, float, float]) -> bool:
@@ -846,6 +1004,8 @@ def finish_page(raw: RawPage, decoder: GlyphDecoder) -> PageIR:
                 char = replace(char, text=decoder.decode(char))
             elif not char.ink and char.text not in SPACES:
                 continue
+            elif char.suspect and (char.font, char.code) in decoder.table:
+                char = replace(char, text=decoder.table[(char.font, char.code)], broken=True)
             chars.append(char)
         if any(c.text == UNKNOWN_GLYPH for c in chars):
             notes.append("UNDECODED_GLYPHS")
@@ -854,7 +1014,9 @@ def finish_page(raw: RawPage, decoder: GlyphDecoder) -> PageIR:
         words, source = build_words(chars), "TEXT"
     lines = build_lines(words, raw.page_no)
     source = source if lines else "EMPTY"
-    return PageIR(raw.page_no, raw.width, raw.height, lines, raw.shapes, source, notes)
+    return PageIR(
+        raw.page_no, raw.width, raw.height, lines, raw.shapes, source, notes, layout=raw.layout
+    )
 
 
 def build_words(chars: list[Char]) -> list[Word]:
@@ -939,6 +1101,7 @@ class Region:
     right: float
     lines: list[Line] = field(default_factory=list, repr=False)
     box: Shape | None = None
+    label: str | None = None
 
 
 @dataclass
@@ -952,6 +1115,8 @@ class Body:
     body_size: float
     regions: list[Region] = field(default_factory=list)
     pages: dict[int, PageIR] = field(default_factory=dict)
+    break_ratio: float = float("inf")
+    pitch_of: dict[int, float] = field(default_factory=dict)
 
 
 @dataclass
@@ -992,7 +1157,7 @@ def line_style(line: Line) -> tuple[str, float, bool, str]:
 
 
 def find_furniture(pages: list[PageIR], body_style: tuple[str, float, bool, str]) -> set[int]:
-    """Üst/alt bilgi: kenarda aynen tekrarlayan, aynı stilde koşu başlığı ya da yalnız sayı."""
+    """Üst/alt bilgi: kenarda aynen tekrarlayan, gövdede olmayan stilde koşu başlığı ya da sayı."""
     texts: Counter[tuple[str | None, str]] = Counter()
     styles: Counter[tuple[str | None, tuple[str, float, bool, str]]] = Counter()
     for page in pages:
@@ -1010,6 +1175,12 @@ def find_furniture(pages: list[PageIR], body_style: tuple[str, float, bool, str]
                 if outer(text_line, page)
             }
         )
+    inner = {
+        line_style(text_line)
+        for page in pages
+        for text_line in page.lines
+        if band(text_line, page) is None
+    }
     furniture = set()
     for page in pages:
         for line in page.lines:
@@ -1026,12 +1197,13 @@ def find_furniture(pages: list[PageIR], body_style: tuple[str, float, bool, str]
                 and style[0] != "OCR"
                 and style != body_style
                 and styles[(zone, style)] >= 2
+                and style not in inner
                 and alone_in_row(line, page)
             )
             lone_number = (
                 outer(line, page)
                 and not DIGITS.sub("", line.text).strip(" -–/.|")
-                and alone_in_row(line, page)
+                and alone_in_row(line, page, float("inf"))
             )
             tiny = outer(line, page) and line.size < TINY_PRINT_RATIO * body_style[1]
             if repeated or running or lone_number or tiny:
@@ -1039,14 +1211,14 @@ def find_furniture(pages: list[PageIR], body_style: tuple[str, float, bool, str]
     return furniture
 
 
-def alone_in_row(line: Line, page: PageIR) -> bool:
-    """Satırın aynı sırada, birleşecek kadar yakın komşusu yok mu (sayfa numarası gibi)."""
+def alone_in_row(line: Line, page: PageIR, reach: float = ROW_MERGE_GAP_EM) -> bool:
+    """Satırın aynı sırada, verilen uzaklıktan (em) yakın komşusu yok mu."""
     middle = (line.y0 + line.y1) / 2
     for other in page.lines:
         if other is line or abs((other.y0 + other.y1) / 2 - middle) >= ROW_TOLERANCE_EM * line.size:
             continue
         gap = max(other.x0 - line.x1, line.x0 - other.x1)
-        if gap <= ROW_MERGE_GAP_EM * line.size:
+        if gap <= reach * line.size:
             return False
     return True
 
@@ -1067,15 +1239,226 @@ def reading_order(pages: list[PageIR]) -> Body:
     for page in pages:
         lines = [text_line for text_line in page.lines if id(text_line) not in furniture_ids]
         furniture.extend(text_line for text_line in page.lines if id(text_line) in furniture_ids)
+        if page.layout:
+            blocks, dropped = layout_blocks(page, lines, body_size, len(pages))
+            furniture.extend(dropped)
+            for index, (label, block_lines, box) in enumerate(blocks):
+                left = min(text_line.x0 for text_line in block_lines)
+                right = max(text_line.x1 for text_line in block_lines)
+                regions.append(Region((page.page_no, index), left, right, block_lines, box, label))
+            continue
         for index, (group, box) in enumerate(page_regions(lines, page, body_size)):
             regions.append(Region((page.page_no, index), 0.0, 0.0, merge_segments(group), box))
-    set_edges(regions, body_size)
-    box_edges(regions)
+    rule_regions = [region for region in regions if region.label is None]
+    set_edges(rule_regions, body_size)
+    box_edges(rule_regions)
     ordered = [line for region in regions for line in region.lines]
     region_of = {id(line): region for region in regions for line in region.lines}
     shapes = {page.page_no: page.shapes for page in pages}
     by_number = {page.page_no: page for page in pages}
-    return Body(ordered, furniture, region_of, shapes, body_size, regions, by_number)
+    body = Body(ordered, furniture, region_of, shapes, body_size, regions, by_number)
+    body.pitch_of = line_pitches(regions)
+    body.break_ratio = paragraph_break_ratio(regions, body.pitch_of)
+    return body
+
+
+def line_pitches(regions: list[Region]) -> dict[int, float]:
+    """Her satırın, bölgesinde bir üst sıradaki en yakın satıra göre adımı (araya giren dahil)."""
+    pitches: dict[int, float] = {}
+    for region in regions:
+        ordered = sorted(region.lines, key=lambda text_line: text_line.y1)
+        for index, line in enumerate(ordered):
+            for upper in reversed(ordered[:index]):
+                pitch = line_pitch(upper, line)
+                if pitch > SAME_ROW_PITCH:
+                    pitches[id(line)] = pitch
+                    break
+    return pitches
+
+
+def paragraph_break_ratio(regions: list[Region], pitch_of: dict[int, float]) -> float:
+    """Paragraf arası eşiği: cümlesi süren satırların adımının üstündeki doğal kırılma."""
+    values, continuing = [], []
+    for region in regions:
+        ordered = sorted(region.lines, key=lambda text_line: text_line.y1)
+        for upper, lower in zip(ordered, ordered[1:], strict=False):
+            if line_pitch(upper, lower) <= SAME_ROW_PITCH:
+                continue
+            values.append(pitch_of[id(lower)])
+            if lower.words[0].text[:1].islower():
+                continuing.append(pitch_of[id(lower)])
+    if not values:
+        return float("inf")
+    return natural_break(values, median(continuing or values))
+
+
+def line_pitch(upper: Line, lower: Line) -> float:
+    """İki satırın alt kenarları arası, büyük olanın boyutuna oranla."""
+    return (lower.y1 - upper.y1) / max(upper.size, lower.size, 1.0)
+
+
+def natural_break(values: list[float], usual: float) -> float:
+    """Olağan değerin üstündeki en alçak ayrık küme sınırı (log ölçekte yinelenen Otsu)."""
+    logs = np.log(sorted(value for value in values if value > 0))
+    if len(logs) < 4 or usual <= 0:
+        return float("inf")
+    low, high, best = 0, len(logs), float("inf")
+    while high - low >= 2:
+        split = otsu_split(logs[low:high])
+        if split is None:
+            break
+        lower, upper = logs[low : low + split], logs[low + split : high]
+        boundary = (lower[-1] + upper[0]) / 2
+        if boundary <= np.log(usual):
+            low += split
+            continue
+        if distinct(lower, upper):
+            best = float(np.exp(boundary))
+        high = low + split
+    return best
+
+
+def distinct(lower: np.ndarray, upper: np.ndarray) -> bool:
+    """Kümeler ayrık mı: ortalamalar uzak ya da aradaki boşluk alt kümenin yayılımını aşıyor."""
+    if upper.mean() - lower.mean() >= np.log(GAP_BREAK_MIN_JUMP):
+        return True
+    gap = upper[0] - lower[-1]
+    spread = np.percentile(lower, 75) - np.percentile(lower, 25)
+    return bool(gap >= np.log(GAP_MIN_STEP) and gap >= GAP_NOISE_FACTOR * spread)
+
+
+def otsu_split(values: np.ndarray) -> int | None:
+    """Sıralı değerleri, sınıflar arası farkı en büyük iki kümeye bölen sıra; bölünemezse None."""
+    count = len(values)
+    prefix = np.cumsum(values)
+    sizes = np.arange(1, count)
+    lower_mean = prefix[:-1] / sizes
+    upper_mean = (prefix[-1] - prefix[:-1]) / (count - sizes)
+    score = sizes * (count - sizes) * (upper_mean - lower_mean) ** 2
+    score[values[1:] == values[:-1]] = -1.0
+    if score.max() <= 0:
+        return None
+    return int(score.argmax()) + 1
+
+
+def layout_blocks(
+    page: PageIR, lines: list[Line], size: float, page_count: int
+) -> tuple[list[tuple[str, list[Line], Shape | None]], list[Line]]:
+    """Kelimeleri düzen bölgelerine, kutusuzları kural bloklarına dağıtıp okuma sırasına koyar."""
+    holders: dict[int, list[Word]] = defaultdict(list)
+    orphans: list[Word] = []
+    for text_line in lines:
+        for word in text_line.words:
+            box = holding_box(word, page.layout)
+            if box is None:
+                orphans.append(word)
+            else:
+                holders[box.order].append(word)
+    blocks: list[tuple[float, str, list[Line]]] = []
+    dropped: list[Line] = []
+    by_order = {box.order: box for box in page.layout}
+    for order, words in holders.items():
+        box = by_order[order]
+        block_lines = ordered_lines(words, page.page_no, size)
+        if box.label in FURNITURE_LABELS and (box.label != "header" or page_count == 1):
+            dropped.extend(block_lines)
+            continue
+        label = "doc_title" if box.label == "header" else box.label
+        blocks.append((float(order), label, block_lines))
+    blocks.extend(orphan_blocks(orphans, page, blocks, size))
+    blocks.sort(key=lambda block: block[0])
+    shaped = [
+        (label, block_lines, enclosing_box(block_lines, page)) for _, label, block_lines in blocks
+    ]
+    return shaped, dropped
+
+
+def holding_box(word: Word, boxes: list[LayoutBox]) -> LayoutBox | None:
+    """Kelimenin ortasını içeren en küçük düzen kutusu (biraz payla)."""
+    pad = LAYOUT_WORD_TOLERANCE * (word.y1 - word.y0)
+    cx, cy = (word.x0 + word.x1) / 2, (word.y0 + word.y1) / 2
+    inside = [
+        box
+        for box in boxes
+        if box.x0 - pad <= cx <= box.x1 + pad and box.y0 - pad <= cy <= box.y1 + pad
+    ]
+    return min(inside, key=lambda b: ((b.x1 - b.x0) * (b.y1 - b.y0), -b.score), default=None)
+
+
+def ordered_lines(words: list[Word], page_no: int, size: float) -> list[Line]:
+    """Bloğun kelimelerinden satırları kurar; blok içinde sütun varsa sütun sırasıyla dizer."""
+    lines = build_lines(words, page_no)
+    groups = flatten(xy_cut(make_items(lines, []), size), size)
+    return [text_line for group, _ in groups for text_line in merge_segments(group)]
+
+
+def orphan_blocks(
+    words: list[Word], page: PageIR, blocks: list[tuple[float, str, list[Line]]], size: float
+) -> list[tuple[float, str, list[Line]]]:
+    """Kutusuz kelimeleri bloklar; her parçayı sütunundaki üst bloğun arkasına yerleştirir."""
+    if not words:
+        return []
+    spans = [(order, bounds(block_lines)) for order, _, block_lines in blocks]
+    pieces: list[list[Line]] = []
+    for group, _ in page_regions(build_lines(words, page.page_no), page, size):
+        current: list[Line] = []
+        for text_line in merge_segments(group):
+            if current and any(
+                overlaps_x(span, text_line)
+                and current[-1].y1 <= span[1]
+                and span[3] <= text_line.y0
+                for _, span in spans
+            ):
+                pieces.append(current)
+                current = []
+            current.append(text_line)
+        if current:
+            pieces.append(current)
+    placed = []
+    for piece in pieces:
+        x0, y0, x1, y1 = bounds(piece)
+        column = [(order, span) for order, span in spans if span[0] < x1 and x0 < span[2]]
+        above = [(order, span) for order, span in column if span[3] <= y0 + 1]
+        below = [(order, span) for order, span in column if span[1] >= y0]
+        if above:
+            position = max(above, key=lambda item: item[1][3])[0] + 0.5
+        elif below:
+            position = min(below, key=lambda item: item[1][1])[0] - 0.5
+        else:
+            position = max((order for order, _ in spans), default=0.0) + 0.5
+        placed.append((position + y0 / 1e6, "text", piece))
+    return placed
+
+
+def bounds(lines: list[Line]) -> tuple[float, float, float, float]:
+    """Satırların ortak kutusu."""
+    return (
+        min(text_line.x0 for text_line in lines),
+        min(text_line.y0 for text_line in lines),
+        max(text_line.x1 for text_line in lines),
+        max(text_line.y1 for text_line in lines),
+    )
+
+
+def overlaps_x(span: tuple[float, float, float, float], line: Line) -> bool:
+    """Kutu ile satır yatayda örtüşüyor mu."""
+    return span[0] < line.x1 and line.x0 < span[2]
+
+
+def enclosing_box(lines: list[Line], page: PageIR) -> Shape | None:
+    """Bloğu içine alan en küçük kutu ya da çerçeve (sayfanın tamamı değil)."""
+    x0, y0, x1, y1 = bounds(lines)
+    cx, cy = (x0 + x1) / 2, (y0 + y1) / 2
+    holders = [
+        shape
+        for shape in page.shapes
+        if shape.kind in ("BOX", "FRAME")
+        and shape.x0 <= cx <= shape.x1
+        and shape.y0 <= cy <= shape.y1
+        and (shape.x1 - shape.x0) * (shape.y1 - shape.y0)
+        < BOX_MAX_PAGE_SHARE * page.width * page.height
+    ]
+    return min(holders, key=lambda s: (s.x1 - s.x0) * (s.y1 - s.y0), default=None)
 
 
 def page_regions(
@@ -1494,28 +1877,23 @@ def compose_paragraphs(
     rows = join_rows([(list(w), text_line) for w, text_line in pieces if w], bottoms or {})
     if not rows:
         return []
-    usual_gap = usual_row_gap(rows, body)
     starts = indent_starts(rows, body)
-    prose = full_share(rows, body, right) >= PROSE_FULL_SHARE
-    paragraphs: list[list[tuple[str, Row]]] = []
+    paragraphs: list[list[Row]] = []
     for k, row in enumerate(rows):
-        sep = (
-            "\n\n"
-            if k == 0 or k in starts
-            else separator(rows[k - 1], row, body, right, usual_gap, prose)
-        )
-        if sep == "\n\n":
+        if k == 0 or k in starts or paragraph_break(rows[k - 1], row, body):
             paragraphs.append([])
-        paragraphs[-1].append((sep, row))
+        paragraphs[-1].append(row)
     result = []
     for paragraph in paragraphs:
-        plain = not keep_bold and mostly_bold([w for _, row in paragraph for w in row.words])
-        text = ""
-        for k, (sep, row) in enumerate(paragraph):
-            text += (sep if k else "") + words_md(row.words, row_hlines(row, body), notes, plain)
+        plain = not keep_bold and mostly_bold([w for row in paragraph for w in row.words])
+        verse = verse_like(paragraph, body, right)
+        text = words_md(paragraph[0].words, row_hlines(paragraph[0], body), notes, plain)
+        for previous, row in zip(paragraph, paragraph[1:], strict=False):
+            joint = line_join(previous, row, body, right, verse)
+            text += joint + words_md(row.words, row_hlines(row, body), notes, plain)
         text = BOLD_SEAM.sub(r"\1", text)
         if text.strip():
-            result.append((text, [row for _, row in paragraph]))
+            result.append((text, paragraph))
     return result
 
 
@@ -1528,16 +1906,6 @@ def row_hlines(row: Row, body: Body) -> list[Shape]:
         for s in body.shapes[row.line.page_no]
         if s.kind == "HLINE" and s.x1 - s.x0 <= width + UNDERLINE_EXTRA_EM * size
     ]
-
-
-def usual_row_gap(rows: list[Row], body: Body) -> float:
-    """Aynı bölgedeki ardışık satırlar arasındaki olağan boşluk."""
-    gaps = sorted(
-        b.top - a.bottom
-        for a, b in zip(rows, rows[1:], strict=False)
-        if body.region_of[id(a.line)] is body.region_of[id(b.first_line)]
-    )
-    return max(gaps[len(gaps) // 2], 0.0) if gaps else 0.0
 
 
 def indent_starts(rows: list[Row], body: Body) -> set[int]:
@@ -1563,55 +1931,62 @@ def indent_starts(rows: list[Row], body: Body) -> set[int]:
     return starts
 
 
-def full_share(rows: list[Row], body: Body, right: float | None) -> float:
-    """Son satır dışındaki satırların ne kadarı sağ kenara kadar dolu (düz yazı ölçüsü)."""
-    measured = rows[:-1]
-    if len(measured) < 2:
-        return 0.0
-    full = 0
-    for row in measured:
-        region = body.region_of[id(row.line)]
-        edge = right if right is not None else region.right
-        full += row.end_x >= region.left + PROSE_LINE_SHARE * (edge - region.left)
-    return full / len(measured)
-
-
-def separator(
-    previous: Row,
-    current: Row,
-    body: Body,
-    right: float | None,
-    usual_gap: float,
-    prose: bool = False,
-) -> str:
-    """İki satır arasına boşluk, satır sonu ya da paragraf sonu koyar."""
-    size = previous.words[-1].size
+def paragraph_break(previous: Row, current: Row, body: Body) -> bool:
+    """İki satır arasında paragraf biter mi: kalınlık, satır adımı, blok değişimi, kısa satır."""
     run_in = not previous.words[-1].bold and not mostly_bold(current.words)
     if mostly_bold(previous.words) != mostly_bold(current.words) and not run_in:
-        return "\n\n"
+        return True
+    if previous.joined:
+        return False
+    if current.words[0].text[:1].islower() and not CLOSED.search(previous.words[-1].text):
+        return False
     region = body.region_of[id(previous.line)]
-    same_region = region is body.region_of[id(current.first_line)]
-    if same_region and current.top - previous.bottom > usual_gap + 0.5 * size:
-        return "\n\n"
+    following = body.region_of[id(current.first_line)]
+    if region is following:
+        pitch = body.pitch_of.get(id(current.first_line))
+        if pitch is None:
+            pitch = line_pitch(previous.line, current.first_line)
+        return pitch > body.break_ratio
+    if region.label is not None or following.label is not None:
+        return True
+    return previous.end_x < region.right - 1.5 * previous.words[-1].size
+
+
+def line_join(previous: Row, current: Row, body: Body, right: float | None, verse: bool) -> str:
+    """Aynı paragrafta satır birleşimi: dize ya da kasıtlı kırılmada satır sonu, değilse boşluk."""
     if previous.joined:
         return " "
-    if (
-        not same_region
-        and current.words[0].text[:1].islower()
-        and not CLOSED.search(previous.words[-1].text)
-    ):
+    if body.region_of[id(previous.line)] is not body.region_of[id(current.first_line)]:
         return " "
-    if not same_region and previous.end_x < region.right - 1.5 * size:
-        return "\n\n"
-    first = current.words[0]
-    if HARD_START.match(first.text):
+    fits = next_word_fits(previous, current, body, right)
+    if HARD_START.match(current.words[0].text):
         return "\n"
-    edge = right if right is not None else region.right
-    if not prose and first.text[:1].isupper() and previous.end_x < edge - 1.5 * size:
-        return "\n"
-    margin = OCR_FIT_MARGIN_EM * size if first.ocr else 0.0
-    fits = previous.end_x + 0.3 * size + (first.x1 - first.x0) <= edge + 1 - margin
+    if verse:
+        return " " if current.words[0].text[:1].islower() and not fits else "\n"
     return "\n" if fits else " "
+
+
+def next_word_fits(previous: Row, current: Row, body: Body, right: float | None) -> bool:
+    """Sonraki satırın ilk kelimesi bu satırın sonuna sığar mıydı (sığarsa kırılma kasıtlıdır)."""
+    size = previous.words[-1].size
+    edge = right if right is not None else body.region_of[id(previous.line)].right
+    first = current.words[0]
+    margin = OCR_FIT_MARGIN_EM * size if first.ocr else 0.0
+    return previous.end_x + 0.3 * size + (first.x1 - first.x0) <= edge + 1 - margin
+
+
+def verse_like(rows: list[Row], body: Body, right: float | None) -> bool:
+    """Paragraf dize düzeninde mi: satırlar çoğunlukla erken bitiyor ve büyük harfle başlıyor."""
+    pairs = [
+        (a, b)
+        for a, b in zip(rows, rows[1:], strict=False)
+        if not a.joined and body.region_of[id(a.line)] is body.region_of[id(b.first_line)]
+    ]
+    if len(pairs) < 2:
+        return False
+    fits = sum(next_word_fits(a, b, body, right) for a, b in pairs) / len(pairs)
+    upper = sum(b.words[0].text[:1].isupper() for _, b in pairs) / len(pairs)
+    return (fits >= VERSE_FIT_SHARE and upper >= VERSE_UPPER_SHARE) or fits >= VERSE_FIT_ONLY_SHARE
 
 
 # ================================================================== ORTAK SONU
@@ -1620,11 +1995,19 @@ def separator(
 
 NUMBER = re.compile(r"^(\d{1,3})([.)\-–:]?)$")
 GLUED_MARKER = re.compile(r"^(\d{1,3})([.)])(soru)([.:)]?)$")
+GLUED_NUMBER = re.compile(r"^(\d{1,3}[.)])([^\W\d_].*)$")
+GLUED_OPTION = re.compile(r"^(\(?[A-E]\))(\S.*)$")
+GLUED_DOT_OPTION = re.compile(r"^([A-E]\.)([A-ZÇĞİÖŞÜ][a-zçğıöşü]{2,}.*)$")
 LABEL = re.compile(r"^(soru|sual)([.:]?)$")
-OPTION = re.compile(r"^\(?([A-E])([).\-:])\)?$")
+OPTION = re.compile(r"^\(?([A-F])([).\-:])\)?$")
 INLINE_ANSWER = re.compile(r"^(?:Doğru\s+)?(?:Cevap|Yanıt)\s*:?\s*([A-E])\.?$", re.IGNORECASE)
-KEY_PAIR = re.compile(r"(?<![\w.])(\d{1,3})\s*[.)\-–:]\s*([A-E])(?!\w)")
+KEY_PAIR = re.compile(r"(?<![\w.])(\d{1,3})\s*[.)\-–:]?\s*([A-E])(?!\w)")
 KEY_HEADING = re.compile(r"^(cevap anahtarı|cevaplar|yanıt anahtarı):?$")
+QUESTION_CUE = re.compile(r"\?|hangi")
+PASSAGE_REFERENCE = re.compile(
+    r"yukarıdaki|(?:bu|verilen)\s+(?:parça|metin|dize|şiir|cümle|bölüm|tablo|açıklama|bilgi|söz)"
+)
+PASSAGE_REACH = 6
 PASSAGE_CUE = re.compile(r"(\d{1,3})\.?((?:\s*(?:[-–]|,|ve)\s*\d{1,3}\.?)+)\s*soru", re.IGNORECASE)
 ROMAN = re.compile(r"^(?:I{1,3}|IV|VI{0,3}|IX|X)$")
 ROMAN_LIKE = re.compile(r"^(\(?)([IVXl1|ıiMWN]{1,4})(\)?)([.,;:]?)$")
@@ -1636,16 +2019,16 @@ ITEM_ROMAN = re.compile(r"^([IVXl1|ıiMWN!]{1,4})\.")
 ROMANISH = re.compile(r"^[IVXl1|ıiMWN!ve,.\sYalnız]+$")
 ROMAN_TOKEN_GAP = 0.35
 ROMAN_CAP_SHARE = 0.85
-CHAIN_START_PENALTY = 1.5
 MARK_GAP_EM = 0.8
 OPTION_LABELS = list("ABCDE")
+NUMERAL_ALIASES = str.maketrans({"l": "I", "1": "I", "|": "I"})
 
 
 @dataclass
 class Question:
     """Ayrıştırılmış soru: numara, sayfa, kök, şıklar, ortak parça, cevap ve sorunlar."""
 
-    number: int
+    number: int | None
     page_no: int
     stem: list[str] = field(default_factory=list)
     options: dict[str, list[str]] = field(default_factory=dict)
@@ -1676,6 +2059,17 @@ class Mark:
     label: str
     x: float
     y: float
+
+
+@dataclass
+class OptionSet:
+    """Okuma sırasındaki A-E şık kümesi: imza, ilk ve son işaretin satır sırası, harfler."""
+
+    signature: tuple
+    start: int
+    last: int
+    labels: set[str] = field(default_factory=set)
+    valid: bool = True
 
 
 def marker_of(line: Line) -> tuple[int, str, str, int] | None:
@@ -1715,88 +2109,161 @@ def position_class(word: Word, left: float) -> str:
     return "FLUSH" if offset <= 1.5 else "IN"
 
 
-def number_candidates(body: Body, excluded: set[int]) -> list[Candidate]:
-    """Satır başındaki numara adaylarını imzalarıyla toplar."""
+def zone_candidates(body: Body, zone: list[int]) -> list[Candidate]:
+    """Bölgedeki satır başı soru numarası adayları, imzalarıyla."""
     candidates = []
-    for position, line in enumerate(body.lines):
-        if id(line) in excluded:
-            continue
-        found = marker_of(line)
+    for position in zone:
+        line = body.lines[position]
+        following = body.lines[position + 1] if position + 1 < len(body.lines) else None
+        found = marker_of(line) or lone_marker(line, following)
         if not found:
             continue
         number, label, punct, skip = found
         first = line.words[0]
         region = body.region_of[id(line)]
-        shape = in_shape(first, body.shapes[line.page_no])
         signature = (
             label,
             punct,
             None if first.ocr else first.bold,
             first.color,
-            shape,
+            in_shape(first, body.shapes[line.page_no]),
             position_class(first, region.left),
         )
         candidates.append(Candidate(position, number, signature, line, skip))
     return candidates
 
 
-def best_chains(numbers: list[int]) -> tuple[float, list[int]]:
-    """Ardışık artan zincirlerden (yeniden başlayabilir) en yüksek puanlı alt diziyi seçer."""
-    n = len(numbers)
-    if n == 0:
-        return 0.0, []
-    best = [0.0] * n
-    previous = [-1] * n
-    for i in range(n):
-        base = max(range(i), key=lambda j: best[j], default=-1)
-        carried = best[base] if base >= 0 and best[base] > 0 else 0.0
-        best[i] = carried + 1 - CHAIN_START_PENALTY
-        previous[i] = base if carried > 0 else -1
-        for j in range(i):
-            if numbers[i] == numbers[j] + 1 and best[j] + 1 > best[i]:
-                best[i], previous[i] = best[j] + 1, j
-    end = max(range(n), key=lambda i: best[i])
-    chosen, i = [], end
-    while i >= 0:
-        chosen.append(i)
-        i = previous[i]
-    return best[end], sorted(chosen)
+def lone_marker(line: Line, following: Line | None) -> tuple[int, str, str, int] | None:
+    """Tek başına satır olmuş numara ("3."), metni aynı sırada sağında başlıyorsa."""
+    number = NUMBER.match(line.words[0].text) if len(line.words) == 1 else None
+    if number is None or following is None or following.page_no != line.page_no:
+        return None
+    same_row = (
+        abs(following.y0 + following.y1 - line.y0 - line.y1) / 2 < ROW_TOLERANCE_EM * line.size
+    )
+    return (int(number[1]), "", number[2], 1) if same_row and following.x0 > line.x1 else None
 
 
-def find_marks(span: list[Line], first_word: int) -> list[Mark]:
-    """A..E'yi en çok tamamlayan imzadaki şık işaretleri, harf sırasıyla."""
-    by_signature: dict[tuple, list[Mark]] = defaultdict(list)
-    for li, line in enumerate(span):
-        start = first_word if li == 0 else 0
-        for wi in range(start, len(line.words)):
+def choose_marker(
+    candidates: list[Candidate], marked: list[int], previous: int | None, usual: tuple | None
+) -> Candidate | None:
+    """Alıştırma ve liste olmayan adaylardan sırayı süren, olağan imzalı ya da son numara."""
+    eligible = [
+        c
+        for c in candidates
+        if not any(p > c.position for p in marked)
+        and not any(
+            d.position > c.position
+            and d.signature[:2] == c.signature[:2]
+            and d.number == c.number + 1
+            for d in candidates
+        )
+    ]
+    usual_ones = [c for c in eligible if c.signature == usual]
+    for group in (
+        [c for c in usual_ones if previous is not None and c.number == previous + 1],
+        [c for c in eligible if previous is not None and c.number == previous + 1],
+        usual_ones,
+        eligible,
+    ):
+        if group:
+            return group[-1]
+    return None
+
+
+def usual_signature(body: Body, sets: list[OptionSet], excluded: set[int]) -> tuple | None:
+    """Şık kümelerinin önündeki bölgelerde en çok görülen soru numarası imzası."""
+    counts: Counter[tuple] = Counter()
+    start = 0
+    for option_set in sets:
+        zone = [p for p in range(start, option_set.start) if id(body.lines[p]) not in excluded]
+        counts.update({c.signature for c in zone_candidates(body, zone)})
+        start = option_set.last + 1
+    return counts.most_common(1)[0][0] if counts else None
+
+
+def mark_gap(previous: Word, word: Word) -> bool:
+    """Kelimeden önce şık işaretini ayıracak kadar geniş boşluk var mı."""
+    return word.x0 - previous.x1 > MARK_GAP_EM * word.size
+
+
+def mark_words(line: Line) -> list[tuple[int, str, tuple]]:
+    """Satırdaki şık işaretleri (kelime sırası, harf, imza): satır başında ya da boşluktan sonra."""
+    found = []
+    for index, word in enumerate(line.words):
+        match = OPTION.match(word.text)
+        if match and (index == 0 or mark_gap(line.words[index - 1], word)):
+            found.append((index, match[1], (match[2], None if word.ocr else word.bold)))
+    return found
+
+
+def option_sets(body: Body, excluded: set[int]) -> list[OptionSet]:
+    """Okuma sırasında A'dan E'ye eksiksiz, aynı imzalı şık kümeleri (F ile süren liste değil)."""
+    open_sets: dict[tuple, OptionSet] = {}
+    found: list[OptionSet] = []
+    for position, line in enumerate(body.lines):
+        if id(line) in excluded:
+            continue
+        for _, label, signature in mark_words(line):
+            current = open_sets.get(signature)
+            if label == "A":
+                current = OptionSet(signature, position, position, {"A"})
+                open_sets[signature] = current
+                found.append(current)
+            elif current is not None and current.valid:
+                if label == "F":
+                    current.valid = False
+                elif len(current.labels) < len(OPTION_LABELS):
+                    current.labels.add(label)
+                    current.last = position
+    complete = sorted(
+        (s for s in found if s.valid and s.labels == set(OPTION_LABELS)), key=lambda s: s.start
+    )
+    kept: list[OptionSet] = []
+    for option_set in complete:
+        if not kept or option_set.start > kept[-1].last:
+            kept.append(option_set)
+    return kept
+
+
+def find_marks(span: list[Line], first_line: int, skip: int, signature: tuple) -> list[Mark]:
+    """Kümenin imzasındaki şık işaretleri (her harfin ilki), harf sırasıyla."""
+    picked: dict[str, Mark] = {}
+    for li in range(first_line, len(span)):
+        line = span[li]
+        for wi, label, sign in mark_words(line):
+            if (li == 0 and wi < skip) or sign != signature or label not in OPTION_LABELS:
+                continue
             word = line.words[wi]
-            match = OPTION.match(word.text)
-            gap_ok = wi == start or word.x0 - line.words[wi - 1].x1 > MARK_GAP_EM * word.size
-            if match and gap_ok:
-                bold = None if word.ocr else word.bold
-                by_signature[(match[2], bold)].append(Mark(li, wi, match[1], word.x0, word.y0))
-    best: list[Mark] = []
-    for marks in by_signature.values():
-        picked: dict[str, Mark] = {}
-        for mark in marks:
-            picked.setdefault(mark.label, mark)
-        labels = sorted(picked)
-        if len(labels) > len(best):
-            best = [picked[label] for label in labels]
-    return best
+            picked.setdefault(label, Mark(li, wi, label, word.x0, word.y0))
+    return [picked[label] for label in sorted(picked)]
 
 
-def key_regions(body: Body) -> tuple[set[int], dict[int, str]]:
-    """Cevap anahtarı satırlarını bulur: "1-B 2-E" çiftleri ya da alt alta sayı/harf ızgarası."""
-    excluded, key = set(), {}
+def key_regions(body: Body) -> tuple[set[int], list[tuple[int, dict[int, str]]]]:
+    """Cevap anahtarları ve yerleri: "1-B", "3E-4B" çiftleri ya da alt alta sayı ve harf."""
+    position_of = {id(line): p for p, line in enumerate(body.lines)}
+    excluded: set[int] = set()
+    keys: list[tuple[int, dict[int, str]]] = []
     for row in page_rows(body.lines):
         pairs = KEY_PAIR.findall(" ".join(line.text for line in row))
         if len(pairs) >= 3:
             excluded.update(id(line) for line in row)
-            key.update({int(n): letter for n, letter in pairs})
+            start = min(position_of[id(line)] for line in row)
+            keys.append((start, {int(n): letter for n, letter in pairs}))
     for line in body.lines:
         if KEY_HEADING.match(tr_lower(line.text).strip()):
             excluded.add(id(line))
+    grid = key_grid(body)
+    if len(grid) >= 3:
+        for number, letter in grid:
+            excluded.update({id(number), id(letter)})
+        start = min(position_of[id(number)] for number, _ in grid)
+        keys.append((start, {int(n.words[0].text): letter.words[0].text for n, letter in grid}))
+    return excluded, sorted(keys, key=lambda item: item[0])
+
+
+def key_grid(body: Body) -> list[tuple[Line, Line]]:
+    """Alt alta yazılmış anahtar: yalnız sayı olan satırın hemen altında yalnız harf olan satır."""
     numbers = [
         text_line
         for text_line in body.lines
@@ -1819,11 +2286,20 @@ def key_regions(body: Body) -> tuple[set[int], dict[int, str]]:
         ]
         if below:
             grid.append((number, below[0]))
-    if len(grid) >= 3:
-        for number, letter in grid:
-            excluded.update({id(number), id(letter)})
-            key[int(number.words[0].text)] = letter.words[0].text
-    return excluded, key
+    return grid
+
+
+def key_answer(
+    keys: list[tuple[int, dict[int, str]]], position: int, number: int | None
+) -> str | None:
+    """Sorunun cevabı: sorudan sonraki ilk anahtarda (yoksa öncekilerin sonuncusunda) numarası."""
+    if number is None:
+        return None
+    after = [key for start, key in keys if start > position and number in key]
+    before = [key for start, key in keys if start <= position and number in key]
+    if after:
+        return after[0][number]
+    return before[-1][number] if before else None
 
 
 def page_rows(lines: list[Line]) -> list[list[Line]]:
@@ -1853,7 +2329,7 @@ def attach_numerals(
     bottoms: dict[int, float] = {}
     kept: list[Line] = []
     for line in span:
-        if kept and all(ROMAN.match(w.text) for w in line.words):
+        if kept and all(numeral_text(w) for w in line.words):
             above = kept[-1]
             gap = line.y0 - above.y1
             if -0.5 * line.size <= gap < 1.5 * line.size and annotate(line, above, body, notes):
@@ -1863,22 +2339,35 @@ def attach_numerals(
     return kept, notes, bottoms
 
 
+def numeral_text(word: Word) -> str | None:
+    """Kelime Roma numarasıysa onu verir; I yerine yazılmış l, 1, | kabul edilir."""
+    text = word.text.translate(NUMERAL_ALIASES)
+    return text if ROMAN.match(text) else None
+
+
 def annotate(numerals: Line, above: Line, body: Body, notes: dict[int, str]) -> bool:
-    """Her numarayı üstteki satırda x'i en yakın altı çizili kelime dizisinin sonuna bağlar."""
+    """Her numarayı üstteki satırda, çizgisi x'ine en yakın altı çizili öbeğin sonuna bağlar."""
     hlines = [s for s in body.shapes[above.page_no] if s.kind == "HLINE"]
-    lined = [any(underlined(c, hlines) for c in w.chars) for w in above.words]
-    if not any(lined):
+    owners = [underline_index(w, hlines) for w in above.words]
+    drawn = {owner for owner in owners if owner is not None}
+    if not drawn:
         return False
     for numeral in numerals.words:
         cx = (numeral.x0 + numeral.x1) / 2
-        index = min(
-            (i for i, flag in enumerate(lined) if flag),
-            key=lambda i: abs((above.words[i].x0 + above.words[i].x1) / 2 - cx),
-        )
-        while index + 1 < len(above.words) and lined[index + 1]:
-            index += 1
-        notes[id(above.words[index])] = f" ({numeral.text})"
+        chosen = min(drawn, key=lambda k: max(hlines[k].x0 - cx, cx - hlines[k].x1, 0.0))
+        word = above.words[max(i for i, owner in enumerate(owners) if owner == chosen)]
+        notes[id(word)] = notes.get(id(word), "") + f" ({numeral_text(numeral)})"
     return True
+
+
+def underline_index(word: Word, hlines: list[Shape]) -> int | None:
+    """Kelimenin altı çizili harflerinin çoğunun altındaki çizginin sırası."""
+    counts = Counter(
+        next((k for k, hline in enumerate(hlines) if underlined(char, [hline])), None)
+        for char in word.chars
+    )
+    counts.pop(None, None)
+    return counts.most_common(1)[0][0] if counts else None
 
 
 def fix_ocr_romans(span: list[Line], body: Body) -> None:
@@ -2040,19 +2529,6 @@ def snap_roman_options(
             question.options[label] = [phrase]
 
 
-def fix_sequence(words: list[Word]) -> None:
-    """Sırayla I, II, III... olması gereken kelimeleri, sıra tutarlıysa düzeltir."""
-    if len(words) < 2 or len(words) > len(ROMANS):
-        return
-    inner = [ROMAN_LIKE.match(w.text) for w in words]
-    valid = [(k, m[2]) for k, m in enumerate(inner) if m and ROMAN.match(m[2])]
-    if any(roman != ROMANS[k] for k, roman in valid) or len(valid) * 2 < len(words) - 1:
-        return
-    for k, (word, match) in enumerate(zip(words, inner, strict=True)):
-        if match and match[2] != ROMANS[k]:
-            set_word_text(word, match[1] + ROMANS[k] + match[3] + match[4])
-
-
 def set_word_text(word: Word, text: str) -> None:
     """OCR kelimesinin metnini ve eşit bölünmüş harflerini yeniler."""
     template = word.chars[0]
@@ -2087,6 +2563,33 @@ def normalize_ocr_marks(lines: list[Line]) -> None:
         line.words = words
 
 
+def split_glued(lines: list[Line]) -> None:
+    """Yapışık soru numarasını ("8.Biçim") ve şık işaretini ("A)Eleştiri") ayrı kelime yapar."""
+    for line in lines:
+        words: list[Word] = []
+        for word in line.words:
+            match = GLUED_NUMBER.match(word.text) if not words else None
+            if match is None and (not words or mark_gap(words[-1], word)):
+                match = GLUED_OPTION.match(word.text) or GLUED_DOT_OPTION.match(word.text)
+            words.extend(split_word(word, match.end(1)) if match else [word])
+        line.words = words
+
+
+def split_word(word: Word, cut: int) -> list[Word]:
+    """Kelimeyi metin sırasından ikiye böler; harf kutuları yoksa eşit paydan."""
+    if "".join(c.text for c in word.chars) == word.text:
+        head_chars, tail_chars = word.chars[:cut], word.chars[cut:]
+        return [
+            replace(word, text=word.text[:cut], chars=head_chars, x1=head_chars[-1].x1),
+            replace(word, text=word.text[cut:], chars=tail_chars, x0=tail_chars[0].x0),
+        ]
+    middle = word.x0 + (word.x1 - word.x0) * cut / len(word.text)
+    head, tail = replace(word, x1=middle), replace(word, x0=middle)
+    set_word_text(head, word.text[:cut])
+    set_word_text(tail, word.text[cut:])
+    return [head, tail]
+
+
 def roman_phrases() -> list[str]:
     """Şıklardaki Roma rakamı öbekleri: "Yalnız I", "I ve II", "I, II ve III"..."""
     phrases = []
@@ -2100,80 +2603,99 @@ def roman_phrases() -> list[str]:
 
 
 def parse(pages: list[PageIR]) -> tuple[list[Question], dict]:
-    """Sayfalardan soruları, öğrenilen biçim profiliyle birlikte çıkarır."""
+    """Soruları şık kümelerine dayanarak çıkarır: her A-E kümesi bir sorunun şık alanıdır."""
     body = reading_order(pages)
     normalize_ocr_marks(body.lines)
-    excluded, key = key_regions(body)
-    groups: dict[tuple, list[Candidate]] = defaultdict(list)
-    for candidate in number_candidates(body, excluded):
-        groups[candidate.signature].append(candidate)
-    scored = []
-    for signature, group in groups.items():
-        score, chosen = best_chains([c.number for c in group])
-        markers = [group[i] for i in chosen]
-        complete = sum(
-            len(find_marks(question_span(body, markers, k, excluded), markers[k].skip)) == 5
-            for k in range(len(markers))
-        )
-        scored.append((score + complete, signature, markers))
-    scored.sort(key=lambda item: -item[0])
-    if not scored or scored[0][0] <= 0:
-        return [], {"reason": "no question markers", "pages": [p.source for p in pages]}
-    total, signature, markers = scored[0]
-    questions = [build_question(body, markers, k, key, excluded) for k in range(len(markers))]
-    attach_passages(body, questions)
+    split_glued(body.lines)
+    excluded, keys = key_regions(body)
+    sets = option_sets(body, excluded)
+    usual = usual_signature(body, sets, excluded)
+    position_of = {id(line): p for p, line in enumerate(body.lines)}
+    questions: list[Question] = []
+    passages: list[tuple[set[int], list[str], int]] = []
+    zone_start, previous, rejected = 0, None, 0
+    for k, option_set in enumerate(sets):
+        end = sets[k + 1].start if k + 1 < len(sets) else len(body.lines)
+        zone = [p for p in range(zone_start, option_set.start) if id(body.lines[p]) not in excluded]
+        span = [p for p in range(option_set.start, end) if id(body.lines[p]) not in excluded]
+        marked = [p for p in zone if mark_words(body.lines[p])]
+        marker = choose_marker(zone_candidates(body, zone), marked, previous, usual)
+        start = zone.index(marker.position) if marker else unnumbered_start(body, zone)
+        lines = [body.lines[p] for p in zone[start:] + span]
+        question = build_question(body, lines, option_set, marker)
+        zone_start = position_of[id(question.tail[0])] if question.tail else end
+        if not QUESTION_CUE.search(tr_lower(" ".join(question.stem))):
+            rejected += 1
+            continue
+        pre = [body.lines[p] for p in zone[:start]]
+        zone_passage(body, pre, question, passages, len(questions))
+        if question.answer is None:
+            question.answer = key_answer(keys, option_set.start, question.number)
+            question.answer_source = "KEY" if question.answer else None
+        if question.answer is None:
+            question.problems.append("NO_ANSWER_KEY")
+        questions.append(question)
+        previous = question.number if question.number is not None else previous
     names = ["label", "punct", "bold", "color", "in_shape", "position"]
     profile = {
-        "question_marker": dict(zip(names, signature, strict=True)),
-        "marker_score": round(total, 1),
-        "runner_up": [(round(s, 1), sig) for s, sig, _ in scored[1:3]],
+        "option_sets": len(sets),
+        "questions": len(questions),
+        "not_multiple_choice": rejected,
+        "unnumbered": sum(q.number is None for q in questions),
+        "question_marker": dict(zip(names, usual, strict=True)) if usual else None,
         "regions": len(body.regions),
         "body_size": body.body_size,
+        "paragraph_break": round(body.break_ratio, 3),
         "furniture": sorted({text_line.text for text_line in body.furniture})[:8],
-        "answer_key_entries": len(key),
+        "answer_keys": [len(key) for _, key in keys],
         "pages": [(p.source, p.notes) for p in pages],
     }
     return questions, profile
 
 
-def question_span(body: Body, markers: list[Candidate], k: int, excluded: set[int]) -> list[Line]:
-    """Sorunun numarasından sonraki sorunun numarasına kadar olan satırlar."""
-    end = markers[k + 1].position if k + 1 < len(markers) else len(body.lines)
-    return [
-        text_line
-        for text_line in body.lines[markers[k].position : end]
-        if id(text_line) not in excluded
-    ]
+def unnumbered_start(body: Body, zone: list[int]) -> int:
+    """Numarasız sorunun kökü: bölgenin son paragrafı, önündeki "ÖSS - 2008:" etiketiyle."""
+    lines = [body.lines[p] for p in zone]
+    paragraphs = compose_paragraphs([(line.words, line) for line in lines], body)
+    if not paragraphs:
+        return len(zone)
+    index_of = {id(line): k for k, line in enumerate(lines)}
+    start = index_of[id(paragraphs[-1][1][0].first_line)]
+    if len(paragraphs) > 1:
+        label, rows = paragraphs[-2]
+        if label.replace("*", "").strip().endswith(":") and len(rows) == 1:
+            start = index_of[id(rows[0].first_line)]
+    return start
 
 
 def build_question(
-    body: Body, markers: list[Candidate], k: int, key: dict[int, str], excluded: set[int]
+    body: Body, lines: list[Line], option_set: OptionSet, marker: Candidate | None
 ) -> Question:
-    """Sorunun kökünü, şıklarını ve cevabını çıkarır."""
-    marker = markers[k]
-    span = question_span(body, markers, k, excluded)
-    fix_ocr_romans(span, body)
-    span, notes, bottoms = attach_numerals(span, body)
-    question = Question(number=marker.number, page_no=marker.line.page_no)
-    marks = find_marks(span, marker.skip)
+    """Kök satırlarından ve şık alanından soruyu kurar; şık alanından sonrası kuyruktur."""
+    fix_ocr_romans(lines, body)
+    span, notes, bottoms = attach_numerals(lines, body)
+    skip = marker.skip if marker else 0
+    first_line = marker.line if marker else span[0]
+    question = Question(number=marker.number if marker else None, page_no=first_line.page_no)
+    if marker is None:
+        question.problems.append("NO_NUMBER")
+    a_line = body.lines[option_set.start]
+    first = next(i for i, line in enumerate(span) if line is a_line)
+    marks = find_marks(span, first, skip, option_set.signature)
     first_mark_line = marks[0].line_index if marks else len(span)
     stem_pieces = [
-        (span[li].words[marker.skip :] if li == 0 else span[li].words, span[li])
+        (span[li].words[skip:] if li == 0 else span[li].words, span[li])
         for li in range(first_mark_line)
     ]
-    option_pieces = collect_options(span, marks, marker.skip, question, stem_pieces, body)
+    option_pieces = collect_options(span, marks, skip, question, stem_pieces, body)
     question.stem = compose(stem_pieces, body, notes, bottoms=bottoms)
     rights = option_rights(marks, span, body)
     for label in sorted(option_pieces):
         question.options[label] = compose(option_pieces[label], body, notes, rights[label])
-    if question.answer is None and marker.number in key:
-        question.answer, question.answer_source = key[marker.number], "KEY"
     if list(question.options) != OPTION_LABELS:
         question.problems.append("OPTION_COUNT")
     if not question.stem:
         question.problems.append("EMPTY_STEM")
-    if question.answer is None:
-        question.problems.append("NO_ANSWER_KEY")
     if any(w.ocr for line in span for w in line.words):
         snap_roman_options(question, option_pieces, body)
         question.problems.append("OCR_TEXT")
@@ -2244,30 +2766,44 @@ def continues(previous: Line, line: Line, body: Body) -> bool:
     return same_region and -0.5 * line.size <= gap < 0.8 * line.size
 
 
-def attach_passages(body: Body, questions: list[Question]) -> None:
-    """Şık alanından sonra kalan metni sonraki soru(lar)ın ortak parçası yapar."""
-    for k, question in enumerate(questions):
-        tail = question.tail
-        if not tail:
-            continue
-        cue_line = next(
-            (i for i, text_line in enumerate(tail[:2]) if PASSAGE_CUE.search(text_line.text)), None
-        )
-        numbers = {questions[k + 1].number} if k + 1 < len(questions) else set()
-        start = 0
-        if cue_line is not None:
-            cue = PASSAGE_CUE.search(tail[cue_line].text)
-            assert cue
-            found = [int(n) for n in re.findall(r"\d{1,3}", cue[0])]
-            ranged = bool(re.search(r"[-–]", cue[2]))
-            numbers = set(range(min(found), max(found) + 1)) if ranged else set(found)
-            start = cue_line + 1
-        passage = compose([(text_line.words, text_line) for text_line in tail[start:]], body)
-        for later in questions[k + 1 : k + 7]:
-            if later.number in numbers:
-                later.passage = passage
-                if cue_line is None:
-                    later.problems.append("PASSAGE_WITHOUT_CUE")
+def zone_passage(
+    body: Body,
+    pre: list[Line],
+    question: Question,
+    passages: list[tuple[set[int], list[str], int]],
+    index: int,
+) -> None:
+    """Sorudan önceki metni yönergedeki sorulara ya da "bu parça" diyen soruya ortak parça yapar."""
+    cue_line = next((k for k, line in enumerate(pre) if PASSAGE_CUE.search(line.text)), None)
+    if cue_line is not None:
+        cue = PASSAGE_CUE.search(pre[cue_line].text)
+        assert cue
+        found = [int(n) for n in re.findall(r"\d{1,3}", cue[0])]
+        ranged = bool(re.search(r"[-–]", cue[2]))
+        numbers = set(range(min(found), max(found) + 1)) if ranged else set(found)
+        text = compose([(line.words, line) for line in pre[cue_line + 1 :]], body)
+        passages.append((numbers, text, index))
+    for numbers, text, created in reversed(passages):
+        if question.number in numbers and index - created < PASSAGE_REACH:
+            question.passage = text
+            return
+    reference = PASSAGE_REFERENCE.search(tr_lower(" ".join(question.stem)))
+    block = passage_block(body, pre, question.page_no)
+    if block and reference and len(question.stem) == 1:
+        question.passage = compose([(line.words, line) for line in block], body)
+        question.problems.append("PASSAGE_WITHOUT_CUE")
+
+
+def passage_block(body: Body, pre: list[Line], page_no: int) -> list[Line]:
+    """Kökün hemen üstündeki metin: aynı sayfada, sol kenardan numaralı son maddeden sonrası."""
+    block: list[Line] = []
+    for line in reversed(pre):
+        region = body.region_of[id(line)]
+        numbered = marker_of(line) and position_class(line.words[0], region.left) != "IN"
+        if line.page_no != page_no or numbered:
+            break
+        block.append(line)
+    return block[::-1]
 
 
 ROMAN_PHRASES = roman_phrases()
