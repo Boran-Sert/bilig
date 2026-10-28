@@ -13,7 +13,8 @@ ORTAK bölüm (kitap okuyucuda birebir aynısı vardır):
    Tesseract'la okunur; her (font, kod) için oy sayılır, yeterli oy toplanınca oylama durur.
    Kod oy çokluğuyla, oyu yoksa fontun kod kaymasıyla çözülür.
 4. Metin katmanı olmayan sayfa (harfleri çizim, tarama) Tesseract'la okunur; kalınlık harf
-   çizgisinin kalınlığından tahmin edilir.
+   çizgisinin kalınlığından tahmin edilir. Metinli sayfada metin katmanının kapsamadığı büyük
+   resimler de (metin nesneleri gizli çizilip) okunur; OCR güveni düşük resim yazısız sayılır.
 5. Düzen: kenarda aynen tekrarlayan satır, gövdede kullanılmayan stilde koşu başlığı, sırasında
    yalnız duran sayı ve kenardaki küçük alt yazıya bitişik kısa satırlar (logo) üst ya da alt
    bilgidir. Okuma sırası XY-cut ile bulunur (kutular bölünmez).
@@ -68,6 +69,9 @@ from PIL import Image
 # ================================================================== ORTAK BAŞLANGIÇ
 
 TEXT_LAYER_MIN_CHARS = 20
+IMAGE_OCR_MIN_SHARE = 0.02
+IMAGE_OCR_MIN_CONFIDENCE = 60.0
+IMAGE_ORDER_STEP = 100_000
 LAYOUT_ENABLED = os.environ.get("LAYOUT", "0") == "1"
 LAYOUT_MODEL = os.environ.get("LAYOUT_MODEL", "")
 LAYOUT_CACHE_DIR = os.environ.get("LAYOUT_CACHE_DIR")
@@ -293,6 +297,7 @@ class RawPage:
     ocr_words: list[Word]
     votes: Counter[tuple[str, int, str]]
     layout: list[LayoutBox] = field(default_factory=list)
+    image_words: list[Word] = field(default_factory=list)
 
 
 def read_document(path: str) -> list[PageIR]:
@@ -346,9 +351,19 @@ def read_raw_page(
             shapes = drop_glyph_shapes(shapes, ocr_words)
         elif any((c.broken or c.suspect) and c.ink for c in chars):
             votes = vote_broken_glyphs(page, chars, settled)
+        regions = [] if ocr_words else image_regions(page, chars)
+        image_words = read_images_by_ocr(page, regions) if regions else []
         layout = detect_layout(page)
         return RawPage(
-            index + 1, page.get_width(), page.get_height(), chars, shapes, ocr_words, votes, layout
+            index + 1,
+            page.get_width(),
+            page.get_height(),
+            chars,
+            shapes,
+            ocr_words,
+            votes,
+            layout,
+            image_words,
         )
     finally:
         textpage.close()
@@ -806,9 +821,65 @@ def ocr_cache_path(image_bytes: bytes, psm: int) -> Path | None:
 
 
 def read_page_by_ocr(page: pdfium.PdfPage) -> list[Word]:
-    """Metin katmanı olmayan sayfayı OCR'la kelimelere çevirir; kalınlığı tahmin eder."""
+    """Metin katmanı olmayan sayfayı OCR'la kelimelere çevirir."""
     scale = OCR_DPI / 72
-    image = render_gray(page, scale)
+    return words_from_image(render_gray(page, scale), scale)
+
+
+def image_regions(
+    page: pdfium.PdfPage, chars: list[Char]
+) -> list[tuple[float, float, float, float]]:
+    """Metin katmanının kapsamadığı büyük resimlerin kutuları (üst-sol orijin, iç içe olmayan)."""
+    width, height = page.get_width(), page.get_height()
+    regions: list[tuple[float, float, float, float]] = []
+    for obj in page.get_objects(filter=[pdfium_c.FPDF_PAGEOBJ_IMAGE]):
+        left, bottom, right, top = obj.get_bounds()
+        box = (
+            max(left, 0.0),
+            max(height - top, 0.0),
+            min(right, width),
+            min(height - bottom, height),
+        )
+        if (box[2] - box[0]) * (box[3] - box[1]) < IMAGE_OCR_MIN_SHARE * width * height:
+            continue
+        covered = sum(
+            1
+            for c in chars
+            if c.ink
+            and c.text not in SPACES
+            and box[0] <= (c.x0 + c.x1) / 2 <= box[2]
+            and box[1] <= (c.y0 + c.y1) / 2 <= box[3]
+        )
+        middle = ((box[0] + box[2]) / 2, (box[1] + box[3]) / 2)
+        inside = any(r[0] <= middle[0] <= r[2] and r[1] <= middle[1] <= r[3] for r in regions)
+        if covered < TEXT_LAYER_MIN_CHARS and not inside:
+            regions.append(box)
+    return regions
+
+
+def read_images_by_ocr(
+    page: pdfium.PdfPage, regions: list[tuple[float, float, float, float]]
+) -> list[Word]:
+    """Resim bölgelerini metin nesneleri gizli çizip OCR'la okur; yazısız resimler atılır."""
+    scale = OCR_DPI / 72
+    with deactivated(page, lambda obj: obj.type == pdfium_c.FPDF_PAGEOBJ_TEXT):
+        image = render_gray(page, scale)
+    words: list[Word] = []
+    for index, (x0, y0, x1, y1) in enumerate(regions):
+        left, top = int(x0 * scale), int(y0 * scale)
+        crop = image.crop((left, top, int(x1 * scale) + 1, int(y1 * scale) + 1))
+        found = words_from_image(crop, scale, (left, top), (index + 1) * IMAGE_ORDER_STEP)
+        confident = [w for w in found if w.confidence >= IMAGE_OCR_MIN_CONFIDENCE]
+        letters = sum(len(w.text) for w in confident)
+        if letters >= TEXT_LAYER_MIN_CHARS and len(confident) * 2 >= len(found):
+            words.extend(found)
+    return words
+
+
+def words_from_image(
+    image: Image.Image, scale: float, shift: tuple[int, int] = (0, 0), order_base: int = 0
+) -> list[Word]:
+    """Görüntüyü OCR'la kelimelere çevirir; kalınlığı çizgi kalınlığından tahmin eder."""
     found = run_ocr(image, OCR_PAGE_PSM)
     gray = np.asarray(image)
     strokes = [stroke_width(gray, w) for w in found]
@@ -825,7 +896,15 @@ def read_page_by_ocr(page: pdfium.PdfPage) -> list[Word]:
             if 0 <= k < len(found) and found[k].line_key == word.line_key and strokes[k] > 0
         ]
         bold = stroke > 0 and median(around) >= OCR_BOLD_STROKE_RATIO * typical
-        words.append(ocr_word(word, scale, size, bold))
+        placed = replace(
+            word,
+            x0=word.x0 + shift[0],
+            y0=word.y0 + shift[1],
+            x1=word.x1 + shift[0],
+            y1=word.y1 + shift[1],
+            order=word.order + order_base,
+        )
+        words.append(ocr_word(placed, scale, size, bold))
     return words
 
 
@@ -1019,7 +1098,9 @@ def finish_page(raw: RawPage, decoder: GlyphDecoder) -> PageIR:
             notes.append("UNDECODED_GLYPHS")
         if any(c.broken for c in chars):
             notes.append("REPAIRED_GLYPHS")
-        words, source = build_words(chars), "TEXT"
+        words, source = build_words(chars) + raw.image_words, "TEXT"
+        if raw.image_words:
+            notes.append("IMAGE_OCR")
     lines = build_lines(words, raw.page_no)
     source = source if lines else "EMPTY"
     return PageIR(
@@ -1085,7 +1166,8 @@ def build_lines(words: list[Word], page_no: int) -> list[Line]:
         rows.append([word])
     lines = []
     for row in rows:
-        row.sort(key=lambda w: (w.order, w.x0) if w.ocr else (0, w.x0))
+        all_ocr = all(w.ocr for w in row)
+        row.sort(key=lambda w: (w.order, w.x0) if all_ocr else (0, w.x0))
         segment = [row[0]]
         for word in row[1:]:
             if word.x0 - segment[-1].x1 > SEGMENT_GAP_EM * max(word.size, segment[-1].size):
