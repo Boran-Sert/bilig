@@ -103,7 +103,7 @@ Kesik çizgili kutu dış servis. Python servisi hem anlık istekleri (anlatım,
 | --- | --- |
 | Web arayüzü | React, Vite, TypeScript, shadcn/ui, TanStack Query, Recharts, react-markdown, react-dropzone |
 | Java servisi | Spring Boot (Web, Security, Data JPA, Validation), Flyway, springdoc-openapi |
-| Python servisi | FastAPI, anthropic SDK, PyMuPDF, sentence-transformers (bge-m3 embedding, bge-reranker-v2-m3), psycopg, pgvector, Pydantic, Jinja2, rapidfuzz |
+| Python servisi | FastAPI, anthropic SDK, pypdfium2 ve Tesseract (PDF ve OCR), sentence-transformers (bge-m3 embedding, bge-reranker-v2-m3), psycopg, pgvector, Pydantic, Jinja2, rapidfuzz |
 | Veritabanı | PostgreSQL, pgvector (vektör araması), pg_textsearch (Türkçe BM25 kelime araması) |
 
 Sürümler ve her iş için seçilen kütüphanelerin tam listesi [Bölüm 13](#s13)'te.
@@ -183,7 +183,7 @@ Girdi
 
 Nasıl
 
-- PyMuPDF metni çıkarır. Kazanımlar düzenli ifadeyle yakalanır: `A.2. 5. Metnin olay örgüsünü belirler.`
+- PDF dış yüzü (`app.ingest.pdf.read_lines`) metni satır satır çıkarır. Kazanımlar düzenli ifadeyle yakalanır: `A.2. 5. Metnin olay örgüsünü belirler.`
 - Kazanımın altındaki a, b, c maddeleri o kazanımın MEB açıklaması olarak kaydedilir. Bu açıklamalar yapay zekanın kurallarıdır, örneğin "aruz kalıplarını buldurmaya yönelik çalışmalara yer verilmez".
 - Ünite tabloları üç sütunlu olduğu için her tablo sayfası bir kez Sonnet'e metin ve görüntüyle verilir. Çıktı JSON: sınıf, ünite, süre, dönemler, metin sayıları, dil bilgisi konuları.
 - Üniteler kazanım gruplarına kuralla bağlanır: Hikâye, Roman, Masal → A.2; Şiir → A.1; Tiyatro → A.3; Makale, Deneme → A.4.
@@ -210,30 +210,21 @@ Bir `source` kaydı ve kuyrukta bir iş.
 
 Nasıl
 
-PyMuPDF metni çıkarır, kelimelerin ne kadarının Türkçe kelime listesinde bulunduğuna bakılır. %90 üstü metin yolu. Altındaysa önce bozuk font eşlemesi kodla düzeltilmeye çalışılır; düzeltilen metin %90'ı geçerse metin yolu, geçmezse görüntü yolu.
+Ayrı bir adım değildir; PDF okuması (A5) sırasında çalışır. PDF motoru her sayfanın harflerini okur, gizli metni atar ve bozuk eşlemeli harfleri ("Ġ", "Ģ") OCR oylarıyla onarır; onarılmış sayfa metninde kelimelerin ne kadarının Türkçe kelime listesinde bulunduğuna bakılır. %90 üstü metin yolu. Altındaysa önce bozuk font eşlemesi kodla düzeltilmeye çalışılır; düzeltilen metin %90'ı geçerse düzeltme harflere uygulanır, geçmezse sayfa Tesseract'la da okunur ve oranı yüksek okuma kalır. Metin katmanı olmayan sayfa ve metinli sayfadaki yazılı resimler Tesseract'la (Türkçe) okunur.
 
 Örnek
 
 Masal sayfasında "Masal; genellikle" metni "0DVDO JHQHOOLNOH" diye çıkıyor: her harf 29 kod noktası kaymış, fontun karakter eşlemesi bozuk. Kayma sabitse kodla geri çevrilir ve sayfa metin yoluna döner; Türkçe harflerde (ş, ğ, ı) aynı kaymanın olup olmadığı henüz denenmedi. Soru bankası çıktısında hiç metin yok: görüntü yoluna düşer. Program, ÖDSGM testi ve MEB kitapları metin yolundan gider.
 
-### A4Kaynak profili (her kitap ya da seri için bir kez)
+### A4Kaynak profili (kaldırıldı)
 
-Nasıl
-
-- PyMuPDF her metin parçası için font, boyut, kalın ve italik bilgisi, renk ve konum verir; renkli kutular çizim olarak gelir.
-- Bir script kitaptaki bütün stil kombinasyonlarını sayar ve her birinden örnek metin çıkarır.
-- Stil listesi 5-10 örnek sayfanın görüntüsüyle Sonnet'e verilir. Sonnet eşlemeyi önerir: "bu stil Bilgi Köşesi başlığı, bu etkinlik etiketi, italik eser adı, üstteki satır sayfa başlığı".
-- Öneri inceleme listesine düşer, Fatih onaylar ve `profiles/tde12_meb.yaml` olarak kaydedilir.
-
-Sonraki dosyalar
-
-Yeni dosyanın stilleri mevcut profillerle karşılaştırılır; eşleşen profil otomatik seçilir.
+Yayınevine ya da seriye özel profil yoktur. Ölçüler (gövde boyutu, paragraf aralığı, başlık stili, soru numarası ve şık biçimi) her belgeden yeniden öğrenilir; yeni bir kitap için dosya yazılmaz, onay beklenmez.
 
 ### A5Ortak formata ayrıştırma
 
 Kitap
 
-Profil her sayfaya kodla uygulanır, LLM yok. Sayfa başlığı ve numarası atılır; satırlar konuma göre paragraflara toplanır; kutunun içindeki metin kutunun türünü alır; italik `*...*` olarak korunur. Sayfa sonunda yarım kalan blok sonraki sayfanın başındaki aynı stil blokla birleşir; alıntının altındaki kaynak satırı alıntıya bağlanır.
+Kitap motoru (`app.ingest.pdf.read_textbook`) kodla çalışır, LLM yok. Kenarda tekrarlayan satırlar, sayfa numarası ve logolar atılır; okuma sırası XY-cut ile bulunur, kutular bölünmez; paragraf eşiği belgeden öğrenilir. Başlıklar stil ve hizalamadan bulunur, düzey alır ve başlık yolu kurulur; kutudaki metin BILGI olur (ALINTI ve ETKINLIK ayrımı sonraki iş); italik `*...*` olarak korunur. Sütun ya da sayfa sonunda yarım kalan paragraf sonraki sütunda sürer.
 
 Görüntü
 
@@ -800,7 +791,7 @@ Aynı işi yapan ikinci bir kütüphane eklenmez. "Kullanma" sütunu, yapay zeka
 | Embedding ve reranker | `sentence-transformers` (`SentenceTransformer`, `CrossEncoder`) | Ayrı embedding sunucusu, embedding API'si |
 | Kelime araması | `pg_textsearch` (BM25) | ParadeDB pg_search (AGPL), Elasticsearch, Postgres `ts_rank` |
 | Sonuç birleştirme | RRF, elle yazılmış kısa fonksiyon | LangChain retriever'ları |
-| PDF | PyMuPDF (`import pymupdf`) | Docling, pdfplumber, PyPDF2 |
+| PDF | pypdfium2 (PDFium) ve Tesseract 5 (`tur`), `app.ingest.pdf` dış yüzüyle | PyMuPDF (AGPL), Docling, pdfplumber, PyPDF2 |
 | Prompt şablonu | Jinja2 (`.j2` dosyaları) | Python f-string içinde prompt |
 | Metin benzerliği | rapidfuzz | difflib |
 | Log | structlog (JSON çıktı) | `print` |
@@ -861,7 +852,6 @@ services/ai/
 ├── scripts/download_models.py modelleri sabit sürümle /models'e indirir
 ├── llm_tasks.yaml          görev → model, prompt, ayarlar
 ├── prompts/tde/*.j2        prompt dosyaları, ders başına klasör
-├── profiles/*.yaml         kaynak profilleri
 ├── app/
 │   ├── main.py             FastAPI uygulaması (python -m uvicorn app.main:app)
 │   ├── worker.py           iş kuyruğu çalışanı (python -m app.worker)
@@ -876,9 +866,10 @@ services/ai/
 │   ├── db/                 pool.py, queries/ (modül başına SQL sabitleri)
 │   ├── ingest/
 │   │   ├── pipeline.py     adımları sırayla çalıştırır, job.step günceller
-│   │   ├── readers/        base.py (SourceReader), program.py, textbook.py, test.py, answer_key.py
+│   │   ├── pdf/            PDF dış yüzü (read_questions, read_textbook, read_lines, render_page);
+│   │   │                   question_reader.py ve book_reader.py tek dosyalık iki motor
+│   │   ├── readers/        program.py, program_units.py, answer_key.py (düz satırlardan)
 │   │   ├── text_layer.py   metin katmanı kontrolü
-│   │   ├── profile.py      stil sayımı, profil önerisi, profil uygulama
 │   │   ├── vision.py       sayfa görüntüsü → bloklar
 │   │   ├── validators.py
 │   │   ├── entities.py     bilgi katmanı
@@ -1213,6 +1204,9 @@ HF_HOME=/models
 HF_HUB_OFFLINE=1
 WORKER_CONCURRENCY=4
 LOG_LEVEL=INFO
+WORD_LIST_PATH=/app/data/turkce_kelimeler.txt
+TESSERACT_CMD=tesseract
+OCR_CACHE_DIR=
 
 # web
 VITE_API_BASE_URL=/api
