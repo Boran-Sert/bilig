@@ -1,7 +1,8 @@
 """Öğretim programından okunan kazanım ağacının modelleri (hazırlık hattı A1).
 
 Ağaç ders › öğretim programı › kazanım grubu › kazanım biçimindedir ve docs/veritabani.md'deki
-subject, curriculum, learning_outcome_group ve learning_outcome tablolarına yazılır.
+subject, curriculum, learning_outcome_group ve learning_outcome tablolarına yazılır. Üniteler
+curriculum_unit tablosuna, ünitede işlenen kazanımlar curriculum_unit_outcome tablosuna yazılır.
 """
 
 from typing import Literal
@@ -55,3 +56,20 @@ class ProgramSaveSummary(BaseModel):
     updated: int
     unchanged: int
     missing: int
+
+
+class CurriculumUnit(BaseModel):
+    """Bir sınıfın ünitesi ve ünitenin bağlandığı kazanım grupları (kuralla bulunur)."""
+
+    grade: int
+    unit_no: int
+    title: str
+    group_codes: list[str]
+
+
+class UnitSaveSummary(BaseModel):
+    """Kaç ünite yazıldığı, kaç kazanım bağı eklendiği ve kaçının kaldırıldığı."""
+
+    units: int
+    linked: int
+    unlinked: int
