@@ -10,5 +10,8 @@
     "title": "Sayfa bulunamadı",
     "description": "Aradığınız sayfa mevcut değil veya taşınmış olabilir.",
     "backHome": "Ana sayfaya dön"
+  },
+  "errors": {
+    "unknown": "Beklenmeyen bir hata oluştu."
   }
 }
