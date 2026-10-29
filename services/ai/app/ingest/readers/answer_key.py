@@ -32,7 +32,7 @@ class AttachedAnswers(BaseModel):
     """Cevapları yazılmış sorular ve incelemeye düşecek numaralar."""
 
     questions: list[ParsedQuestion]
-    missing: list[int]
+    missing: list[int | None]
     conflicting: list[int]
     unused: list[int]
 
@@ -81,14 +81,15 @@ def attach_answers(
     """Anahtardaki cevapları sorulara yazar; eksik, çelişen ve kullanılmayan numaraları ayırır."""
     answered, missing, conflicting = [], [], []
     for question in questions:
-        inline, from_key = question.correct_option, key.get(question.number)
+        inline = question.correct_option
+        from_key = key.get(question.number) if question.number is not None else None
         if inline is not None and from_key is not None and inline != from_key:
             conflicting.append(question.number)
         correct = from_key or inline
         if correct is None:
             missing.append(question.number)
         answered.append(question.model_copy(update={"correct_option": correct}))
-    numbers = {question.number for question in questions}
+    numbers = {question.number for question in questions if question.number is not None}
     unused = sorted(number for number in key if number not in numbers)
     return AttachedAnswers(
         questions=answered, missing=missing, conflicting=conflicting, unused=unused

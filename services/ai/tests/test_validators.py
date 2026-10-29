@@ -144,6 +144,15 @@ def test_validate_questions_flags_only_the_repeated_question() -> None:
     ]
 
 
+def test_unnumbered_question_stays_out_of_number_sequence() -> None:
+    """Numarasız örnek soru sıra kontrolüne girmez; çevresindeki numaralar yine denetlenir."""
+    questions = [build_question(1), build_question(1), build_question(2), build_question(4)]
+    questions[1] = questions[1].model_copy(update={"number": None})
+    assert validate_questions(questions) == [
+        QuestionCheck(index=3, number=4, problems=[ValidationProblem.NUMBER_SEQUENCE])
+    ]
+
+
 def test_normalize_drops_markup_and_case() -> None:
     """İşaretler, tablo çizgisi ve büyük harf karşılaştırmaya girmez."""
     markdown = "**İSTANBUL** ve *Kiralık Konak*\n\n| Eser | Yazar |\n|---|---|\n| <u>Ka</u> | O |"
