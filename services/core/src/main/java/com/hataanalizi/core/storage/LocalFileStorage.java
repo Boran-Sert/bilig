@@ -1,12 +1,13 @@
 package com.hataanalizi.core.storage;
 
+import com.hataanalizi.core.common.ApiException;
+import com.hataanalizi.core.common.ErrorCode;
 import java.io.IOException;
 import java.io.InputStream;
-import java.io.UncheckedIOException;
 import java.nio.file.Files;
+import java.nio.file.InvalidPathException;
 import java.nio.file.Path;
 import java.nio.file.StandardCopyOption;
-import java.util.Objects;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.boot.autoconfigure.condition.ConditionalOnProperty;
 import org.springframework.stereotype.Component;
@@ -27,12 +28,14 @@ public class LocalFileStorage implements FileStorage {
     @Override
     public void save(String path, InputStream content) {
         Path target = resolvePath(path);
-        Objects.requireNonNull(content, "content");
+        if (content == null) {
+            throw new ApiException(ErrorCode.VALIDATION_FAILED);
+        }
         try {
             Files.createDirectories(target.getParent());
             Files.copy(content, target, StandardCopyOption.REPLACE_EXISTING);
         } catch (IOException exception) {
-            throw new UncheckedIOException("Could not save stored file", exception);
+            throw new ApiException(ErrorCode.INTERNAL_ERROR, exception);
         }
     }
 
@@ -42,7 +45,7 @@ public class LocalFileStorage implements FileStorage {
         try {
             return Files.newInputStream(resolvePath(path));
         } catch (IOException exception) {
-            throw new UncheckedIOException("Could not open stored file", exception);
+            throw new ApiException(ErrorCode.INTERNAL_ERROR, exception);
         }
     }
 
@@ -54,15 +57,18 @@ public class LocalFileStorage implements FileStorage {
 
     /** Yolu köke sabitler ve depolama dizininin dışına çıkmasını engeller. */
     private Path resolvePath(String path) {
-        Objects.requireNonNull(path, "path");
-        Path relativePath = Path.of(path);
-        if (path.contains("..") || relativePath.isAbsolute()) {
-            throw new IllegalArgumentException("Storage path must remain inside the storage directory");
+        if (path == null || path.contains("..")) {
+            throw new ApiException(ErrorCode.VALIDATION_FAILED);
         }
-        Path target = storageDirectory.resolve(relativePath).normalize();
-        if (!target.startsWith(storageDirectory) || target.equals(storageDirectory)) {
-            throw new IllegalArgumentException("Storage path must remain inside the storage directory");
+        try {
+            Path relativePath = Path.of(path);
+            Path target = storageDirectory.resolve(relativePath).normalize();
+            if (relativePath.isAbsolute() || !target.startsWith(storageDirectory) || target.equals(storageDirectory)) {
+                throw new ApiException(ErrorCode.VALIDATION_FAILED);
+            }
+            return target;
+        } catch (InvalidPathException exception) {
+            throw new ApiException(ErrorCode.VALIDATION_FAILED, exception);
         }
-        return target;
     }
 }

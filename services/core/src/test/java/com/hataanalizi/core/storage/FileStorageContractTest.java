@@ -3,6 +3,8 @@ package com.hataanalizi.core.storage;
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
 
+import com.hataanalizi.core.common.ApiException;
+import com.hataanalizi.core.common.ErrorCode;
 import java.io.ByteArrayInputStream;
 import java.io.InputStream;
 import java.nio.file.Path;
@@ -49,10 +51,14 @@ class FileStorageContractTest {
         LocalFileStorage storage = new LocalFileStorage(storageDirectory.toString());
 
         assertThatThrownBy(() -> storage.save("../outside.pdf", new ByteArrayInputStream(new byte[] {1})))
-                .isInstanceOf(IllegalArgumentException.class);
+                .isInstanceOfSatisfying(
+                        ApiException.class,
+                        exception -> assertThat(exception.getErrorCode()).isEqualTo(ErrorCode.VALIDATION_FAILED));
         assertThatThrownBy(() -> storage.open(
                         storageDirectory.resolveSibling("outside.pdf").toString()))
-                .isInstanceOf(IllegalArgumentException.class);
+                .isInstanceOfSatisfying(
+                        ApiException.class,
+                        exception -> assertThat(exception.getErrorCode()).isEqualTo(ErrorCode.VALIDATION_FAILED));
     }
 
     /** Yerel depolamanın yalnızca STORAGE_TYPE=local iken etkinleştiğini doğrular. */
