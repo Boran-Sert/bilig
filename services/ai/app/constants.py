@@ -49,3 +49,6 @@ RERANKER_MAX_LENGTH = 512
 
 SERVICE_ROOT = Path(__file__).resolve().parents[1]
 LLM_TASKS_PATH = SERVICE_ROOT / "llm_tasks.yaml"
+PROMPTS_DIR = SERVICE_ROOT / "prompts" / "tde"
+PROMPT_VERSION_PATTERN = r"\{# version: (\d+) #\}"
+PROMPT_BLOCKS = ("system", "user")
