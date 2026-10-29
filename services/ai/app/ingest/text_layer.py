@@ -54,7 +54,11 @@ class TextLayerResult(BaseModel):
 
 def check_page(page: pymupdf.Page, known_words: frozenset[str]) -> TextLayerResult:
     """Sayfanın metin katmanını ölçer; oran düşükse font düzeltmesi dener."""
-    text = page_text(page)
+    return check_page_text(page_text(page), known_words)
+
+
+def check_page_text(text: str, known_words: frozenset[str]) -> TextLayerResult:
+    """Sayfa metnini ölçer; oran düşükse font düzeltmesi dener."""
     result = measure_text(text, known_words)
     if result.ok:
         return result
