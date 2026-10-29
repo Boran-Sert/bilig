@@ -13,7 +13,7 @@ import org.testcontainers.utility.DockerImageName;
 
 /** Projenin eklentili PostgreSQL imajını testlerde kullanıma hazırlar. */
 @TestConfiguration(proxyBeanMethods = false)
-class TestcontainersConfiguration {
+public class TestcontainersConfiguration {
 
     /** Proje Dockerfile'ından oluşturulan PostgreSQL konteynerini sağlar. */
     @Bean
