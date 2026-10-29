@@ -1,12 +1,22 @@
 /**
- * Arayüzün giriş noktası.
- * Uygulamayı index.html içindeki root elemanına bağlar.
+ * Uygulamanın giriş noktası.
+ * Çevirileri ve sayfa yönlendirmelerini başlatıp React uygulamasını bağlar.
  */
 import { StrictMode } from "react";
 import { createRoot } from "react-dom/client";
+import { RouterProvider } from "react-router";
+import "./lib/i18n";
+import { router } from "./routes";
+import "./styles/index.css";
 
-createRoot(document.getElementById("root")!).render(
+const rootElement = document.getElementById("root");
+
+if (!rootElement) {
+  throw new Error("Root element was not found.");
+}
+
+createRoot(rootElement).render(
   <StrictMode>
-    <main />
+    <RouterProvider router={router} />
   </StrictMode>,
 );

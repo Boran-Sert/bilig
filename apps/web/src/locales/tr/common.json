@@ -1,0 +1,14 @@
+﻿{
+  "app": {
+    "name": "Bilig",
+    "description": "Yapay zekâ destekli öğrenme platformu"
+  },
+  "navigation": {
+    "home": "Ana sayfa"
+  },
+  "notFound": {
+    "title": "Sayfa bulunamadı",
+    "description": "Aradığınız sayfa mevcut değil veya taşınmış olabilir.",
+    "backHome": "Ana sayfaya dön"
+  }
+}
