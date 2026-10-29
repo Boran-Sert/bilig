@@ -2,7 +2,8 @@
 
 QuestionContent question.content (jsonb) kolonuna olduğu gibi yazılır; doğru şık content'e
 girmez, question.correct_option kolonundadır. ParsedQuestion okuyucunun (#130) çıktısıdır:
-içerik, testteki soru numarası, sayfa ve bulunduysa cevap anahtarındaki şık.
+içerik, testteki soru numarası (kaynakta numarasız örnek soruda boş), sayfa ve bulunduysa cevap
+anahtarındaki şık.
 """
 
 from typing import Literal, get_args
@@ -38,7 +39,7 @@ class QuestionContent(BaseModel):
 class ParsedQuestion(BaseModel):
     """Kaynaktan okunan soru; cevap anahtarı bulunamadıysa correct_option boştur."""
 
-    number: int
+    number: int | None
     page_no: int
     content: QuestionContent
     correct_option: OptionLabel | None

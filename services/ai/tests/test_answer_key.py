@@ -32,7 +32,7 @@ TEST 10
 """
 
 
-def build_question(number: int, correct_option: OptionLabel | None = None) -> ParsedQuestion:
+def build_question(number: int | None, correct_option: OptionLabel | None = None) -> ParsedQuestion:
     """Sadece numarası ve cevabı önemli olan soru kurar."""
     content = QuestionContent(stem=[Block(type="paragraph", md="Kök")], options=[])
     return ParsedQuestion(number=number, page_no=1, content=content, correct_option=correct_option)
@@ -144,6 +144,13 @@ def test_attach_answers_writes_key_and_reports_missing_and_unused() -> None:
     assert [question.correct_option for question in result.questions] == ["C", "E", None]
     assert (result.missing, result.conflicting, result.unused) == ([3], [], [7])
     assert [question.correct_option for question in questions] == [None, "E", None]
+
+
+def test_attach_answers_does_not_match_unnumbered_question_to_key() -> None:
+    """Numarasız soru anahtardan cevap almaz; satır içi cevabı yoksa eksik sayılır."""
+    attached = attach_answers([build_question(None), build_question(1)], {1: "A"})
+    assert [question.correct_option for question in attached.questions] == [None, "A"]
+    assert attached.missing == [None]
 
 
 def test_attach_answers_reports_key_and_inline_conflict() -> None:

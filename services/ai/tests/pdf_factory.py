@@ -2,8 +2,8 @@
 
 Metin parçası sayfanın üstünden ölçülen taban çizgisine yazılır; "**kalın**" ve "*italik*"
 işaretli bölümler Liberation Sans'ın kalın ve italik fontlarıyla ayrı metin nesnesi olur. Çizgi
-(altı çizili söz, tablo kenarı) ve dolgulu kutu da çizilebilir; kutular metni örtmesin diye önce
-çizilir. Fontlar tests/fixtures/fonts
+(altı çizili söz, tablo kenarı), dolgulu kutu ve metin katmanı olmayan yazılı resim (OCR testi) de
+çizilebilir; kutular metni örtmesin diye önce çizilir. Fontlar tests/fixtures/fonts
 altındadır (SIL OFL 1.1). Üretilen PDF bayt olarak döner; okuyuculara olduğu gibi verilir.
 """
 
@@ -15,6 +15,7 @@ from pathlib import Path
 
 import pypdfium2 as pdfium
 import pypdfium2.raw as pdfium_c
+from PIL import Image, ImageDraw, ImageFont
 
 FONT_DIR = Path(__file__).parent / "fixtures" / "fonts"
 FONT_FILES = {
@@ -25,6 +26,7 @@ FONT_FILES = {
 PAGE_WIDTH = 595.0
 PAGE_HEIGHT = 842.0
 MARKUP = re.compile(r"(\*\*.+?\*\*|\*.+?\*)")
+PICTURE_DPI = 300
 
 
 @dataclass
@@ -58,7 +60,17 @@ class Box:
     gray: int = 220
 
 
-Item = Text | Rule | Box
+@dataclass
+class Picture:
+    """Sol üst köşesi (x, y) olan, satırları siyahla yazılmış beyaz resim (metin katmanı yok)."""
+
+    lines: list[str]
+    x: float
+    y: float
+    size: float = 14.0
+
+
+Item = Text | Rule | Box | Picture
 
 
 def make_pdf(pages: list[list[Item]]) -> bytes:
@@ -70,6 +82,8 @@ def make_pdf(pages: list[list[Item]]) -> bytes:
         for item in sorted(items, key=lambda item: not isinstance(item, Box)):
             if isinstance(item, Text):
                 draw_text(document, page, fonts, item)
+            elif isinstance(item, Picture):
+                draw_picture(document, page, item)
             else:
                 draw_shape(page, item)
         pdfium_c.FPDFPage_GenerateContent(page.raw)
@@ -158,3 +172,22 @@ def draw_shape(page: pdfium.PdfPage, item: Rule | Box) -> None:
         pdfium_c.FPDFPageObj_SetFillColor(path, item.gray, item.gray, item.gray, 255)
         pdfium_c.FPDFPath_SetDrawMode(path, pdfium_c.FPDF_FILLMODE_WINDING, False)
     pdfium_c.FPDFPage_InsertObject(page.raw, path)
+
+
+def draw_picture(document: pdfium.PdfDocument, page: pdfium.PdfPage, item: Picture) -> None:
+    """Satırları resme yazıp sayfaya resim nesnesi olarak koyar."""
+    scale = PICTURE_DPI / 72
+    font = ImageFont.truetype(str(FONT_DIR / FONT_FILES["regular"]), round(item.size * scale))
+    leading = item.size * 1.5
+    width = max(font.getlength(line) for line in item.lines) / scale + item.size
+    height = leading * len(item.lines) + item.size
+    image = Image.new("L", (round(width * scale), round(height * scale)), 255)
+    pen = ImageDraw.Draw(image)
+    for index, line in enumerate(item.lines):
+        pen.text((item.size * scale / 2, (item.size / 2 + index * leading) * scale), line, 0, font)
+    picture = pdfium.PdfImage.new(document)
+    picture.set_bitmap(pdfium.PdfBitmap.from_pil(image))
+    picture.set_matrix(
+        pdfium.PdfMatrix().scale(width, height).translate(item.x, PAGE_HEIGHT - item.y - height)
+    )
+    page.insert_obj(picture)

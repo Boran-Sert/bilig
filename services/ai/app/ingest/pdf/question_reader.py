@@ -13,6 +13,9 @@ ORTAK bölüm (kitap okuyucuda birebir aynısı vardır):
 3. Bozuk ya da şüpheli (Türkçede olmayan "Ġ", "Ģ" gibi) eşlemeli metin tek başına siyah çizilip
    Tesseract'la okunur; her (font, kod) için oy sayılır, yeterli oy toplanınca oylama durur.
    Kod oy çokluğuyla, oyu yoksa fontun kod kaymasıyla çözülür.
+   Kontrol verilirse (dış yüz: hazırlık hattının text_layer.py'si) onarılmış her sayfanın metni
+   ona sorulur; önerdiği font düzeltmesi harflere uygulanır, oran düşük kalırsa sayfa OCR'la da
+   okunur ve Türkçe kelime oranı yüksek olan okuma kalır.
 4. Metin katmanı olmayan sayfa (harfleri çizim, tarama) Tesseract'la okunur; kalınlık harf
    çizgisinin kalınlığından tahmin edilir. Metinli sayfada metin katmanının kapsamadığı büyük
    resimler de (metin nesneleri gizli çizilip) okunur; OCR güveni düşük resim yazısız sayılır.
@@ -143,6 +146,23 @@ class OcrSettings:
     cache_dir: Path | None = None
 
 
+class OcrError(RuntimeError):
+    """Tesseract çalıştırılamadı ya da hata verdi."""
+
+
+@dataclass(frozen=True)
+class TextReview:
+    """Metin katmanı kontrolünün kararı: Türkçe kelime oranı, yeterliliği ve harf düzeltmesi."""
+
+    ratio: float
+    ok: bool
+    translate: Callable[[str], str] | None = None
+    fix: str | None = None
+
+
+TextCheck = Callable[[str], TextReview | None]
+
+
 @dataclass
 class Char:
     """Sayfadaki tek karakter: metin, kutu (üst-sol orijin), stil ve okuma bilgisi."""
@@ -248,6 +268,7 @@ class PageIR:
     source: str = "TEXT"
     notes: list[str] = field(default_factory=list)
     document: PdfSource = ""
+    text_ratio: float | None = None
 
 
 @dataclass
@@ -284,8 +305,13 @@ def ocr_settings() -> OcrSettings:
     return OcrSettings(settings.tesseract_cmd, settings.ocr_cache_dir)
 
 
-def read_document(source: PdfSource, ocr: OcrSettings) -> list[PageIR]:
-    """PDF'i sayfa ara temsiline çevirir; bozuk fontları belge düzeyinde çözer."""
+def read_document(
+    source: PdfSource, ocr: OcrSettings, check: TextCheck | None = None
+) -> list[PageIR]:
+    """PDF'i sayfa ara temsiline çevirir; bozuk fontları belge düzeyinde çözer.
+
+    Kontrol verilirse onarılmış her metin sayfası ona sorulur (Türkçe kelime oranı).
+    """
     document = pdfium.PdfDocument(source)
     votes: Counter[tuple[str, int, str]] = Counter()
     raws = []
@@ -293,14 +319,58 @@ def read_document(source: PdfSource, ocr: OcrSettings) -> list[PageIR]:
         for index in range(len(document)):
             raws.append(read_raw_page(document, index, settled_codes(votes), ocr))
             votes.update(raws[-1].votes)
+        resolve_weights([char for raw in raws for char in raw.chars])
+        decoder = GlyphDecoder(votes)
+        pages = [finish_page(raw, decoder) for raw in raws]
+        if check is not None:
+            pages = [
+                review_page(document, raw, page, decoder, (check, ocr))
+                for raw, page in zip(raws, pages, strict=True)
+            ]
     finally:
         document.close()
-    resolve_weights([char for raw in raws for char in raw.chars])
-    decoder = GlyphDecoder(votes)
-    pages = [finish_page(raw, decoder) for raw in raws]
     for page in pages:
         page.document = source
     return pages
+
+
+def review_page(
+    document: pdfium.PdfDocument,
+    raw: RawPage,
+    page: PageIR,
+    decoder: GlyphDecoder,
+    checking: tuple[TextCheck, OcrSettings],
+) -> PageIR:
+    """Sayfa metnini kontrole sorar; düzeltmeyi uygular ya da OCR okumasını dener."""
+    check, ocr = checking
+    review = check(page_text(page)) if page.source == "TEXT" else None
+    if review is None:
+        return page
+    if review.translate is not None:
+        fixed = finish_page(raw, decoder, review.translate)
+        fixed.text_ratio = review.ratio
+        fixed.notes.append(f"FONT_FIX_{review.fix}")
+        return fixed
+    page.text_ratio = review.ratio
+    if review.ok:
+        return page
+    pdf_page = document[raw.page_no - 1]
+    try:
+        by_ocr = finish_page(replace(raw, ocr_words=read_page_by_ocr(pdf_page, ocr)), decoder)
+    finally:
+        pdf_page.close()
+    ocr_review = check(page_text(by_ocr))
+    if ocr_review is not None and ocr_review.ratio > review.ratio:
+        by_ocr.text_ratio = ocr_review.ratio
+        by_ocr.notes.append("TEXT_LAYER_REPLACED")
+        return by_ocr
+    page.notes.append("LOW_TEXT_LAYER")
+    return page
+
+
+def page_text(page: PageIR) -> str:
+    """Sayfa metni: satırlar alt alta, satır sonu tiresiyle bölünen kelime birleşik."""
+    return "\n".join(line.text for line in page.lines).replace(SOFT_HYPHEN + "\n", "")
 
 
 def font_family(font: str) -> str:
@@ -716,9 +786,12 @@ def run_ocr(image: Image.Image, psm: int, ocr: OcrSettings) -> list[OcrWord]:
             output = cached.read_text(encoding="utf-8")
         else:
             command = [ocr.command, str(path), "stdout", "-l", OCR_LANGUAGE, "--psm", str(psm)]
-            output = subprocess.run(
-                [*command, "tsv"], capture_output=True, text=True, check=True
-            ).stdout
+            try:
+                output = subprocess.run(
+                    [*command, "tsv"], capture_output=True, text=True, check=True
+                ).stdout
+            except (OSError, subprocess.CalledProcessError) as error:
+                raise OcrError(f"Tesseract failed: {error}") from error
             if cached:
                 cached.write_text(output, encoding="utf-8")
     words: list[OcrWord] = []
@@ -1006,8 +1079,10 @@ def shape_kind(
     return "SHAPE"
 
 
-def finish_page(raw: RawPage, decoder: GlyphDecoder) -> PageIR:
-    """Bozuk karakterleri çözüp gizlileri atar; kelime ve satırları kurar."""
+def finish_page(
+    raw: RawPage, decoder: GlyphDecoder, translate: Callable[[str], str] | None = None
+) -> PageIR:
+    """Bozuk karakterleri çözüp gizlileri atar; istenirse harfleri çevirir, satırları kurar."""
     notes: list[str] = []
     if raw.ocr_words:
         words, source = raw.ocr_words, "OCR"
@@ -1020,6 +1095,8 @@ def finish_page(raw: RawPage, decoder: GlyphDecoder) -> PageIR:
                 continue
             elif char.suspect and (char.font, char.code) in decoder.table:
                 char = replace(char, text=decoder.table[(char.font, char.code)], broken=True)
+            if translate is not None and char.text not in SPACES | {SOFT_HYPHEN, BULLET}:
+                char = replace(char, text=translate(char.text))
             chars.append(char)
         if any(c.text == UNKNOWN_GLYPH for c in chars):
             notes.append("UNDECODED_GLYPHS")

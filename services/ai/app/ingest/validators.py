@@ -1,7 +1,8 @@
 """Ayrıştırılan içeriğin kontrolleri (hazırlık hattı A6).
 
 Sorularda beş şık (A-E sırasıyla, hiçbiri boş değil), dolu kök, şıklardan biri olan cevap ve
-1'den başlayıp birer artan numara aranır; numara kontrolü bir testin bütün soruları için çağrılır.
+1'den başlayıp birer artan numara aranır; numara kontrolü bir testin bütün soruları için çağrılır,
+numarasız soru bu sıraya girmez.
 Cevap anahtarı hiç bulunamayan soru burada değil, okuyucuda NO_ANSWER_KEY olarak incelemeye düşer
 (#130); bu yüzden boş cevap sorun sayılmaz. Görüntüden üretilen metin, sayfanın metin katmanı
 varsa ona en az TEXT_SIMILARITY_MIN_RATIO oranında benzemelidir. Benzerlik markdown işaretleri,
@@ -48,13 +49,15 @@ class QuestionCheck(BaseModel):
     """Kontrolden geçemeyen sorunun listedeki yeri, numarası ve sorunları."""
 
     index: int
-    number: int
+    number: int | None
     problems: list[ValidationProblem]
 
 
 def validate_questions(questions: Sequence[ParsedQuestion]) -> list[QuestionCheck]:
     """Bir testin sorularını tek tek ve numara sırasıyla kontrol eder; sorunlu olanları döner."""
-    out_of_sequence = set(positions_out_of_sequence([question.number for question in questions]))
+    numbered = [(index, q.number) for index, q in enumerate(questions) if q.number is not None]
+    positions = positions_out_of_sequence([number for _, number in numbered])
+    out_of_sequence = {numbered[position][0] for position in positions}
     checks = []
     for index, question in enumerate(questions):
         problems = check_question(question)
