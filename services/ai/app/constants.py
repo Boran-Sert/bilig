@@ -3,6 +3,8 @@
 Ortama göre değişen değerler burada değil, app/config.py'deki ayarlardadır (plan 13.8).
 """
 
+from pathlib import Path
+
 SERVICE_NAME = "ai"
 REQUEST_ID_HEADER = "X-Request-Id"
 UVICORN_LOGGERS = ("uvicorn", "uvicorn.access", "uvicorn.error")
@@ -44,3 +46,6 @@ STORAGE_FILE_MODE = 0o644
 EMBEDDING_BATCH_SIZE = 32
 EMBEDDING_MAX_TOKENS = 2048
 RERANKER_MAX_LENGTH = 512
+
+SERVICE_ROOT = Path(__file__).resolve().parents[1]
+LLM_TASKS_PATH = SERVICE_ROOT / "llm_tasks.yaml"
