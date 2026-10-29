@@ -1,7 +1,8 @@
 """Öğretim programı okuyucusu (hazırlık hattı A1).
 
-Program PDF'i Word'den üretildiği için metin katmanı sağlamdır; PyMuPDF metni satır satır
-verir. Kazanımlar "A.2. 5. Metnin olay örgüsünü belirler." ya da "B.3. ..." biçiminde yakalanır.
+Program PDF'i Word'den üretildiği için metin katmanı sağlamdır; PDF dış yüzü (read_lines) metni
+satır satır, paragraf arasında boş satırla verir. Kazanımlar "A.2. 5. Metnin olay örgüsünü
+belirler." ya da "B.3. ..." biçiminde yakalanır.
 Kazanımın altındaki a, b, c maddeleri ya da maddesiz paragraf o kazanımın MEB açıklamasıdır ve
 olduğu gibi saklanır. Grup adı, kazanımlardan önceki büyük harfli başlıktan ("1. ŞİİR",
 "B) YAZMA") alınır. Okuma kazanımlardan sonraki ilk bölüm başlığında ("3.3. ÜNİTE, ...") durur.
@@ -19,7 +20,6 @@ from collections.abc import Iterable
 from itertools import takewhile
 from pathlib import Path
 
-import pymupdf
 import structlog
 
 from app.config import LogSettings, get_settings
@@ -32,6 +32,7 @@ from app.constants import (
 )
 from app.db.pool import close_pool, open_pool
 from app.db.queries.program import save_program
+from app.ingest import pdf
 from app.log import configure_logging
 from app.schemas.program import (
     Curriculum,
@@ -83,8 +84,7 @@ def read_program(path: Path) -> Program:
 
 def read_outcome_groups(path: Path) -> list[LearningOutcomeGroup]:
     """Program PDF'ini okuyup kazanım gruplarını ve kazanımları döner."""
-    with pymupdf.open(path) as document:
-        lines = [line for page in document for line in page.get_text().splitlines()]
+    lines = pdf.read_lines(path)
     return parse_outcome_groups(lines)
 
 

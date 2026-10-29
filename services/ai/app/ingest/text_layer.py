@@ -15,14 +15,14 @@ yazımlar parçalarına ayrılır.
 Oran eşiğin altındaysa önce bozuk font eşlemesi kodla düzeltilmeye çalışılır (font_fix.py);
 düzeltilmiş metin eşiği geçerse sayfa metin yolundan gider ve uygulanan düzeltme sonuçta
 taşınır. Sağlam sayfaya ve çok az kelimeli sayfaya düzeltme denenmez: kısa metinde onlarca
-kayma adayından biri tesadüfen eşiği geçebilir.
+kayma adayından biri tesadüfen eşiği geçebilir. Sayfa metnini PDF dış yüzü (app/ingest/pdf) verir:
+motor bozuk harfleri onardıktan sonra her sayfayı check_page_text'e sorar.
 """
 
 import re
 from functools import lru_cache
 from pathlib import Path
 
-import pymupdf
 from pydantic import BaseModel
 
 from app.constants import (
@@ -52,9 +52,8 @@ class TextLayerResult(BaseModel):
     fix: FontFix | None = None
 
 
-def check_page(page: pymupdf.Page, known_words: frozenset[str]) -> TextLayerResult:
-    """Sayfanın metin katmanını ölçer; oran düşükse font düzeltmesi dener."""
-    text = page_text(page)
+def check_page_text(text: str, known_words: frozenset[str]) -> TextLayerResult:
+    """Sayfa metnini ölçer; oran düşükse font düzeltmesi dener."""
     result = measure_text(text, known_words)
     if result.ok:
         return result
@@ -71,12 +70,6 @@ def find_font_fix(text: str, known_words: frozenset[str]) -> TextLayerResult | N
         if fixed.ok and (best is None or fixed.ratio > best.ratio):
             best = TextLayerResult(ratio=fixed.ratio, ok=True, fix=fix)
     return best
-
-
-def page_text(page: pymupdf.Page) -> str:
-    """Sayfanın metin katmanını, satır sonunda tireyle bölünen kelimeleri birleştirerek okur."""
-    text: str = page.get_text("text", flags=pymupdf.TEXTFLAGS_TEXT | pymupdf.TEXT_DEHYPHENATE)
-    return text
 
 
 def measure_text(text: str, known_words: frozenset[str]) -> TextLayerResult:
