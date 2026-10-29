@@ -789,7 +789,7 @@ def run_ocr(image: Image.Image, psm: int, ocr: OcrSettings) -> list[OcrWord]:
             command = [ocr.command, str(path), "stdout", "-l", OCR_LANGUAGE, "--psm", str(psm)]
             try:
                 output = subprocess.run(
-                    [*command, "tsv"], capture_output=True, text=True, check=True
+                    [*command, "tsv"], capture_output=True, text=True, encoding="utf-8", check=True
                 ).stdout
             except (OSError, subprocess.CalledProcessError) as error:
                 raise OcrError(f"Tesseract failed: {error}") from error
