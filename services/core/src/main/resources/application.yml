@@ -12,5 +12,10 @@ spring:
       ddl-auto: validate
     open-in-view: false
 
+app:
+  ai:
+    connect-timeout: 2s
+    read-timeout: 5s
+
 server:
   port: 8081
