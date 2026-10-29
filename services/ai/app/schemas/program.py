@@ -65,3 +65,11 @@ class CurriculumUnit(BaseModel):
     unit_no: int
     title: str
     group_codes: list[str]
+
+
+class UnitSaveSummary(BaseModel):
+    """Kaç ünite yazıldığı, kaç kazanım bağı eklendiği ve kaçının kaldırıldığı."""
+
+    units: int
+    linked: int
+    unlinked: int
