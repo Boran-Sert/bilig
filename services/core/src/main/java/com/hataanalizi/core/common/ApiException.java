@@ -15,6 +15,12 @@ public class ApiException extends RuntimeException {
         this.messageArguments = messageArguments.clone();
     }
 
+    public ApiException(ErrorCode errorCode, Throwable cause, Object... messageArguments) {
+        super(errorCode.name(), cause);
+        this.errorCode = errorCode;
+        this.messageArguments = messageArguments.clone();
+    }
+
     /** Hatanın kodunu döndürür. */
     public ErrorCode getErrorCode() {
         return errorCode;
