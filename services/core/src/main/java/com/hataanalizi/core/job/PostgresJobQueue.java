@@ -1,0 +1,27 @@
+package com.hataanalizi.core.job;
+
+import com.fasterxml.jackson.databind.JsonNode;
+import org.springframework.boot.autoconfigure.condition.ConditionalOnExpression;
+import org.springframework.stereotype.Component;
+
+/** İşleri PostgreSQL background_job tablosuna kaydeder. */
+@Component
+@ConditionalOnExpression("'${app.job-queue:${JOB_QUEUE:}}' == 'postgres'")
+public class PostgresJobQueue implements JobQueue {
+
+    private final BackgroundJobRepository backgroundJobRepository;
+
+    /** İş kuyruğu kayıt deposunu saklar. */
+    public PostgresJobQueue(BackgroundJobRepository backgroundJobRepository) {
+        this.backgroundJobRepository = backgroundJobRepository;
+    }
+
+    /** İşi çağıranın transaction'ına katılarak kuyruğa ekler. */
+    @Override
+    public long enqueue(JobType type, JsonNode payload) {
+        BackgroundJob backgroundJob = new BackgroundJob();
+        backgroundJob.setJobType(type);
+        backgroundJob.setPayload(payload);
+        return backgroundJobRepository.save(backgroundJob).getId();
+    }
+}
