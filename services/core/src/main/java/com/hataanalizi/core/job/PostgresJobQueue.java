@@ -1,8 +1,8 @@
 package com.hataanalizi.core.job;
 
-import com.fasterxml.jackson.databind.JsonNode;
 import org.springframework.boot.autoconfigure.condition.ConditionalOnExpression;
 import org.springframework.stereotype.Component;
+import tools.jackson.databind.JsonNode;
 
 /** İşleri PostgreSQL background_job tablosuna kaydeder. */
 @Component

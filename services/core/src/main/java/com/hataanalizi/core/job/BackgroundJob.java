@@ -1,6 +1,5 @@
 package com.hataanalizi.core.job;
 
-import com.fasterxml.jackson.databind.JsonNode;
 import jakarta.persistence.Column;
 import jakarta.persistence.Entity;
 import jakarta.persistence.EnumType;
@@ -16,6 +15,7 @@ import lombok.Setter;
 import org.hibernate.annotations.JdbcTypeCode;
 import org.hibernate.annotations.UpdateTimestamp;
 import org.hibernate.type.SqlTypes;
+import tools.jackson.databind.JsonNode;
 
 /** İş kuyruğundaki bir işi veritabanındaki background_job satırıyla eşler. */
 @Entity

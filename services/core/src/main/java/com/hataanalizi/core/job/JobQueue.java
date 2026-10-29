@@ -1,6 +1,6 @@
 package com.hataanalizi.core.job;
 
-import com.fasterxml.jackson.databind.JsonNode;
+import tools.jackson.databind.JsonNode;
 
 /** İş kodunun kuyruk altyapısından bağımsız kullanacağı sözleşmeyi tanımlar. */
 public interface JobQueue {
