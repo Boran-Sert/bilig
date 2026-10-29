@@ -6,8 +6,6 @@ from app.ingest.steps import IngestStep, remaining_steps
 
 ORDER = [
     "REGISTERED",
-    "TEXT_LAYER",
-    "PROFILE",
     "EXTRACT",
     "VALIDATE",
     "ENTITIES",
@@ -42,7 +40,7 @@ def test_job_resumes_after_last_completed_step(
     assert remaining_steps(last_completed_step) == [IngestStep(step) for step in expected]
 
 
-@pytest.mark.parametrize("last_completed_step", ["", "registered", "OCR"])
+@pytest.mark.parametrize("last_completed_step", ["", "registered", "OCR", "PROFILE"])
 def test_unknown_step_is_an_error(last_completed_step: str) -> None:
     """Tanınmayan adım adı baştan başlatmaz, hata verir."""
     with pytest.raises(ValueError, match="Unknown ingest step"):

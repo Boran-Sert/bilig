@@ -31,12 +31,16 @@ PICTURE_DPI = 300
 
 @dataclass
 class Text:
-    """Sol kenarı x, taban çizgisi sayfanın üstünden y olan metin; ** ve * stil işaretidir."""
+    """Sol kenarı x, taban çizgisi sayfanın üstünden y olan metin; ** ve * stil işaretidir.
+
+    standard ise metin Türkçe harfleri kodlayamayan gömülmemiş Helvetica ile yazılır.
+    """
 
     text: str
     x: float
     y: float
     size: float = 10.0
+    standard: bool = False
 
 
 @dataclass
@@ -77,6 +81,7 @@ def make_pdf(pages: list[list[Item]]) -> bytes:
     """Her sayfanın öğelerini A4 sayfaya çizip PDF'in baytlarını döner."""
     document = pdfium.PdfDocument.new()
     fonts = {style: load_font(document, name) for style, name in FONT_FILES.items()}
+    fonts["standard"] = pdfium_c.FPDFText_LoadStandardFont(document.raw, b"Helvetica")
     for items in pages:
         page = document.new_page(PAGE_WIDTH, PAGE_HEIGHT)
         for item in sorted(items, key=lambda item: not isinstance(item, Box)):
@@ -124,6 +129,9 @@ def draw_text(
     item: Text,
 ) -> None:
     """Metni stil işaretlerine göre parçalara bölüp art arda yazar."""
+    if item.standard:
+        write_run(document, page, fonts["standard"], item.text, item.x, item)
+        return
     x = item.x
     for part in MARKUP.split(item.text):
         if not part:
@@ -191,3 +199,17 @@ def draw_picture(document: pdfium.PdfDocument, page: pdfium.PdfPage, item: Pictu
         pdfium.PdfMatrix().scale(width, height).translate(item.x, PAGE_HEIGHT - item.y - height)
     )
     page.insert_obj(picture)
+
+
+def raw_page_text(data: bytes) -> str:
+    """PDF'in ilk sayfasının ham metin katmanı (onarım ve düzeltme yapılmadan)."""
+    document = pdfium.PdfDocument(data)
+    try:
+        page = document[0]
+        textpage = page.get_textpage()
+        text: str = textpage.get_text_range()
+        textpage.close()
+        page.close()
+    finally:
+        document.close()
+    return text

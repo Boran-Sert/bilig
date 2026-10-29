@@ -6,14 +6,15 @@ sayfası karışıklığı ya da sabit kod kayması) PDF'e yazılır. Metinler b
 
 import random
 import string
+import textwrap
 
-import pymupdf
 import pytest
 
 from app.constants import FONT_FIX_MIN_WORDS
 from app.ingest import text_layer
 from app.ingest.font_fix import FontFix, FontFixKind, apply_fix, candidate_fixes
-from app.ingest.text_layer import TextLayerResult, check_page, find_font_fix, measure_text
+from app.ingest.text_layer import TextLayerResult, check_page_text, find_font_fix, measure_text
+from tests.pdf_factory import Text, make_pdf, raw_page_text
 from tests.word_list import KNOWN_WORDS
 
 PARAGRAPH = (
@@ -41,11 +42,10 @@ def to_cp1252(text: str) -> str:
     return text.encode("cp1254").decode("cp1252")
 
 
-def saved_page(text: str) -> pymupdf.Page:
-    """Metni gömülü fontla yeni bir PDF'e yazar, PDF'i kaydedip ilk sayfasını açar."""
-    document = pymupdf.open()
-    document.new_page().insert_htmlbox(pymupdf.Rect(50, 50, 550, 800), f"<p>{text}</p>")
-    return pymupdf.open("pdf", document.tobytes())[0]
+def saved_page(text: str) -> str:
+    """Metni gömülü fontla yeni bir PDF'e yazar ve sayfanın ham metin katmanını döner."""
+    lines = textwrap.wrap(text, 80)
+    return raw_page_text(make_pdf([[Text(line, 50, 72 + 15 * k) for k, line in enumerate(lines)]]))
 
 
 def fail_if_called(text: str) -> list[FontFix]:
@@ -107,9 +107,9 @@ def test_shifted_page_is_fixed_and_takes_text_path() -> None:
     """Kodları 29 kaymış sayfa düzeltilir, metin yoluna gider ve düzeltme sonuçta taşınır."""
     page = saved_page(garble(PARAGRAPH, SHIFT))
 
-    result = check_page(page, KNOWN_WORDS)
+    result = check_page_text(page, KNOWN_WORDS)
 
-    assert measure_text(text_layer.page_text(page), KNOWN_WORDS).ratio < 0.2
+    assert measure_text(page, KNOWN_WORDS).ratio < 0.2
     assert result.ok
     assert result.ratio >= 0.9
     assert result.fix == FontFix(kind=FontFixKind.CODE_SHIFT, shift=SHIFT)
@@ -117,7 +117,7 @@ def test_shifted_page_is_fixed_and_takes_text_path() -> None:
 
 def test_codepage_page_is_fixed_and_takes_text_path() -> None:
     """ı → ý bozukluğu olan sayfa kod sayfası düzeltmesiyle metin yoluna gider."""
-    result = check_page(saved_page(to_cp1252(PARAGRAPH)), KNOWN_WORDS)
+    result = check_page_text(saved_page(to_cp1252(PARAGRAPH)), KNOWN_WORDS)
 
     assert result.ok
     assert result.fix == FontFix(kind=FontFixKind.TURKISH_CODEPAGE)
@@ -127,7 +127,7 @@ def test_sound_page_is_not_changed(monkeypatch: pytest.MonkeyPatch) -> None:
     """Sağlam sayfaya düzeltme denenmez ve sonuçta düzeltme yoktur."""
     monkeypatch.setattr(text_layer, "candidate_fixes", fail_if_called)
 
-    result = check_page(saved_page(PARAGRAPH), KNOWN_WORDS)
+    result = check_page_text(saved_page(PARAGRAPH), KNOWN_WORDS)
 
     assert result.ok
     assert result.fix is None
@@ -136,10 +136,7 @@ def test_sound_page_is_not_changed(monkeypatch: pytest.MonkeyPatch) -> None:
 def test_page_without_text_is_not_fixed(monkeypatch: pytest.MonkeyPatch) -> None:
     """Metni olmayan sayfaya düzeltme denenmez; doğrudan görüntü yoluna düşer."""
     monkeypatch.setattr(text_layer, "candidate_fixes", fail_if_called)
-    document = pymupdf.open()
-    document.new_page()
-
-    result = check_page(pymupdf.open("pdf", document.tobytes())[0], KNOWN_WORDS)
+    result = check_page_text(raw_page_text(make_pdf([[]])), KNOWN_WORDS)
 
     assert not result.ok
     assert result.fix is None
@@ -149,7 +146,7 @@ def test_page_with_lost_letters_stays_on_image_path() -> None:
     """Harfleri kaybolmuş (ş → ·) sayfa kodla düzelmez ve görüntü yoluna düşer."""
     lost = "".join("·" if char in "ğĞşŞıİ" else char for char in PARAGRAPH)
 
-    result = check_page(saved_page(lost), KNOWN_WORDS)
+    result = check_page_text(saved_page(lost), KNOWN_WORDS)
 
     assert not result.ok
     assert result.fix is None

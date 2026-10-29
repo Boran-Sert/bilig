@@ -7,11 +7,11 @@ geçişi) taklit eder; metinler bu test için yazılmıştır.
 
 from pathlib import Path
 
-import pymupdf
 import pytest
 
 from app.ingest.readers.program import heading_name, parse_outcome_groups, read_outcome_groups
 from app.schemas.program import LearningOutcome, LearningOutcomeGroup
+from tests.pdf_factory import lines_pdf
 
 PAGES = [
     [
@@ -60,11 +60,7 @@ PAGES = [
 
 def write_program_pdf(path: Path) -> Path:
     """Test satırlarını her biri ayrı sayfada olacak biçimde PDF'e yazar."""
-    document = pymupdf.open()
-    for lines in PAGES:
-        page = document.new_page(width=900)
-        page.insert_htmlbox(pymupdf.Rect(30, 30, 870, 820), "<br>".join(lines))
-    document.save(path)
+    path.write_bytes(lines_pdf(PAGES))
     return path
 
 
