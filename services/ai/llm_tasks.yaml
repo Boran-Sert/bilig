@@ -1,0 +1,63 @@
+# Claude görevlerinin ayarları (plan Bölüm 10). Her görev: model, prompts/tde altındaki prompt
+# dosyası, en fazla çıktı token'ı ve saniye cinsinden zaman aşımı. Görev adı app/llm/tasks.py'deki
+# LlmTask'ta da bulunur; modelin fiyatı llm_pricing.yaml'da olmalıdır.
+DOC_CLASSIFY:
+  model: claude-haiku-5-5
+  prompt: doc_classify.j2
+  max_tokens: 16000
+  timeout_seconds: 120
+UNIT_DETECT:
+  model: claude-haiku-5-5
+  prompt: unit_detect.j2
+  max_tokens: 16000
+  timeout_seconds: 120
+PAGE_EXTRACT:
+  model: claude-haiku-5-5
+  prompt: page_extract.j2
+  max_tokens: 16000
+  timeout_seconds: 120
+ENTITY_EXTRACT:
+  model: claude-haiku-5-5
+  prompt: entity_extract.j2
+  max_tokens: 16000
+  timeout_seconds: 120
+OUTCOME_MATCH:
+  model: claude-haiku-5-5
+  prompt: outcome_match.j2
+  max_tokens: 16000
+  timeout_seconds: 120
+ANSWER_SOLVE:
+  model: claude-sonnet-5-5
+  prompt: answer_solve.j2
+  max_tokens: 16000
+  timeout_seconds: 120
+HINT:
+  model: claude-haiku-5-5
+  prompt: hint.j2
+  max_tokens: 16000
+  timeout_seconds: 120
+ERROR_TYPE:
+  model: claude-haiku-5-5
+  prompt: error_type.j2
+  max_tokens: 16000
+  timeout_seconds: 120
+TOPIC_EXPLAIN:
+  model: claude-sonnet-5-5
+  prompt: topic_explain.j2
+  max_tokens: 16000
+  timeout_seconds: 120
+CHAT:
+  model: claude-sonnet-5-5
+  prompt: chat.j2
+  max_tokens: 16000
+  timeout_seconds: 120
+QUESTION_GENERATE:
+  model: claude-sonnet-5-5
+  prompt: question_generate.j2
+  max_tokens: 16000
+  timeout_seconds: 120
+QUESTION_VERIFY:
+  model: claude-sonnet-5-5
+  prompt: question_verify.j2
+  max_tokens: 16000
+  timeout_seconds: 120
