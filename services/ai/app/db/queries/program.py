@@ -1,16 +1,25 @@
-"""Kazanım ağacını veritabanına yazan sorgular (hazırlık hattı A1).
+"""Kazanım ağacını ve üniteleri veritabanına yazan sorgular (hazırlık hattı A1).
 
 Ders, program, kazanım grubu ve kazanım benzersiz anahtarlarıyla upsert edilir; komut ikinci
 kez çalışınca kopya satır oluşmaz. Kazanımın arama metni değişirse eski embedding silinir,
 çünkü artık o metne ait değildir; kazanım vektörleri ayrı adımda yeniden hesaplanır (#123).
 Değişmeyen kazanım güncellenmez. Programda kayıtlı olup PDF'te artık olmayan kazanımlar
-silinmez (soru bağları olabilir), sadece sayılır. Tablolar core'un Flyway migration'larıyla kurulur.
+silinmez (soru bağları olabilir), sadece sayılır. Üniteler sınıf ve sırasıyla upsert edilir;
+ünitenin kazanım bağları ünitenin gruplarındaki kazanımlara eşitlenir, kurala artık uymayan bağ
+kaldırılır. Grubu verilip programda kazanımı olmayan ünite (eksik program yüklemesi) hata verir.
+Tablolar core'un Flyway migration'larıyla kurulur.
 """
 
 from psycopg import AsyncConnection
 
 from app.constants import SEARCH_PATH_SEPARATOR
-from app.schemas.program import LearningOutcome, Program, ProgramSaveSummary
+from app.schemas.program import (
+    CurriculumUnit,
+    LearningOutcome,
+    Program,
+    ProgramSaveSummary,
+    UnitSaveSummary,
+)
 
 UPSERT_SUBJECT = """
 INSERT INTO subject (code, name)
@@ -58,6 +67,53 @@ WHERE learning_outcome_group.curriculum_id = %(curriculum_id)s
         SELECT 1
         FROM unnest(%(group_codes)s::text[], %(outcome_codes)s::text[]) AS saved(group_code, code)
         WHERE saved.group_code = learning_outcome_group.code AND saved.code = learning_outcome.code
+    )
+"""
+
+FIND_CURRICULUM = """
+SELECT curriculum.id
+FROM curriculum
+JOIN subject ON subject.id = curriculum.subject_id
+WHERE subject.code = %(subject_code)s AND curriculum.name = %(curriculum_name)s
+"""
+
+UPSERT_CURRICULUM_UNIT = """
+INSERT INTO curriculum_unit (curriculum_id, grade, unit_no, title)
+VALUES (%(curriculum_id)s, %(grade)s, %(unit_no)s, %(title)s)
+ON CONFLICT (curriculum_id, grade, unit_no) DO UPDATE SET title = EXCLUDED.title
+RETURNING id
+"""
+
+COUNT_GROUP_OUTCOMES = """
+SELECT count(*)
+FROM learning_outcome
+JOIN learning_outcome_group
+    ON learning_outcome_group.id = learning_outcome.learning_outcome_group_id
+WHERE learning_outcome_group.curriculum_id = %(curriculum_id)s
+    AND learning_outcome_group.code = ANY(%(group_codes)s::text[])
+"""
+
+LINK_UNIT_OUTCOMES = """
+INSERT INTO curriculum_unit_outcome (curriculum_unit_id, learning_outcome_id)
+SELECT %(unit_id)s, learning_outcome.id
+FROM learning_outcome
+JOIN learning_outcome_group
+    ON learning_outcome_group.id = learning_outcome.learning_outcome_group_id
+WHERE learning_outcome_group.curriculum_id = %(curriculum_id)s
+    AND learning_outcome_group.code = ANY(%(group_codes)s::text[])
+ON CONFLICT DO NOTHING
+"""
+
+UNLINK_OTHER_OUTCOMES = """
+DELETE FROM curriculum_unit_outcome
+WHERE curriculum_unit_id = %(unit_id)s
+    AND learning_outcome_id NOT IN (
+        SELECT learning_outcome.id
+        FROM learning_outcome
+        JOIN learning_outcome_group
+            ON learning_outcome_group.id = learning_outcome.learning_outcome_group_id
+        WHERE learning_outcome_group.curriculum_id = %(curriculum_id)s
+            AND learning_outcome_group.code = ANY(%(group_codes)s::text[])
     )
 """
 
@@ -125,4 +181,44 @@ async def _count_missing(connection: AsyncConnection, curriculum_id: int, progra
     row = await cursor.fetchone()
     if row is None:
         raise RuntimeError("Count returned no row")
+    return int(row[0])
+
+
+async def save_units(
+    connection: AsyncConnection,
+    subject_code: str,
+    curriculum_name: str,
+    units: list[CurriculumUnit],
+) -> UnitSaveSummary:
+    """Üniteleri ve kazanım bağlarını tek transaction'da yazar; eklenen ve kaldırılan bağı sayar."""
+    linked = unlinked = 0
+    async with connection.transaction():
+        curriculum_id = await _find_curriculum(connection, subject_code, curriculum_name)
+        for unit in units:
+            unit_id = await _fetch_id(
+                connection,
+                UPSERT_CURRICULUM_UNIT,
+                {"curriculum_id": curriculum_id, **unit.model_dump(exclude={"group_codes"})},
+            )
+            values = {
+                "unit_id": unit_id,
+                "curriculum_id": curriculum_id,
+                "group_codes": unit.group_codes,
+            }
+            if unit.group_codes and not await _fetch_id(connection, COUNT_GROUP_OUTCOMES, values):
+                raise ValueError(f"No outcomes in groups {unit.group_codes} for {unit.title!r}")
+            unlinked += (await connection.execute(UNLINK_OTHER_OUTCOMES, values)).rowcount
+            linked += (await connection.execute(LINK_UNIT_OUTCOMES, values)).rowcount
+    return UnitSaveSummary(units=len(units), linked=linked, unlinked=unlinked)
+
+
+async def _find_curriculum(
+    connection: AsyncConnection, subject_code: str, curriculum_name: str
+) -> int:
+    """Dersin programını adıyla bulur; yoksa önce kazanımların yüklenmesini ister."""
+    values = {"subject_code": subject_code, "curriculum_name": curriculum_name}
+    cursor = await connection.execute(FIND_CURRICULUM, values)
+    row = await cursor.fetchone()
+    if row is None:
+        raise ValueError(f"Curriculum {curriculum_name!r} not found; import the program first")
     return int(row[0])

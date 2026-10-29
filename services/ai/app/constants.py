@@ -18,6 +18,15 @@ PROGRAM_CURRICULUM_MODEL = "LEGACY"
 PROGRAM_CURRICULUM_YEAR = 2018
 SEARCH_PATH_SEPARATOR = " › "
 PAGE_IMAGE_DPI = 150
+UNIT_GROUP_KEYWORDS = {  # şapkasız küçük harf
+    "hikaye": "A.2",
+    "roman": "A.2",
+    "masal": "A.2",
+    "şiir": "A.1",
+    "tiyatro": "A.3",
+    "makale": "A.4",
+    "deneme": "A.4",
+}
 
 TURKISH_LETTERS = frozenset("abcçdefgğhıijklmnoöprsştuüvyzâîû")
 TEXT_LAYER_MIN_RATIO = 0.90
@@ -29,6 +38,8 @@ FONT_FIX_MIN_WORDS = 30
 
 TEXT_SIMILARITY_MIN_RATIO = 0.90
 ANSWER_KEY_MIN_ENTRIES = 5
+
+STORAGE_FILE_MODE = 0o644
 
 EMBEDDING_BATCH_SIZE = 32
 EMBEDDING_MAX_TOKENS = 2048
