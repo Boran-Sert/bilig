@@ -11,8 +11,11 @@ spring:
     hibernate:
       ddl-auto: validate
     open-in-view: false
+    properties:
+      hibernate.type.json_format_mapper: jackson3
 
 app:
+  job-queue: ${JOB_QUEUE:}
   ai:
     connect-timeout: 2s
     read-timeout: 5s
