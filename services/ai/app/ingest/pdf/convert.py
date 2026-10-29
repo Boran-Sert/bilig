@@ -6,7 +6,8 @@ gibi gelir. Numara bir öncekinden küçük ya da ona eşitse yeni test başlar;
 bulunduğu testte kalır. Kitap: başlık BASLIK, kutudaki metin BILGI, öbür paragraf ve liste
 METIN olur; içindekiler blok olarak dönmez. Başlık yolu kaynak adı ve üstteki başlıklardır,
 başlığın kendi yolu kendisiyle biter. Düz satırlar okuma sırasındaki görünen satırlardır;
-paragraf arasına boş satır konur, satır sonu tiresi "-" olarak kalır.
+paragraf arasına boş satır konur (sütun ya da sayfa geçişinde küçük harfle süren cümle kırılmaz),
+satır sonu tiresi "-" olarak kalır.
 """
 
 import re
@@ -115,7 +116,9 @@ def to_lines(body: book_reader.Body) -> list[str]:
 def paragraph_ends(
     previous: book_reader.Line, line: book_reader.Line, body: book_reader.Body
 ) -> bool:
-    """Bölge değişiyorsa ya da satır adımı belgenin paragraf eşiğini aşıyorsa doğru döner."""
+    """Bölge değişiyorsa ya da satır adımı paragraf eşiğini aşıyorsa doğru; süren cümle kırılmaz."""
+    if line.text[:1].islower() and not book_reader.CLOSED.search(previous.text):
+        return False
     if body.region_of[id(previous)] is not body.region_of[id(line)]:
         return True
     return body.pitch_of.get(id(line), 0.0) > body.break_ratio

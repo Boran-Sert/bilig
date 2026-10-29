@@ -88,6 +88,7 @@ PRIVATE_USE = range(0xE000, 0xF900)
 LATIN_EXTENDED_A = range(0x100, 0x180)
 OCR_VOTES_ENOUGH = 5
 SPACES = frozenset(" \r\n\t\xa0   ")
+KEPT_BY_FIX = SPACES | {SOFT_HYPHEN, BULLET}
 WORD_GAP_EM = 0.25
 ROW_TOLERANCE_EM = 0.45
 SEGMENT_GAP_EM = 1.0
@@ -1074,7 +1075,7 @@ def finish_page(
                 continue
             elif char.suspect and (char.font, char.code) in decoder.table:
                 char = replace(char, text=decoder.table[(char.font, char.code)], broken=True)
-            if translate is not None and char.text not in SPACES | {SOFT_HYPHEN, BULLET}:
+            if translate is not None and not char.broken and char.text not in KEPT_BY_FIX:
                 char = replace(char, text=translate(char.text))
             chars.append(char)
         if any(c.text == UNKNOWN_GLYPH for c in chars):
