@@ -1,12 +1,10 @@
-package com.hataanalizi.core;
+package com.hataanalizi.core.job;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertNotNull;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
-import com.hataanalizi.core.job.JobQueue;
-import com.hataanalizi.core.job.JobStatus;
-import com.hataanalizi.core.job.JobType;
+import com.hataanalizi.core.TestcontainersConfiguration;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.context.SpringBootTest;

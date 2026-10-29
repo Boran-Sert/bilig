@@ -1,12 +1,12 @@
 package com.hataanalizi.core.job;
 
-import org.springframework.boot.autoconfigure.condition.ConditionalOnExpression;
+import org.springframework.boot.autoconfigure.condition.ConditionalOnProperty;
 import org.springframework.stereotype.Component;
 import tools.jackson.databind.JsonNode;
 
 /** İşleri PostgreSQL background_job tablosuna kaydeder. */
 @Component
-@ConditionalOnExpression("'${app.job-queue:${JOB_QUEUE:}}' == 'postgres'")
+@ConditionalOnProperty(name = "app.job-queue", havingValue = "postgres")
 public class PostgresJobQueue implements JobQueue {
 
     private final BackgroundJobRepository backgroundJobRepository;
