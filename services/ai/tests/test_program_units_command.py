@@ -5,7 +5,6 @@ from collections.abc import AsyncIterator, Iterator
 from contextlib import asynccontextmanager
 from pathlib import Path
 
-import pymupdf
 import pytest
 import structlog
 
@@ -13,6 +12,7 @@ from app.config import get_settings
 from app.constants import PROGRAM_CURRICULUM_NAME, PROGRAM_SUBJECT_CODE
 from app.ingest.readers import program_units
 from app.schemas.program import CurriculumUnit, UnitSaveSummary
+from tests.pdf_factory import lines_pdf
 
 UNIT = CurriculumUnit(grade=12, unit_no=1, title="Şiir", group_codes=["A.1"])
 
@@ -21,10 +21,7 @@ UNIT = CurriculumUnit(grade=12, unit_no=1, title="Şiir", group_codes=["A.1"])
 def program_pdf(tmp_path: Path) -> Path:
     """İki üniteli küçük bir program PDF'i yazar."""
     path = tmp_path / "program.pdf"
-    document = pymupdf.open()
-    html = "<p>12. SINIF</p><p>1. ÜNİTE: ŞİİR</p><p>2. ÜNİTE: ROMAN</p>"
-    document.new_page().insert_htmlbox(pymupdf.Rect(50, 50, 500, 300), html)
-    document.save(path)
+    path.write_bytes(lines_pdf([["12. SINIF", "1. ÜNİTE: ŞİİR", "2. ÜNİTE: ROMAN"]]))
     return path
 
 

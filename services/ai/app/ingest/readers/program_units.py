@@ -19,13 +19,13 @@ import re
 from collections.abc import Iterable
 from pathlib import Path
 
-import pymupdf
 import structlog
 
 from app.config import LogSettings, get_settings
 from app.constants import PROGRAM_CURRICULUM_NAME, PROGRAM_SUBJECT_CODE, UNIT_GROUP_KEYWORDS
 from app.db.pool import close_pool, open_pool
 from app.db.queries.program import save_units
+from app.ingest import pdf
 from app.log import configure_logging
 from app.schemas.program import CurriculumUnit
 from app.text.turkish import normalize_nfc, tr_lower, tr_upper
@@ -56,8 +56,7 @@ def main(argv: list[str] | None = None) -> None:
 
 def read_units(path: Path) -> list[CurriculumUnit]:
     """Program PDF'ini okuyup bütün sınıfların ünitelerini döner."""
-    with pymupdf.open(path) as document:
-        lines = [line for page in document for line in page.get_text().splitlines()]
+    lines = pdf.read_lines(path)
     return parse_units(lines)
 
 

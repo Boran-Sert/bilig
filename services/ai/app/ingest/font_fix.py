@@ -8,7 +8,7 @@ Burada bilinen iki bozukluk için düzeltme adayları üretilir:
 - Sabit kod kayması: her karakter aynı sayıda kod noktası kaymış
   ("Masal genellikle" → "0DVDO JHQHOOLNOH", 29 kayma).
 
-Hangi adayın işe yaradığına metin katmanı kontrolü karar verir (text_layer.check_page):
+Hangi adayın işe yaradığına metin katmanı kontrolü karar verir (text_layer.check_page_text):
 düzeltilmiş metnin oranı eşiği geçerse sayfa metin yolundan gider. Sayfadaki her karakterin
 aynı biçimde bozulduğu varsayılır; yarısı bozuk sayfa düzelmez ve görüntü yoluna düşer.
 """

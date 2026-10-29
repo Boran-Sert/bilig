@@ -1,6 +1,8 @@
 """Hazırlık hattının adımları (plan Bölüm 6, 13.12).
 
 Yüklenen her kaynak bu adımları bu sırayla geçer; sıra Java'daki IngestStep ile aynıdır.
+Metin katmanı kontrolü (A3) EXTRACT'ın içindedir: PDF motoru onarılmış her sayfayı ona sorar.
+Kaynak profili (A4) yoktur; kurallar her belgeden öğrenilir.
 background_job.last_completed_step tamamlanan son adımın adını taşır; yarıda kalan iş, ondan
 sonraki adımdan devam eder. Adı tanınmayan kayıt hatadır: sessizce baştan başlamak, yapılmış
 adımları ikinci kez çalıştırır.
@@ -13,8 +15,6 @@ class IngestStep(StrEnum):
     """Hazırlık hattının adımları, çalışma sırasıyla."""
 
     REGISTERED = "REGISTERED"
-    TEXT_LAYER = "TEXT_LAYER"
-    PROFILE = "PROFILE"
     EXTRACT = "EXTRACT"
     VALIDATE = "VALIDATE"
     ENTITIES = "ENTITIES"

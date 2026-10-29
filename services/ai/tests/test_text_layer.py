@@ -1,26 +1,29 @@
 """Metin katmanı kontrolünü test eder.
 
-Test PDF'leri burada üretilir; içindeki metinler bu test için yazılmıştır, hiçbir kitaptan
-alınmamıştır. Sağlam PDF Türkçe harfleri taşıyan gömülü bir fontla, bozuk PDF'ler ise Türkçe
-harfleri kodlayamayan standart Helvetica fontuyla ya da kaymış karakter kodlarıyla yazılır.
+Test PDF'leri burada üretilir (tests/pdf_factory.py); içindeki metinler bu test için yazılmıştır,
+hiçbir kitaptan alınmamıştır. Sağlam PDF Türkçe harfleri taşıyan gömülü bir fontla, bozuk PDF'ler
+ise Türkçe harfleri kodlayamayan standart Helvetica fontuyla ya da kaymış karakter kodlarıyla
+yazılır. Kontrol sayfanın ham metin katmanıyla, satır sonu tiresi PDF motorunun sayfa metniyle
+denenir.
 """
 
+import textwrap
 import unicodedata
 from pathlib import Path
 
-import pymupdf
 import pytest
 
 from app.constants import TEXT_LAYER_MIN_RATIO, TURKISH_LETTERS
 from app.ingest import text_layer
+from app.ingest.pdf import book_reader
 from app.ingest.text_layer import (
-    check_page,
+    check_page_text,
     extract_words,
     is_known_word,
     load_word_list,
     measure_text,
-    page_text,
 )
+from tests.pdf_factory import Text, make_pdf, raw_page_text
 from tests.word_list import KNOWN_WORDS, REPOSITORY_WORD_LIST
 
 PARAGRAPH = (
@@ -31,20 +34,18 @@ PARAGRAPH = (
 SHIFTED_PARAGRAPH = "".join(chr(ord(char) - 29) if char.isalpha() else char for char in PARAGRAPH)
 
 
-def saved_page(write: str, text: str) -> pymupdf.Page:
-    """Metni verilen yolla yeni bir PDF'e yazar, PDF'i kaydedip ilk sayfasını açar."""
-    document = pymupdf.open()
-    page = document.new_page()
-    if write == "embedded":
-        page.insert_htmlbox(pymupdf.Rect(50, 50, 550, 800), text)
-    else:
-        page.insert_text((50, 72), text, fontname="helv")
-    return pymupdf.open("pdf", document.tobytes())[0]
+def saved_page(write: str, text: str) -> bytes:
+    """Metni verilen yolla, satırlara bölerek yeni bir PDF'e yazar ve PDF'in baytlarını döner."""
+    lines = textwrap.wrap(text, 80) if write == "embedded" else [text]
+    standard = write != "embedded"
+    return make_pdf(
+        [[Text(line, 50, 72 + 15 * k, standard=standard) for k, line in enumerate(lines)]]
+    )
 
 
 def test_sound_pdf_page_takes_text_path() -> None:
     """Türkçe harfleri doğru çıkan sayfa metin yoluna gider."""
-    result = check_page(saved_page("embedded", f"<p>{PARAGRAPH}</p>"), KNOWN_WORDS)
+    result = check_page_text(raw_page_text(saved_page("embedded", PARAGRAPH)), KNOWN_WORDS)
 
     assert result.ok
     assert result.ratio == 1.0
@@ -52,11 +53,11 @@ def test_sound_pdf_page_takes_text_path() -> None:
 
 def test_pdf_page_with_lost_turkish_letters_takes_image_path() -> None:
     """Fontu Türkçe harfleri kodlayamayan sayfa görüntü yoluna düşer."""
-    page = saved_page("helvetica", PARAGRAPH)
+    page = raw_page_text(saved_page("helvetica", PARAGRAPH))
 
-    result = check_page(page, KNOWN_WORDS)
+    result = check_page_text(page, KNOWN_WORDS)
 
-    assert "ş" not in page.get_text()
+    assert "ş" not in page
     assert not result.ok
 
 
@@ -70,10 +71,7 @@ def test_shifted_codes_have_low_ratio() -> None:
 
 def test_empty_pdf_page_takes_image_path() -> None:
     """Metin katmanı olmayan (taranmış) sayfanın oranı sıfırdır."""
-    document = pymupdf.open()
-    document.new_page()
-
-    result = check_page(pymupdf.open("pdf", document.tobytes())[0], KNOWN_WORDS)
+    result = check_page_text(raw_page_text(make_pdf([[]])), KNOWN_WORDS)
 
     assert result.ratio == 0.0
     assert not result.ok
@@ -81,9 +79,11 @@ def test_empty_pdf_page_takes_image_path() -> None:
 
 def test_word_split_by_hyphen_across_lines_is_joined() -> None:
     """Satır sonunda tireyle bölünen kelime tek kelime olarak ölçülür."""
-    page = saved_page("embedded", "<p>Divan şiiri araş-<br>tırmacıları bu konuyu inceledi.</p>")
+    lines = ["Divan şiiri araş-", "tırmacıları bu konuyu inceledi."]
+    source = make_pdf([[Text(line, 50, 72 + 15 * k) for k, line in enumerate(lines)]])
+    [page] = book_reader.read_document(source, book_reader.OcrSettings())
 
-    assert "araştırmacıları" in extract_words(page_text(page))
+    assert "araştırmacıları" in extract_words(book_reader.page_text(page))
 
 
 def test_uppercase_turkish_text_is_measured_with_turkish_lowercase() -> None:

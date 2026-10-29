@@ -2,7 +2,6 @@
 
 from pathlib import Path
 
-import pymupdf
 import pytest
 
 from app.ingest.readers.program_units import (
@@ -12,6 +11,7 @@ from app.ingest.readers.program_units import (
     unit_title,
 )
 from app.schemas.program import CurriculumUnit
+from tests.pdf_factory import lines_pdf
 
 PROGRAM_LINES = [
     "3.3. ÜNİTE, SÜRE VE İÇERİK TABLOLARI",
@@ -113,10 +113,7 @@ def test_unit_group_codes_follow_plan_rules(title: str, codes: list[str]) -> Non
 def test_read_units_reads_generated_pdf(tmp_path: Path) -> None:
     """Testte üretilen PDF'in metin katmanından üniteler okunur."""
     path = tmp_path / "program.pdf"
-    document = pymupdf.open()
-    html = "<p>11. SINIF</p><p>1. ÜNİTE: GİRİŞ</p><p>2. ÜNİTE: MAKALE</p>"
-    document.new_page().insert_htmlbox(pymupdf.Rect(50, 50, 500, 300), html)
-    document.save(path)
+    path.write_bytes(lines_pdf([["11. SINIF", "1. ÜNİTE: GİRİŞ", "2. ÜNİTE: MAKALE"]]))
 
     assert [(unit.grade, unit.title, unit.group_codes) for unit in read_units(path)] == [
         (11, "Giriş", []),
