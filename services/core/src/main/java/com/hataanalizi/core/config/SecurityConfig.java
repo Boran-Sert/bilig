@@ -1,5 +1,6 @@
 package com.hataanalizi.core.config;
 
+import com.hataanalizi.core.common.AppConstants;
 import com.hataanalizi.core.common.ErrorCode;
 import com.hataanalizi.core.common.RequestIdFilter;
 import jakarta.servlet.http.HttpServletResponse;
@@ -42,7 +43,7 @@ public class SecurityConfig {
                         .requestMatchers("/api/auth/**", "/v3/api-docs/**", "/swagger-ui/**", "/swagger-ui.html")
                         .permitAll()
                         .requestMatchers("/api/admin/**")
-                        .hasAnyRole("CONTENT_ADMIN", "ADMIN")
+                        .hasAnyRole(AppConstants.CONTENT_ADMIN_ROLE, AppConstants.ADMIN_ROLE)
                         .requestMatchers("/api/**")
                         .authenticated()
                         .anyRequest()

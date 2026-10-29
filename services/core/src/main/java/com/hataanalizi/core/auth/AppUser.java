@@ -1,5 +1,6 @@
 package com.hataanalizi.core.auth;
 
+import com.hataanalizi.core.common.AppConstants;
 import jakarta.persistence.Column;
 import jakarta.persistence.Entity;
 import jakarta.persistence.GeneratedValue;
@@ -48,7 +49,7 @@ public class AppUser {
     private Short grade;
 
     @Column(name = "explain_style", nullable = false, columnDefinition = "text")
-    private String explainStyle = "SIMPLE";
+    private String explainStyle = AppConstants.DEFAULT_EXPLAIN_STYLE;
 
     @Column(name = "external_user_id", columnDefinition = "text")
     private String externalUserId;

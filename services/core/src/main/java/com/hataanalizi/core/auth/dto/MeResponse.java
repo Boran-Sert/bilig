@@ -1,6 +1,7 @@
 package com.hataanalizi.core.auth.dto;
 
 import com.hataanalizi.core.auth.AppUser;
+import com.hataanalizi.core.auth.AppUserPrincipal;
 
 /** Giriş yapmış kullanıcının gizli olmayan profil bilgilerini taşır. */
 public record MeResponse(Long id, String email, String displayName, String role, Short grade, String explainStyle) {
@@ -14,5 +15,16 @@ public record MeResponse(Long id, String email, String displayName, String role,
                 appUser.getRole(),
                 appUser.getGrade(),
                 appUser.getExplainStyle());
+    }
+
+    /** Kimlik doğrulama sırasında yüklenen kullanıcıdan parola içermeyen yanıtı üretir. */
+    public static MeResponse from(AppUserPrincipal principal) {
+        return new MeResponse(
+                principal.id(),
+                principal.email(),
+                principal.displayName(),
+                principal.role(),
+                principal.grade(),
+                principal.explainStyle());
     }
 }
