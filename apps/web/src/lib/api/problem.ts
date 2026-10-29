@@ -52,7 +52,5 @@ export function getProblemMessage(error: unknown): string {
     return error.message;
   }
 
-  return i18n.t("errors.unknown", {
-    defaultValue: "An unexpected error occurred.",
-  });
+  return i18n.t("errors.unknown");
 }
