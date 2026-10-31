@@ -1,5 +1,6 @@
 package com.hataanalizi.core.config;
 
+import static org.assertj.core.api.Assertions.assertThat;
 import static org.springframework.security.test.web.servlet.request.SecurityMockMvcRequestPostProcessors.testSecurityContext;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.post;
@@ -13,7 +14,6 @@ import com.hataanalizi.core.common.AppConstants;
 import com.hataanalizi.core.common.GlobalExceptionHandler;
 import com.hataanalizi.core.common.RequestIdFilter;
 import jakarta.servlet.http.Cookie;
-import java.util.UUID;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.webmvc.test.autoconfigure.WebMvcTest;
@@ -21,6 +21,7 @@ import org.springframework.context.annotation.Import;
 import org.springframework.http.MediaType;
 import org.springframework.test.context.bean.override.mockito.MockitoBean;
 import org.springframework.test.web.servlet.MockMvc;
+import org.springframework.test.web.servlet.MvcResult;
 
 /** Güvenlik yollarının, rollerin ve CSRF başlık sözleşmesinin HTTP davranışını doğrular. */
 @WebMvcTest
@@ -95,10 +96,15 @@ class SecurityConfigIT {
     /** CSRF çereziyle eşleşen özel başlığın isteği CSRF kontrolünden geçirdiğini doğrular. */
     @Test
     void postWithCsrfCookieAndHeaderPassesCsrfCheck() throws Exception {
-        String token = UUID.randomUUID().toString();
+        MvcResult csrfResult = mockMvc.perform(get("/api/auth/public"))
+                .andExpect(status().isNotFound())
+                .andReturn();
+        Cookie tokenCookie = csrfResult.getResponse().getCookie("XSRF-TOKEN");
+        assertThat(tokenCookie).isNotNull();
+
         mockMvc.perform(post("/api/auth/login")
-                        .cookie(new Cookie("XSRF-TOKEN", token))
-                        .header("X-XSRF-TOKEN", token)
+                        .cookie(tokenCookie)
+                        .header("X-XSRF-TOKEN", tokenCookie.getValue())
                         .contentType(MediaType.APPLICATION_JSON)
                         .content("{}"))
                 .andExpect(status().isBadRequest())

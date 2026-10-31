@@ -186,11 +186,15 @@ class AuthControllerIT {
     }
 
     /** İsteklere CSRF çereziyle eşleşen başlığı ekler. */
-    private RequestPostProcessor csrfHeaders() {
-        String token = UUID.randomUUID().toString();
+    private RequestPostProcessor csrfHeaders() throws Exception {
+        MvcResult csrfResult = mockMvc.perform(get("/api/auth/public"))
+                .andExpect(status().isNotFound())
+                .andReturn();
+        Cookie tokenCookie = csrfResult.getResponse().getCookie("XSRF-TOKEN");
+        assertThat(tokenCookie).isNotNull();
         return request -> {
-            request.setCookies(new Cookie("XSRF-TOKEN", token));
-            request.addHeader("X-XSRF-TOKEN", token);
+            request.setCookies(tokenCookie);
+            request.addHeader("X-XSRF-TOKEN", tokenCookie.getValue());
             return request;
         };
     }

@@ -9,6 +9,7 @@ import com.hataanalizi.core.common.ErrorCode;
 import jakarta.servlet.http.HttpServletRequest;
 import jakarta.servlet.http.HttpServletResponse;
 import java.util.Locale;
+import org.hibernate.exception.ConstraintViolationException;
 import org.springframework.dao.DataIntegrityViolationException;
 import org.springframework.security.authentication.AuthenticationManager;
 import org.springframework.security.authentication.BadCredentialsException;
@@ -65,7 +66,10 @@ public class AuthService {
         try {
             return MeResponse.from(appUserRepository.saveAndFlush(appUser));
         } catch (DataIntegrityViolationException exception) {
-            throw new ApiException(ErrorCode.EMAIL_TAKEN, exception);
+            if (isEmailAlreadyTaken(exception)) {
+                throw new ApiException(ErrorCode.EMAIL_TAKEN, exception);
+            }
+            throw exception;
         }
     }
 
@@ -105,5 +109,16 @@ public class AuthService {
     /** E-posta adresini boşluklardan arındırıp kök yerel ayara göre küçültür. */
     private String normalizeEmail(String email) {
         return email.trim().toLowerCase(Locale.ROOT);
+    }
+
+    /** E-posta benzersiz kısıtı ihlal edildiyse true döndürür. */
+    private boolean isEmailAlreadyTaken(DataIntegrityViolationException exception) {
+        for (Throwable cause = exception; cause != null; cause = cause.getCause()) {
+            if (cause instanceof ConstraintViolationException violation
+                    && AppConstants.APP_USER_EMAIL_UNIQUE_CONSTRAINT.equals(violation.getConstraintName())) {
+                return true;
+            }
+        }
+        return false;
     }
 }
