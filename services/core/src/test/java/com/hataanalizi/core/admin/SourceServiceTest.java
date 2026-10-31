@@ -3,11 +3,7 @@ package com.hataanalizi.core.admin;
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
 import static org.mockito.ArgumentMatchers.*;
-import static org.mockito.Mockito.never;
-import static org.mockito.Mockito.times;
-import static org.mockito.Mockito.verify;
-import static org.mockito.Mockito.verifyNoInteractions;
-import static org.mockito.Mockito.when;
+import static org.mockito.Mockito.*;
 
 import com.hataanalizi.core.admin.dto.UploadResponse;
 import com.hataanalizi.core.admin.dto.UploadedFile;
@@ -27,6 +23,8 @@ import org.junit.jupiter.api.extension.ExtendWith;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
 import org.springframework.mock.web.MockMultipartFile;
+import org.springframework.transaction.support.TransactionSynchronization;
+import org.springframework.transaction.support.TransactionSynchronizationManager;
 import org.springframework.util.unit.DataSize;
 import org.springframework.web.multipart.MultipartFile;
 import tools.jackson.databind.ObjectMapper;
@@ -219,6 +217,67 @@ class SourceServiceTest {
                 throw new IllegalStateException("Missing PDF test fixture: " + fixtureName);
             }
             return new MockMultipartFile("files", fileName, "application/pdf", fixture.readAllBytes());
+        }
+    }
+
+    /** Transaction rollback olduğunda daha önce yazılmış dosyaları temizler. */
+    @Test
+    void deletesPreviouslySavedFilesWhenTransactionRollsBack() throws Exception {
+        TransactionSynchronizationManager.initSynchronization();
+
+        try {
+            when(sourceDocumentRepository.findBySha256(anyString())).thenReturn(Optional.empty());
+            when(sourceDocumentRepository.insertIfAbsent(anyString(), anyString(), anyString(), eq(UPLOADER_ID)))
+                    .thenReturn(Optional.of(42L), Optional.of(43L));
+
+            doNothing()
+                    .doThrow(new ApiException(ErrorCode.INTERNAL_ERROR))
+                    .when(fileStorage)
+                    .save(anyString(), any(InputStream.class));
+
+            List<MultipartFile> files = List.of(
+                    pdfFile("ilk.pdf", "tiny.pdf"),
+                    new MockMultipartFile(
+                            "files",
+                            "ikinci.pdf",
+                            "application/pdf",
+                            "%PDF-1.4 ikinci test PDF".getBytes(StandardCharsets.US_ASCII)));
+
+            assertThatThrownBy(() -> sourceService.upload(files, UPLOADER_ID)).isInstanceOf(ApiException.class);
+
+            List<TransactionSynchronization> synchronizations = TransactionSynchronizationManager.getSynchronizations();
+
+            synchronizations.forEach(
+                    synchronization -> synchronization.afterCompletion(TransactionSynchronization.STATUS_ROLLED_BACK));
+
+            verify(fileStorage).delete("sources/42.pdf");
+            verify(fileStorage).delete("sources/43.pdf");
+        } finally {
+            TransactionSynchronizationManager.clearSynchronization();
+        }
+    }
+
+    /** Transaction commit olduğunda yüklenen dosyaları korur. */
+    @Test
+    void keepsFilesWhenTransactionCommits() throws Exception {
+        TransactionSynchronizationManager.initSynchronization();
+
+        try {
+            when(sourceDocumentRepository.findBySha256(anyString())).thenReturn(Optional.empty());
+            when(sourceDocumentRepository.insertIfAbsent(anyString(), anyString(), anyString(), eq(UPLOADER_ID)))
+                    .thenReturn(Optional.of(42L));
+
+            sourceService.upload(List.of(pdfFile("ders-kitabi.pdf", "tiny.pdf")), UPLOADER_ID);
+
+            List<TransactionSynchronization> synchronizations = TransactionSynchronizationManager.getSynchronizations();
+
+            synchronizations.forEach(
+                    synchronization -> synchronization.afterCompletion(TransactionSynchronization.STATUS_COMMITTED));
+
+            verify(fileStorage, never()).delete(anyString());
+            verify(fileStorage).save(eq("sources/42.pdf"), any(InputStream.class));
+        } finally {
+            TransactionSynchronizationManager.clearSynchronization();
         }
     }
 }

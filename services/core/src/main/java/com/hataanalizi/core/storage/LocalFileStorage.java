@@ -4,10 +4,7 @@ import com.hataanalizi.core.common.ApiException;
 import com.hataanalizi.core.common.ErrorCode;
 import java.io.IOException;
 import java.io.InputStream;
-import java.nio.file.Files;
-import java.nio.file.InvalidPathException;
-import java.nio.file.Path;
-import java.nio.file.StandardCopyOption;
+import java.nio.file.*;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.boot.autoconfigure.condition.ConditionalOnProperty;
 import org.springframework.stereotype.Component;
@@ -24,17 +21,34 @@ public class LocalFileStorage implements FileStorage {
         this.storageDirectory = Path.of(storageDirectory).toAbsolutePath().normalize();
     }
 
-    /** İçeriği belirtilen güvenli yola yazar. */
+    /** İçeriği geçici dosyaya yazıp tamamlandığında hedefe taşır. */
     @Override
     public void save(String path, InputStream content) {
         Path target = resolvePath(path);
         if (content == null) {
             throw new ApiException(ErrorCode.VALIDATION_FAILED);
         }
+
+        Path tempFile = null;
         try {
             Files.createDirectories(target.getParent());
-            Files.copy(content, target, StandardCopyOption.REPLACE_EXISTING);
+            tempFile = Files.createTempFile(
+                    target.getParent(), target.getFileName().toString(), ".tmp");
+            Files.copy(content, tempFile, StandardCopyOption.REPLACE_EXISTING);
+
+            try {
+                Files.move(tempFile, target, StandardCopyOption.ATOMIC_MOVE, StandardCopyOption.REPLACE_EXISTING);
+            } catch (AtomicMoveNotSupportedException exception) {
+                Files.move(tempFile, target, StandardCopyOption.REPLACE_EXISTING);
+            }
         } catch (IOException exception) {
+            if (tempFile != null) {
+                try {
+                    Files.deleteIfExists(tempFile);
+                } catch (IOException cleanupException) {
+                    exception.addSuppressed(cleanupException);
+                }
+            }
             throw new ApiException(ErrorCode.INTERNAL_ERROR, exception);
         }
     }
@@ -69,6 +83,16 @@ public class LocalFileStorage implements FileStorage {
             return target;
         } catch (InvalidPathException exception) {
             throw new ApiException(ErrorCode.VALIDATION_FAILED, exception);
+        }
+    }
+
+    /** Belirtilen güvenli yoldaki dosyayı siler. */
+    @Override
+    public void delete(String path) {
+        try {
+            Files.deleteIfExists(resolvePath(path));
+        } catch (IOException exception) {
+            throw new ApiException(ErrorCode.INTERNAL_ERROR, exception);
         }
     }
 }

@@ -13,9 +13,13 @@ import java.nio.charset.StandardCharsets;
 import java.security.MessageDigest;
 import java.security.NoSuchAlgorithmException;
 import java.util.*;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
+import org.springframework.transaction.support.TransactionSynchronization;
+import org.springframework.transaction.support.TransactionSynchronizationManager;
 import org.springframework.util.unit.DataSize;
 import org.springframework.web.multipart.MultipartFile;
 import tools.jackson.databind.ObjectMapper;
@@ -24,6 +28,7 @@ import tools.jackson.databind.ObjectMapper;
 @Service
 public class SourceService {
 
+    private static final Logger log = LoggerFactory.getLogger(SourceService.class);
     private static final byte[] PDF_SIGNATURE = "%PDF".getBytes(StandardCharsets.US_ASCII);
     private static final int DIGEST_BUFFER_SIZE = 8192;
 
@@ -55,7 +60,34 @@ public class SourceService {
         }
 
         List<ValidatedFile> validatedFiles = validateFiles(files);
-        return persistFiles(validatedFiles, uploadedBy);
+
+        List<String> filesToCleanup = new ArrayList<>();
+        registerRollbackCleanup(filesToCleanup);
+        return persistFiles(validatedFiles, uploadedBy, filesToCleanup);
+    }
+
+    /** Transaction rollback olduğunda yazılan dosyaları temizlemek üzere kayıt eder. */
+    private void registerRollbackCleanup(List<String> filesToCleanup) {
+        if (!TransactionSynchronizationManager.isSynchronizationActive()) {
+            return;
+        }
+
+        TransactionSynchronizationManager.registerSynchronization(new TransactionSynchronization() {
+            @Override
+            public void afterCompletion(int status) {
+                if (status != STATUS_ROLLED_BACK) {
+                    return;
+                }
+
+                for (String filePath : filesToCleanup) {
+                    try {
+                        fileStorage.delete(filePath);
+                    } catch (RuntimeException exception) {
+                        log.error("Failed to clean up file after transaction rollback: {}", filePath, exception);
+                    }
+                }
+            }
+        });
     }
 
     /** Dosya boyutunu, adını, PDF imzasını ve SHA-256 özetini doğrular. */
@@ -103,7 +135,7 @@ public class SourceService {
     }
 
     /** Yeni dosyaları yazar, işlerini sıraya koyar ve yinelenen kimlikleri döndürür. */
-    private UploadResponse persistFiles(List<ValidatedFile> files, Long uploadedBy) {
+    private UploadResponse persistFiles(List<ValidatedFile> files, Long uploadedBy, List<String> filesToCleanup) {
         Map<String, Long> knownSourceIds = new HashMap<>();
         List<UploadedFile> uploadedFiles = new ArrayList<>(files.size());
         for (ValidatedFile file : files) {
@@ -134,7 +166,10 @@ public class SourceService {
             long sourceId = insertedId.get();
             String filePath = "sources/" + sourceId + ".pdf";
             sourceDocumentRepository.updateFilePath(sourceId, filePath);
+
+            filesToCleanup.add(filePath);
             saveFile(file, filePath);
+
             enqueueIngestJob(sourceId);
             knownSourceIds.put(file.sha256(), sourceId);
             uploadedFiles.add(new UploadedFile(sourceId, file.fileName(), false));
