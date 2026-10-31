@@ -1,0 +1,206 @@
+package com.hataanalizi.core.admin;
+
+import static org.assertj.core.api.Assertions.assertThat;
+import static org.assertj.core.api.Assertions.assertThatThrownBy;
+import static org.mockito.ArgumentMatchers.any;
+import static org.mockito.ArgumentMatchers.anyString;
+import static org.mockito.ArgumentMatchers.eq;
+import static org.mockito.Mockito.never;
+import static org.mockito.Mockito.times;
+import static org.mockito.Mockito.verify;
+import static org.mockito.Mockito.verifyNoInteractions;
+import static org.mockito.Mockito.when;
+
+import com.hataanalizi.core.admin.dto.UploadResponse;
+import com.hataanalizi.core.admin.dto.UploadedFile;
+import com.hataanalizi.core.common.ApiException;
+import com.hataanalizi.core.common.ErrorCode;
+import com.hataanalizi.core.job.JobQueue;
+import com.hataanalizi.core.job.JobType;
+import com.hataanalizi.core.storage.FileStorage;
+import java.io.IOException;
+import java.io.InputStream;
+import java.nio.charset.StandardCharsets;
+import java.util.List;
+import java.util.Optional;
+import java.util.concurrent.atomic.AtomicLong;
+import org.junit.jupiter.api.BeforeEach;
+import org.junit.jupiter.api.Test;
+import org.junit.jupiter.api.extension.ExtendWith;
+import org.mockito.Mock;
+import org.mockito.junit.jupiter.MockitoExtension;
+import org.springframework.mock.web.MockMultipartFile;
+import org.springframework.util.unit.DataSize;
+import org.springframework.web.multipart.MultipartFile;
+import tools.jackson.databind.ObjectMapper;
+
+/** SourceService'ın doğrulama, tekilleştirme ve iş kuyruğu sözleşmesini sınar. */
+@ExtendWith(MockitoExtension.class)
+class SourceServiceTest {
+
+    private static final DataSize MAXIMUM_FILE_SIZE = DataSize.ofMegabytes(100);
+    private static final long UPLOADER_ID = 17L;
+
+    @Mock
+    private SourceDocumentRepository sourceDocumentRepository;
+
+    @Mock
+    private FileStorage fileStorage;
+
+    @Mock
+    private JobQueue jobQueue;
+
+    private SourceService sourceService;
+
+    /** Gerçek JSON üreticisiyle servisi ve en fazla dosya boyutunu hazırlar. */
+    @BeforeEach
+    void setUp() {
+        sourceService = new SourceService(
+                sourceDocumentRepository, fileStorage, jobQueue, new ObjectMapper(), MAXIMUM_FILE_SIZE);
+    }
+
+    /** Yeni dosyayı varsayılan metadata ile kaydeder ve hazırlık işini kuyruğa koyar. */
+    @Test
+    void uploadsNewPdfAndEnqueuesIngestJob() throws Exception {
+        when(sourceDocumentRepository.findBySha256(anyString())).thenReturn(Optional.empty());
+        when(sourceDocumentRepository.save(any(SourceDocument.class))).thenAnswer(invocation -> {
+            SourceDocument sourceDocument = invocation.getArgument(0);
+            sourceDocument.setId(42L);
+            return sourceDocument;
+        });
+        MockMultipartFile file = pdfFile("ders-kitabi.pdf", "tiny.pdf");
+
+        UploadResponse response = sourceService.upload(List.of(file), UPLOADER_ID);
+
+        assertThat(response.files()).singleElement().satisfies(uploadedFile -> {
+            assertThat(uploadedFile.sourceId()).isEqualTo(42L);
+            assertThat(uploadedFile.fileName()).isEqualTo("ders-kitabi.pdf");
+            assertThat(uploadedFile.duplicate()).isFalse();
+        });
+        verify(sourceDocumentRepository).save(any(SourceDocument.class));
+        verify(fileStorage).save(eq("sources/42.pdf"), any(InputStream.class));
+        verify(jobQueue)
+                .enqueue(
+                        eq(JobType.INGEST_SOURCE),
+                        org.mockito.ArgumentMatchers.argThat(
+                                payload -> payload.get("sourceId").asLong() == 42L));
+    }
+
+    /** Dosyanın PDF olduğunu uzantıya değil imzasına göre tanır. */
+    @Test
+    void acceptsPdfContentWithNonPdfExtension() throws Exception {
+        when(sourceDocumentRepository.findBySha256(anyString())).thenReturn(Optional.empty());
+        when(sourceDocumentRepository.save(any(SourceDocument.class))).thenAnswer(invocation -> {
+            SourceDocument sourceDocument = invocation.getArgument(0);
+            sourceDocument.setId(42L);
+            return sourceDocument;
+        });
+
+        UploadResponse response = sourceService.upload(List.of(pdfFile("ders-kitabi.txt", "tiny.pdf")), UPLOADER_ID);
+
+        assertThat(response.files().get(0).fileName()).isEqualTo("ders-kitabi.txt");
+        verify(fileStorage).save(eq("sources/42.pdf"), any(InputStream.class));
+    }
+
+    /** Veritabanında bulunan içeriği tekrar yazmadan eski kaynak numarasıyla döndürür. */
+    @Test
+    void returnsExistingSourceForDuplicateContent() throws Exception {
+        SourceDocument existing = new SourceDocument();
+        existing.setId(13L);
+        when(sourceDocumentRepository.findBySha256(anyString())).thenReturn(Optional.of(existing));
+
+        UploadResponse response = sourceService.upload(List.of(pdfFile("tekrar.pdf", "tiny.pdf")), UPLOADER_ID);
+
+        assertThat(response.files()).singleElement().satisfies(uploadedFile -> {
+            assertThat(uploadedFile.sourceId()).isEqualTo(13L);
+            assertThat(uploadedFile.duplicate()).isTrue();
+        });
+        verify(sourceDocumentRepository, never()).save(any(SourceDocument.class));
+        verifyNoInteractions(fileStorage, jobQueue);
+    }
+
+    /** Aynı batch içindeki tekrar için tek kayıt ve iş oluşturur. */
+    @Test
+    void deduplicatesRepeatedFilesWithinBatch() throws Exception {
+        when(sourceDocumentRepository.findBySha256(anyString())).thenReturn(Optional.empty());
+        when(sourceDocumentRepository.save(any(SourceDocument.class))).thenAnswer(invocation -> {
+            SourceDocument sourceDocument = invocation.getArgument(0);
+            sourceDocument.setId(42L);
+            return sourceDocument;
+        });
+        List<MultipartFile> files = List.of(pdfFile("ilk.pdf", "tiny.pdf"), pdfFile("tekrar.pdf", "tiny.pdf"));
+
+        UploadResponse response = sourceService.upload(files, UPLOADER_ID);
+
+        assertThat(response.files()).extracting(UploadedFile::duplicate).containsExactly(false, true);
+        verify(sourceDocumentRepository).save(any(SourceDocument.class));
+        verify(fileStorage).save(eq("sources/42.pdf"), any(InputStream.class));
+        verify(jobQueue).enqueue(eq(JobType.INGEST_SOURCE), any());
+    }
+
+    /** Bir batch içindeki farklı PDF dosyalarını ayrı kaynaklar ve işler olarak ekler. */
+    @Test
+    void uploadsMultipleDistinctPdfs() throws Exception {
+        AtomicLong nextId = new AtomicLong(41L);
+        when(sourceDocumentRepository.findBySha256(anyString())).thenReturn(Optional.empty());
+        when(sourceDocumentRepository.save(any(SourceDocument.class))).thenAnswer(invocation -> {
+            SourceDocument sourceDocument = invocation.getArgument(0);
+            sourceDocument.setId(nextId.incrementAndGet());
+            return sourceDocument;
+        });
+        List<MultipartFile> files = List.of(
+                pdfFile("ilk.pdf", "tiny.pdf"),
+                new MockMultipartFile(
+                        "files",
+                        "ikinci.pdf",
+                        "application/pdf",
+                        "%PDF-1.4 ikinci test PDF".getBytes(StandardCharsets.US_ASCII)));
+
+        UploadResponse response = sourceService.upload(files, UPLOADER_ID);
+
+        assertThat(response.files()).extracting(UploadedFile::duplicate).containsExactly(false, false);
+        assertThat(response.files()).extracting(UploadedFile::sourceId).containsExactly(42L, 43L);
+        verify(sourceDocumentRepository, times(2)).save(any(SourceDocument.class));
+        verify(fileStorage).save(eq("sources/42.pdf"), any(InputStream.class));
+        verify(fileStorage).save(eq("sources/43.pdf"), any(InputStream.class));
+        verify(jobQueue, times(2)).enqueue(eq(JobType.INGEST_SOURCE), any());
+    }
+
+    /** Geçersiz PDF bulunan batch'te kayıt, dosya veya iş oluşturmadan isteği reddeder. */
+    @Test
+    void rejectsBatchContainingNonPdfBeforeSavingAnything() throws Exception {
+        List<MultipartFile> files =
+                List.of(pdfFile("gecerli.pdf", "tiny.pdf"), pdfFile("gecersiz.pdf", "not-a-pdf.pdf"));
+
+        assertThatThrownBy(() -> sourceService.upload(files, UPLOADER_ID))
+                .isInstanceOfSatisfying(
+                        ApiException.class,
+                        exception -> assertThat(exception.getErrorCode()).isEqualTo(ErrorCode.FILE_NOT_PDF));
+        verify(sourceDocumentRepository, never()).save(any(SourceDocument.class));
+        verifyNoInteractions(fileStorage, jobQueue);
+    }
+
+    /** Boyut sınırını aşan dosyayı FILE_TOO_LARGE koduyla ve yan etkisiz reddeder. */
+    @Test
+    void rejectsOversizedFileBeforeSavingAnything() {
+        MultipartFile oversizedFile = org.mockito.Mockito.mock(MultipartFile.class);
+        when(oversizedFile.getSize()).thenReturn(MAXIMUM_FILE_SIZE.toBytes() + 1);
+
+        assertThatThrownBy(() -> sourceService.upload(List.of(oversizedFile), UPLOADER_ID))
+                .isInstanceOfSatisfying(
+                        ApiException.class,
+                        exception -> assertThat(exception.getErrorCode()).isEqualTo(ErrorCode.FILE_TOO_LARGE));
+        verify(sourceDocumentRepository, never()).save(any(SourceDocument.class));
+        verifyNoInteractions(fileStorage, jobQueue);
+    }
+
+    /** Sınıf yolundaki kendimize ait PDF fikstürünü çok parçalı dosyaya dönüştürür. */
+    private MockMultipartFile pdfFile(String fileName, String fixtureName) throws IOException {
+        try (InputStream fixture = getClass().getResourceAsStream("/fixtures/" + fixtureName)) {
+            if (fixture == null) {
+                throw new IllegalStateException("Missing PDF test fixture: " + fixtureName);
+            }
+            return new MockMultipartFile("files", fileName, "application/pdf", fixture.readAllBytes());
+        }
+    }
+}
