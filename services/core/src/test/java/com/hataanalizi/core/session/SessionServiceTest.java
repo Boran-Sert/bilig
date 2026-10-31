@@ -59,15 +59,12 @@ class SessionServiceTest {
     @Test
     void createsSessionWhenNoInProgressSessionExists() {
         Exam exam = exam(24L);
+        StudySession session = session(32L, 7L, 24L);
+        session.setCurrentPosition((short) 1);
         when(examRepository.findByIdAndStatus(24L, AppConstants.EXAM_STATUS_PUBLISHED))
                 .thenReturn(Optional.of(exam));
         when(studySessionRepository.findByUserIdAndExamIdAndStatus(7L, 24L, AppConstants.SESSION_STATUS_IN_PROGRESS))
-                .thenReturn(Optional.empty());
-        when(studySessionRepository.save(any())).thenAnswer(invocation -> {
-            StudySession session = invocation.getArgument(0);
-            session.setId(32L);
-            return session;
-        });
+                .thenReturn(Optional.empty(), Optional.of(session));
         when(examRepository.findQuestionPositions(24L, AppConstants.QUESTION_STATUS_PUBLISHED))
                 .thenReturn(List.of());
         when(studySessionRepository.findAnswerSelectionsBySessionId(32L)).thenReturn(List.of());
@@ -76,7 +73,7 @@ class SessionServiceTest {
 
         assertThat(response.sessionId()).isEqualTo(32L);
         assertThat(response.currentPosition()).isEqualTo((short) 1);
-        verify(studySessionRepository).save(any(StudySession.class));
+        verify(studySessionRepository).createInProgressSessionIfAbsent(7L, 24L);
     }
 
     /** Test nesnesini belirtilen kimlikle oluşturur. */

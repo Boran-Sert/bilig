@@ -8,6 +8,7 @@ import com.hataanalizi.core.exam.Exam;
 import com.hataanalizi.core.exam.ExamRepository;
 import com.hataanalizi.core.question.Question;
 import com.hataanalizi.core.question.QuestionRepository;
+import com.hataanalizi.core.session.dto.QuestionContent;
 import com.hataanalizi.core.session.dto.SessionQuestionResponse;
 import com.hataanalizi.core.session.dto.SessionResponse;
 import java.util.Collection;
@@ -17,6 +18,7 @@ import java.util.function.Function;
 import java.util.stream.Collectors;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
+import tools.jackson.databind.ObjectMapper;
 
 /** Öğrenci test oturumunu başlatır ya da kaldığı yerden sürdürür. */
 @Service
@@ -25,15 +27,18 @@ public class SessionService {
     private final ExamRepository examRepository;
     private final StudySessionRepository studySessionRepository;
     private final QuestionRepository questionRepository;
+    private final ObjectMapper objectMapper;
 
     /** Oturum ve test veritabanı bağımlılıklarını saklar. */
     public SessionService(
             ExamRepository examRepository,
             StudySessionRepository studySessionRepository,
-            QuestionRepository questionRepository) {
+            QuestionRepository questionRepository,
+            ObjectMapper objectMapper) {
         this.examRepository = examRepository;
         this.studySessionRepository = studySessionRepository;
         this.questionRepository = questionRepository;
+        this.objectMapper = objectMapper;
     }
 
     /** Yayındaki test için öğrencinin açık oturumunu döndürür veya yenisini açar. */
@@ -65,12 +70,15 @@ public class SessionService {
     private StudySession findOrCreateSession(Long examId, Long userId) {
         return studySessionRepository
                 .findByUserIdAndExamIdAndStatus(userId, examId, AppConstants.SESSION_STATUS_IN_PROGRESS)
-                .orElseGet(() -> {
-                    StudySession session = new StudySession();
-                    session.setUserId(userId);
-                    session.setExamId(examId);
-                    return studySessionRepository.save(session);
-                });
+                .orElseGet(() -> createOrReadInProgressSession(examId, userId));
+    }
+
+    /** Oturumu atomik olarak oluşturur ve eşzamanlı isteğin oluşturduğu oturumu okur. */
+    private StudySession createOrReadInProgressSession(Long examId, Long userId) {
+        studySessionRepository.createInProgressSessionIfAbsent(userId, examId);
+        return studySessionRepository
+                .findByUserIdAndExamIdAndStatus(userId, examId, AppConstants.SESSION_STATUS_IN_PROGRESS)
+                .orElseThrow(() -> new IllegalStateException("Active study session was not created."));
     }
 
     /** İstenen soru kimliklerinin veritabanı kayıtlarını bulur. */
@@ -95,6 +103,9 @@ public class SessionService {
             throw new IllegalStateException("Exam question is missing from the question table.");
         }
         return new SessionQuestionResponse(
-                question.getId(), position.getPosition(), question.getContent(), selections.get(question.getId()));
+                question.getId(),
+                position.getPosition(),
+                objectMapper.convertValue(question.getContent(), QuestionContent.class),
+                selections.get(question.getId()));
     }
 }

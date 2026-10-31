@@ -3,6 +3,7 @@ package com.hataanalizi.core.session;
 import java.util.List;
 import java.util.Optional;
 import org.springframework.data.jpa.repository.JpaRepository;
+import org.springframework.data.jpa.repository.Modifying;
 import org.springframework.data.jpa.repository.Query;
 import org.springframework.data.repository.query.Param;
 
@@ -11,6 +12,16 @@ public interface StudySessionRepository extends JpaRepository<StudySession, Long
 
     /** Öğrencinin testteki açık oturumunu bulur. */
     Optional<StudySession> findByUserIdAndExamIdAndStatus(Long userId, Long examId, String status);
+
+    /** Açık oturum yoksa atomik olarak yeni oturum oluşturur. */
+    @Modifying
+    @Query(value = """
+                    INSERT INTO study_session (user_id, exam_id)
+                    VALUES (:userId, :examId)
+                    ON CONFLICT (user_id, exam_id) WHERE status = 'IN_PROGRESS'
+                    DO NOTHING
+                    """, nativeQuery = true)
+    int createInProgressSessionIfAbsent(@Param("userId") Long userId, @Param("examId") Long examId);
 
     /** Oturumdaki cevaplanan soruların seçimlerini döndürür. */
     @Query(value = """
