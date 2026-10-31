@@ -18,6 +18,8 @@ public enum ErrorCode {
     // auth
     AUTH_REQUIRED(HttpStatus.UNAUTHORIZED),
     ACCESS_DENIED(HttpStatus.FORBIDDEN),
+    EMAIL_TAKEN(HttpStatus.CONFLICT),
+    INVALID_CREDENTIALS(HttpStatus.UNAUTHORIZED),
 
     // sınav
 

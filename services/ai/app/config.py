@@ -3,16 +3,16 @@
 Her özelliğin ayarları kendi bloğundadır; yeni ayar kendi bloğuna eklenir ve
 .env.example'a yazılır. Ayar sadece ortam değişkeninden okunur, .env dosyası okunmaz.
 Eksik ya da hatalı ayarda servis açılırken hangi değişkenin sorunlu olduğunu söyleyen
-SettingsError ile durur. Sadece bir sürecin kullandığı bloklar (IngestSettings, PdfSettings) ve
-veritabanı olmadan çalışan model indirme betiğinin okuduğu blok (EmbeddingSettings) Settings'e
-konmaz, kendi load_ fonksiyonuyla okunur.
+SettingsError ile durur. Sadece bir sürecin kullandığı bloklar (IngestSettings, PdfSettings,
+WorkerSettings) ve veritabanı olmadan çalışan model indirme betiğinin okuduğu blok
+(EmbeddingSettings) Settings'e konmaz, kendi load_ fonksiyonuyla okunur.
 """
 
 from functools import lru_cache
 from pathlib import Path
 from typing import Literal
 
-from pydantic import BaseModel, PostgresDsn, ValidationError
+from pydantic import BaseModel, PositiveInt, PostgresDsn, ValidationError
 from pydantic_settings import BaseSettings, SettingsConfigDict
 
 
@@ -42,6 +42,14 @@ class IngestSettings(BaseSettings):
     model_config = SettingsConfigDict(extra="ignore")
 
     word_list_path: Path
+
+
+class WorkerSettings(BaseSettings):
+    """ai-worker'ın iş kuyruğu ayarları; ai-api kullanmadığı için Settings'te değildir."""
+
+    model_config = SettingsConfigDict(extra="ignore")
+
+    worker_concurrency: PositiveInt
 
 
 class PdfSettings(BaseSettings):
@@ -84,6 +92,14 @@ def load_ingest_settings() -> IngestSettings:
     """Hazırlık hattı ayarlarını okur; sorun varsa değişken adlarıyla hata verir."""
     try:
         return IngestSettings()
+    except ValidationError as error:
+        raise SettingsError(_describe_errors(error)) from error
+
+
+def load_worker_settings() -> WorkerSettings:
+    """İş kuyruğu ayarlarını okur; sorun varsa değişken adlarıyla hata verir."""
+    try:
+        return WorkerSettings()
     except ValidationError as error:
         raise SettingsError(_describe_errors(error)) from error
 
