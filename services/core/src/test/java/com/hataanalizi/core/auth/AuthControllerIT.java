@@ -9,6 +9,7 @@ import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.
 import com.hataanalizi.core.TestcontainersConfiguration;
 import com.hataanalizi.core.common.AppConstants;
 import jakarta.servlet.http.Cookie;
+import java.time.Duration;
 import java.util.Locale;
 import java.util.UUID;
 import org.junit.jupiter.api.Test;
@@ -20,6 +21,7 @@ import org.springframework.boot.test.system.OutputCaptureExtension;
 import org.springframework.boot.webmvc.test.autoconfigure.AutoConfigureMockMvc;
 import org.springframework.context.annotation.Import;
 import org.springframework.http.MediaType;
+import org.springframework.jdbc.core.JdbcTemplate;
 import org.springframework.mock.web.MockHttpSession;
 import org.springframework.security.crypto.password.PasswordEncoder;
 import org.springframework.test.context.ActiveProfiles;
@@ -40,13 +42,19 @@ class AuthControllerIT {
     private final MockMvc mockMvc;
     private final AppUserRepository appUserRepository;
     private final PasswordEncoder passwordEncoder;
+    private final JdbcTemplate jdbcTemplate;
 
     /** Test bağımlılıklarını saklar. */
     @Autowired
-    AuthControllerIT(MockMvc mockMvc, AppUserRepository appUserRepository, PasswordEncoder passwordEncoder) {
+    AuthControllerIT(
+            MockMvc mockMvc,
+            AppUserRepository appUserRepository,
+            PasswordEncoder passwordEncoder,
+            JdbcTemplate jdbcTemplate) {
         this.mockMvc = mockMvc;
         this.appUserRepository = appUserRepository;
         this.passwordEncoder = passwordEncoder;
+        this.jdbcTemplate = jdbcTemplate;
     }
 
     /** Kayıt, oturum açma, profil görüntüleme ve çıkış akışını doğrular. */
@@ -72,6 +80,9 @@ class AuthControllerIT {
                                 .getPasswordHash()))
                 .isTrue();
         assertThat(output).doesNotContain(PASSWORD);
+        assertThat(rememberMeTokenCount(normalizedEmail)).isZero();
+        assertThat(loginResult.getResponse().getCookie(AppConstants.REMEMBER_ME_COOKIE_NAME))
+                .isNull();
 
         MockHttpSession session = (MockHttpSession) loginResult.getRequest().getSession(false);
         assertThat(session).isNotNull();
@@ -106,9 +117,67 @@ class AuthControllerIT {
         mockMvc.perform(post("/api/auth/login")
                         .with(csrfHeaders())
                         .contentType(MediaType.APPLICATION_JSON)
-                        .content(loginJson(email, "Wrong-Test-Password-123")))
+                        .content(loginJson(email, "Wrong-Test-Password-123", false)))
                 .andExpect(status().isUnauthorized())
                 .andExpect(jsonPath("$.code").value("INVALID_CREDENTIALS"));
+    }
+
+    /** Kalıcı token'ın oturum olmadan profili açtığını ve kullanımda yenilendiğini doğrular. */
+    @Test
+    void rememberMeLoginSurvivesSessionExpiryAndRotatesToken() throws Exception {
+        String email = uniqueEmail();
+        register(email);
+        MvcResult loginResult = login(email, true);
+        Cookie originalCookie = loginResult.getResponse().getCookie(AppConstants.REMEMBER_ME_COOKIE_NAME);
+        assertThat(originalCookie).isNotNull();
+        assertThat(originalCookie.isHttpOnly()).isTrue();
+        assertThat(originalCookie.getSecure()).isTrue();
+        assertThat(originalCookie.getAttribute("SameSite")).isEqualTo("Lax");
+        assertThat(originalCookie.getMaxAge())
+                .isEqualTo(Math.toIntExact(Duration.ofDays(30).toSeconds()));
+        assertThat(rememberMeTokenCount(email)).isEqualTo(1);
+
+        MvcResult profileResult = mockMvc.perform(get("/api/me").cookie(originalCookie))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.email").value(email))
+                .andReturn();
+
+        Cookie refreshedCookie = profileResult.getResponse().getCookie(AppConstants.REMEMBER_ME_COOKIE_NAME);
+        assertThat(refreshedCookie).isNotNull();
+        assertThat(refreshedCookie.getValue()).isNotEqualTo(originalCookie.getValue());
+        assertThat(rememberMeTokenCount(email)).isEqualTo(1);
+    }
+
+    /** Eski token tekrar kullanıldığında kullanıcının bütün token'larının silindiğini doğrular. */
+    @Test
+    void replayedRememberMeTokenRevokesAllUserTokens() throws Exception {
+        String email = uniqueEmail();
+        register(email);
+        Cookie originalCookie = login(email, true).getResponse().getCookie(AppConstants.REMEMBER_ME_COOKIE_NAME);
+        assertThat(originalCookie).isNotNull();
+        mockMvc.perform(get("/api/me").cookie(originalCookie)).andExpect(status().isOk());
+
+        login(email, true);
+        assertThat(rememberMeTokenCount(email)).isEqualTo(2);
+
+        mockMvc.perform(get("/api/me").cookie(originalCookie)).andExpect(status().isUnauthorized());
+        assertThat(rememberMeTokenCount(email)).isZero();
+    }
+
+    /** Çıkışın sunucu oturumuyla birlikte kalıcı token'ı da sildiğini doğrular. */
+    @Test
+    void logoutRemovesRememberMeToken() throws Exception {
+        String email = uniqueEmail();
+        register(email);
+        MvcResult loginResult = login(email, true);
+        MockHttpSession session = (MockHttpSession) loginResult.getRequest().getSession(false);
+        assertThat(session).isNotNull();
+        assertThat(rememberMeTokenCount(email)).isEqualTo(1);
+
+        mockMvc.perform(post("/api/auth/logout").with(csrfHeaders()).session(session))
+                .andExpect(status().isNoContent());
+
+        assertThat(rememberMeTokenCount(email)).isZero();
     }
 
     /** Geçersiz e-posta adresini 400 olarak reddeder. */
@@ -178,11 +247,35 @@ class AuthControllerIT {
                 """.formatted(email, password, explainStyle);
     }
 
-    /** Giriş isteğinin JSON gövdesini üretir. */
+    /** Kalıcı oturum alanı olmayan eski giriş gövdesini üretir. */
     private String loginJson(String email, String password) {
         return """
                 {"email":"%s","password":"%s"}
                 """.formatted(email, password);
+    }
+
+    /** Giriş isteğinin JSON gövdesini seçilen kalıcı oturum değeriyle üretir. */
+    private String loginJson(String email, String password, boolean rememberMe) {
+        return """
+                {"email":"%s","password":"%s","rememberMe":%s}
+                """.formatted(email, password, rememberMe);
+    }
+
+    /** Test kullanıcısı için kalıcı token ile giriş yapar. */
+    private MvcResult login(String email, boolean rememberMe) throws Exception {
+        return mockMvc.perform(post("/api/auth/login")
+                        .with(csrfHeaders())
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content(loginJson(email, PASSWORD, rememberMe)))
+                .andExpect(status().isOk())
+                .andReturn();
+    }
+
+    /** Kullanıcıya ait kalıcı token satırı sayısını döndürür. */
+    private int rememberMeTokenCount(String email) {
+        Integer tokenCount = jdbcTemplate.queryForObject(
+                "SELECT count(*) FROM persistent_logins WHERE username = ?", Integer.class, email);
+        return tokenCount == null ? 0 : tokenCount;
     }
 
     /** İsteklere CSRF çereziyle eşleşen başlığı ekler. */

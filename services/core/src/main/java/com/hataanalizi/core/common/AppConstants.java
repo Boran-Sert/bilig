@@ -16,6 +16,7 @@ public final class AppConstants {
     public static final String DEFAULT_TENANT_NAME = "Bilig";
     public static final String DEFAULT_EXPLAIN_STYLE = "SIMPLE";
     public static final String EXPLAIN_STYLE_PATTERN = "SIMPLE|EXAMPLES|STEP_BY_STEP";
+    public static final String REMEMBER_ME_COOKIE_NAME = "remember-me";
     public static final String APP_USER_EMAIL_UNIQUE_CONSTRAINT = "app_user_email_key";
     public static final int MIN_PASSWORD_LENGTH = 8;
     public static final int MAX_PASSWORD_LENGTH = 72;
