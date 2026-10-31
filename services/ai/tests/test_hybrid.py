@@ -16,8 +16,12 @@ from pgvector.psycopg import register_vector_async
 from psycopg.rows import TupleRow
 from pydantic import ValidationError
 
-from app.schemas.search import SearchFilters, SearchTarget
+from app.constants import RRF_K
+from app.schemas.search import SearchFilters, SearchHit, SearchTarget
+from app.search import hybrid
 from app.search.bm25 import search_bm25
+from app.search.hybrid import fuse_rrf, hybrid_search
+from app.search.reranker import RankedDocument
 from app.search.vector import search_vector
 
 Connection = psycopg.AsyncConnection[TupleRow]
@@ -108,6 +112,39 @@ def vector(*weights: float) -> list[float]:
 QUERY_TEXT = "Tarık Buğra"
 QUERY_VECTOR = vector(1, 0)
 SEARCH_METHODS = ["vector", "bm25"]
+MEANING_QUERY = "zihinden geçenleri anlatma yöntemi"
+QUERY_EMBEDDINGS = {QUERY_TEXT: vector(0, 1), MEANING_QUERY: vector(0, 1)}
+
+
+class FakeEmbedding:
+    """Sorguya QUERY_EMBEDDINGS'teki vektörü veren sahte embedding."""
+
+    def encode(self, texts: list[str]) -> list[list[float]]:
+        """Her sorgunun önceden belirlenmiş vektörünü döner."""
+        return [QUERY_EMBEDDINGS[text] for text in texts]
+
+
+class FakeReranker:
+    """Adayları ters sırayla dönen ve aldığı adayları saklayan sahte reranker."""
+
+    def __init__(self) -> None:
+        """Henüz çağrılmamış reranker kurar."""
+        self.docs: list[str] | None = None
+
+    def rerank(self, query: str, docs: list[str], top_k: int) -> list[RankedDocument]:
+        """Son adaya en yüksek skoru vererek ilk top_k adayı döner."""
+        self.docs = docs
+        ranked = [RankedDocument(index=index, score=float(index)) for index in range(len(docs))]
+        return list(reversed(ranked))[:top_k]
+
+
+@pytest.fixture
+def reranker(monkeypatch: pytest.MonkeyPatch) -> FakeReranker:
+    """Gerçek modeller yerine sahte embedding ve reranker kullandırır."""
+    fake = FakeReranker()
+    monkeypatch.setattr(hybrid, "get_embedding_provider", FakeEmbedding)
+    monkeypatch.setattr(hybrid, "get_reranker", lambda: fake)
+    return fake
 
 
 @pytest_asyncio.fixture
@@ -296,3 +333,58 @@ async def test_search_skips_draft_knowledge_nodes(connection: Connection, method
 
     assert published in ids
     assert draft not in ids
+
+
+def test_rrf_sums_reciprocal_ranks_and_keeps_hits_from_one_list() -> None:
+    """Puan her listedeki 1 / (RRF_K + sıra) toplamıdır; tek listede olan kayıt da kalır."""
+    first = [SearchHit(id=hit_id, text="", score=0.0) for hit_id in (1, 2, 3)]
+    second = [SearchHit(id=hit_id, text="", score=0.0) for hit_id in (3, 1)]
+
+    fused = fuse_rrf([first, second])
+
+    assert [hit.id for hit in fused] == [1, 3, 2]
+    expected = [
+        1 / (RRF_K + 1) + 1 / (RRF_K + 2),
+        1 / (RRF_K + 3) + 1 / (RRF_K + 1),
+        1 / (RRF_K + 2),
+    ]
+    assert all(map(math.isclose, [hit.score for hit in fused], expected))
+
+
+@pytest.mark.asyncio
+async def test_hybrid_finds_rare_name_by_bm25_and_close_meaning_by_vector(
+    connection: Connection, seed: Seed, reranker: FakeReranker
+) -> None:
+    """Yazar adı vektörde geride kalsa da BM25'le, ortak kelimesi olmayan anlam vektörle bulunur."""
+    author = await add_block(
+        connection, seed, seed.unit_id, "Küçük Ağa romanını Tarık Buğra yazdı.", vector(1, 0)
+    )
+    technique = await add_block(
+        connection, seed, seed.unit_id, "Bilinç akışı iç dünyayı süzgeçsiz yansıtır.", vector(0, 1)
+    )
+    filters = SearchFilters(target=SearchTarget.CONTENT_BLOCK, curriculum_unit_id=seed.unit_id)
+
+    by_name = await hybrid_search(connection, QUERY_TEXT, filters, top_k=5, rerank=False)
+    by_meaning = await hybrid_search(connection, MEANING_QUERY, filters, top_k=5, rerank=False)
+
+    assert (await search_vector(connection, vector(0, 1), filters))[0].id == technique
+    assert [hit.id for hit in by_name] == [author, technique]
+    assert await search_bm25(connection, MEANING_QUERY, filters) == []
+    assert by_meaning[0].id == technique
+    assert reranker.docs is None
+
+
+@pytest.mark.asyncio
+async def test_hybrid_reranks_candidates_and_cuts_to_top_k(
+    connection: Connection, seed: Seed, reranker: FakeReranker
+) -> None:
+    """İstenince reranker sırası ve skoru uygulanır, sonuç top_k kayda kesilir."""
+    for label in ("bir", "iki", "üç"):
+        await add_matching_block(connection, seed, seed.unit_id, label)
+    filters = SearchFilters(target=SearchTarget.CONTENT_BLOCK, curriculum_unit_id=seed.unit_id)
+
+    hits = await hybrid_search(connection, QUERY_TEXT, filters, top_k=2, rerank=True)
+
+    assert reranker.docs is not None
+    assert [hit.text for hit in hits] == [reranker.docs[2], reranker.docs[1]]
+    assert [hit.score for hit in hits] == [2.0, 1.0]
