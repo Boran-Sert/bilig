@@ -36,6 +36,22 @@ export interface paths {
     patch?: never;
     trace?: never;
   };
+  "/api/sessions/{id}/complete": {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    get?: never;
+    put?: never;
+    post: operations["completeSession"];
+    delete?: never;
+    options?: never;
+    head?: never;
+    patch?: never;
+    trace?: never;
+  };
   "/api/auth/register": {
     parameters: {
       query?: never;
@@ -181,6 +197,23 @@ export interface components {
       currentPosition: number;
       questions: components["schemas"]["SessionQuestionResponse"][];
     };
+    SessionCompletionOutcome: {
+      code: string;
+      title: string;
+      /** Format: int64 */
+      wrong: number;
+      failed: boolean;
+    };
+    SessionCompletionResponse: {
+      /** Format: int64 */
+      correct: number;
+      /** Format: int64 */
+      wrong: number;
+      /** Format: int64 */
+      blank: number;
+      net: number;
+      outcomes: components["schemas"]["SessionCompletionOutcome"][];
+    };
     RegisterRequest: {
       /** Format: email */
       email: string;
@@ -282,6 +315,28 @@ export interface operations {
         };
         content: {
           "*/*": components["schemas"]["SessionResponse"];
+        };
+      };
+    };
+  };
+  completeSession: {
+    parameters: {
+      query?: never;
+      header?: never;
+      path: {
+        id: number;
+      };
+      cookie?: never;
+    };
+    requestBody?: never;
+    responses: {
+      /** @description OK */
+      200: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          "*/*": components["schemas"]["SessionCompletionResponse"];
         };
       };
     };
