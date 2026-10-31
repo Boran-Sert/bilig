@@ -8,6 +8,8 @@ import com.hataanalizi.core.exam.Exam;
 import com.hataanalizi.core.exam.ExamRepository;
 import com.hataanalizi.core.question.Question;
 import com.hataanalizi.core.question.QuestionRepository;
+import com.hataanalizi.core.session.dto.AnswerRequest;
+import com.hataanalizi.core.session.dto.AnswerResponse;
 import com.hataanalizi.core.session.dto.QuestionContent;
 import com.hataanalizi.core.session.dto.SessionQuestionResponse;
 import com.hataanalizi.core.session.dto.SessionResponse;
@@ -27,6 +29,7 @@ public class SessionService {
     private final ExamRepository examRepository;
     private final StudySessionRepository studySessionRepository;
     private final QuestionRepository questionRepository;
+    private final StudentAnswerRepository studentAnswerRepository;
     private final ObjectMapper objectMapper;
 
     /** Oturum ve test veritabanı bağımlılıklarını saklar. */
@@ -34,10 +37,12 @@ public class SessionService {
             ExamRepository examRepository,
             StudySessionRepository studySessionRepository,
             QuestionRepository questionRepository,
+            StudentAnswerRepository studentAnswerRepository,
             ObjectMapper objectMapper) {
         this.examRepository = examRepository;
         this.studySessionRepository = studySessionRepository;
         this.questionRepository = questionRepository;
+        this.studentAnswerRepository = studentAnswerRepository;
         this.objectMapper = objectMapper;
     }
 
@@ -57,6 +62,51 @@ public class SessionService {
                 .map(position -> toQuestionResponse(position, questionsById, selections))
                 .toList();
         return new SessionResponse(session.getId(), session.getCurrentPosition(), questions);
+    }
+
+    /** Cevabı kaydeder, oturum ilerlemesini günceller ve kazanımları döndürür. */
+    @Transactional
+    public AnswerResponse submitAnswer(Long sessionId, Long questionId, AuthUser authUser, AnswerRequest request) {
+        requireOwnedInProgressSession(sessionId, authUser.id());
+        StudentAnswerRepository.QuestionContext question = studentAnswerRepository
+                .findPublishedQuestionInSession(sessionId, questionId, AppConstants.QUESTION_STATUS_PUBLISHED)
+                .orElseThrow(() -> new ApiException(ErrorCode.NOT_FOUND));
+        String correctOption = question.getCorrectOption().trim();
+        boolean correct = request.selectedOption().equals(correctOption);
+        saveAnswer(sessionId, questionId, request, correct);
+        studentAnswerRepository.advanceCurrentPosition(sessionId, question.getPosition());
+        List<AnswerResponse.Outcome> outcomes =
+                studentAnswerRepository.findLearningOutcomesByQuestionId(questionId).stream()
+                        .map(outcome -> new AnswerResponse.Outcome(outcome.getCode(), outcome.getTitle()))
+                        .toList();
+        return new AnswerResponse(correct, correctOption, outcomes);
+    }
+
+    /** Oturumun varlığını ve sahibini doğrular, tamamlanmış oturumu reddeder. */
+    private void requireOwnedInProgressSession(Long sessionId, Long userId) {
+        StudentAnswerRepository.SessionContext session = studentAnswerRepository
+                .lockSessionById(sessionId)
+                .orElseThrow(() -> new ApiException(ErrorCode.SESSION_NOT_FOUND));
+        if (!userId.equals(session.getUserId())) {
+            throw new ApiException(ErrorCode.SESSION_NOT_FOUND);
+        }
+        if (AppConstants.SESSION_STATUS_COMPLETED.equals(session.getStatus())) {
+            throw new ApiException(ErrorCode.SESSION_ALREADY_COMPLETED);
+        }
+    }
+
+    /** Yeni cevabı ekler veya önceki cevabın alanlarını günceller. */
+    private void saveAnswer(Long sessionId, Long questionId, AnswerRequest request, boolean correct) {
+        StudentAnswer answer = studentAnswerRepository
+                .findByStudySessionIdAndQuestionId(sessionId, questionId)
+                .orElseGet(StudentAnswer::new);
+        answer.setStudySessionId(sessionId);
+        answer.setQuestionId(questionId);
+        answer.setSelectedOption(request.selectedOption());
+        answer.setCorrect(correct);
+        answer.setDurationMs(request.durationMs());
+        answer.setHintUsed(request.hintUsed());
+        studentAnswerRepository.save(answer);
     }
 
     /** Yalnız yayındaki testi bulur. */

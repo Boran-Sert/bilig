@@ -1,9 +1,11 @@
 package com.hataanalizi.core.session;
 
+import static org.assertj.core.api.Assertions.assertThat;
 import static org.hamcrest.Matchers.nullValue;
 import static org.springframework.security.test.web.servlet.request.SecurityMockMvcRequestPostProcessors.authentication;
 import static org.springframework.security.test.web.servlet.request.SecurityMockMvcRequestPostProcessors.csrf;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.post;
+import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.put;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.jsonPath;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
 
@@ -16,11 +18,13 @@ import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.context.SpringBootTest;
 import org.springframework.boot.webmvc.test.autoconfigure.AutoConfigureMockMvc;
 import org.springframework.context.annotation.Import;
+import org.springframework.http.MediaType;
 import org.springframework.jdbc.core.JdbcTemplate;
 import org.springframework.security.authentication.UsernamePasswordAuthenticationToken;
 import org.springframework.security.core.authority.SimpleGrantedAuthority;
 import org.springframework.test.context.ActiveProfiles;
 import org.springframework.test.web.servlet.MockMvc;
+import org.springframework.test.web.servlet.ResultActions;
 import org.springframework.test.web.servlet.request.RequestPostProcessor;
 import org.springframework.transaction.annotation.Transactional;
 
@@ -34,12 +38,14 @@ class SessionControllerIT {
 
     private final JdbcTemplate jdbcTemplate;
     private final MockMvc mockMvc;
+    private final SessionQuestionFixture questionFixture;
 
     /** Test bağımlılıklarını saklar. */
     @Autowired
     SessionControllerIT(JdbcTemplate jdbcTemplate, MockMvc mockMvc) {
         this.jdbcTemplate = jdbcTemplate;
         this.mockMvc = mockMvc;
+        this.questionFixture = new SessionQuestionFixture(jdbcTemplate);
     }
 
     /** Aynı öğrencinin oturumunu sürdürür ve başkasının oturumunu açığa çıkarmaz. */
@@ -49,14 +55,16 @@ class SessionControllerIT {
         Long otherUserId = insertUser();
         Long unitId = insertCurriculumUnit();
         Long examId = insertExam("PUBLISHED");
-        Long firstQuestionId = insertQuestion(unitId, "PUBLISHED");
-        Long secondQuestionId = insertQuestion(unitId, "PUBLISHED");
-        Long draftQuestionId = insertQuestion(unitId, "DRAFT");
+        Long firstQuestionId = questionFixture.insertQuestion(unitId);
+        Long secondQuestionId = questionFixture.insertQuestion(unitId);
         insertExamQuestion(examId, secondQuestionId, (short) 1);
         insertExamQuestion(examId, firstQuestionId, (short) 2);
-        insertExamQuestion(examId, draftQuestionId, (short) 3);
         Long ownerSessionId = insertStudySession(ownerId, examId, (short) 2);
-        insertAnswer(ownerSessionId, secondQuestionId, "C");
+        jdbcTemplate.update(
+                "INSERT INTO student_answer (study_session_id, question_id, selected_option, is_correct) "
+                        + "VALUES (?, ?, 'C', false)",
+                ownerSessionId,
+                secondQuestionId);
 
         mockMvc.perform(post("/api/tests/{id}/sessions", examId)
                         .with(student(ownerId))
@@ -99,16 +107,76 @@ class SessionControllerIT {
                 .andExpect(jsonPath("$.code").value("EXAM_NOT_FOUND"));
     }
 
+    /** Cevabı üstüne yazar, doğruluğu ve tüm kazanımları döndürür. */
+    @Test
+    void savesAndOverwritesAnswerWithOutcomes() throws Exception {
+        Long userId = insertUser();
+        Long unitId = insertCurriculumUnit();
+        Long examId = insertExam("PUBLISHED");
+        Long questionId = questionFixture.insertQuestion(unitId);
+        insertExamQuestion(examId, questionId, (short) 1);
+        insertOutcomes(unitId, questionId);
+        Long sessionId = insertStudySession(userId, examId, (short) 1);
+
+        submitAnswer(sessionId, questionId, userId, "{\"selectedOption\":\"B\",\"durationMs\":1200,\"hintUsed\":true}")
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.isCorrect").value(true))
+                .andExpect(jsonPath("$.correctOption").value("B"))
+                .andExpect(jsonPath("$.outcomes.length()").value(2))
+                .andExpect(jsonPath("$.outcomes[0].code").exists())
+                .andExpect(jsonPath("$.outcomes[1].title").exists());
+
+        submitAnswer(sessionId, questionId, userId, "{\"selectedOption\":\"A\",\"durationMs\":2400,\"hintUsed\":false}")
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.isCorrect").value(false))
+                .andExpect(jsonPath("$.correctOption").value("B"));
+
+        assertThatAnswerWasOverwritten(sessionId, questionId);
+    }
+
+    /** Başkasının oturumunu ve tamamlanmış oturumu cevaplamaya kapatır. */
+    @Test
+    void rejectsAnotherUsersAndCompletedSessions() throws Exception {
+        Long ownerId = insertUser();
+        Long otherUserId = insertUser();
+        Long unitId = insertCurriculumUnit();
+        Long examId = insertExam("PUBLISHED");
+        Long questionId = questionFixture.insertQuestion(unitId);
+        insertExamQuestion(examId, questionId, (short) 1);
+        Long sessionId = insertStudySession(ownerId, examId, (short) 1);
+        String request = "{\"selectedOption\":\"B\",\"durationMs\":100,\"hintUsed\":false}";
+
+        submitAnswer(sessionId, questionId, otherUserId, request)
+                .andExpect(status().isNotFound())
+                .andExpect(jsonPath("$.code").value("SESSION_NOT_FOUND"));
+
+        jdbcTemplate.update("UPDATE study_session SET status = 'COMPLETED' WHERE id = ?", sessionId);
+        submitAnswer(sessionId, questionId, ownerId, request)
+                .andExpect(status().isConflict())
+                .andExpect(jsonPath("$.code").value("SESSION_ALREADY_COMPLETED"));
+    }
+
+    /** Geçersiz şık ve negatif süre isteğinin doğrulama hatası verdiğini doğrular. */
+    @Test
+    void validatesAnswerRequest() throws Exception {
+        Long userId = insertUser();
+        Long unitId = insertCurriculumUnit();
+        Long examId = insertExam("PUBLISHED");
+        Long questionId = questionFixture.insertQuestion(unitId);
+        insertExamQuestion(examId, questionId, (short) 1);
+        Long sessionId = insertStudySession(userId, examId, (short) 1);
+
+        submitAnswer(sessionId, questionId, userId, "{\"selectedOption\":\"X\",\"durationMs\":-1,\"hintUsed\":false}")
+                .andExpect(status().isBadRequest())
+                .andExpect(jsonPath("$.code").value("VALIDATION_FAILED"));
+    }
+
     /** Yeni bir öğrenci hesabı oluşturur. */
     private Long insertUser() {
         String identifier = UUID.randomUUID().toString();
-        return jdbcTemplate.queryForObject("""
-                INSERT INTO app_user (tenant_id, email, display_name, role)
-                SELECT id, ?, ?, 'STUDENT'
-                FROM tenant
-                WHERE name = 'Bilig'
-                RETURNING id
-                """, Long.class, identifier + "@example.test", identifier);
+        String sql = "INSERT INTO app_user (tenant_id, email, display_name, role) "
+                + "SELECT id, ?, ?, 'STUDENT' FROM tenant WHERE name = 'Bilig' RETURNING id";
+        return jdbcTemplate.queryForObject(sql, Long.class, identifier + "@example.test", identifier);
     }
 
     /** Testte kullanılacak ders programı ve ünitesini oluşturur. */
@@ -116,47 +184,27 @@ class SessionControllerIT {
         String identifier = UUID.randomUUID().toString();
         Long subjectId = jdbcTemplate.queryForObject(
                 "INSERT INTO subject (code, name) VALUES (?, ?) RETURNING id", Long.class, identifier, identifier);
-        Long curriculumId = jdbcTemplate.queryForObject("""
-                INSERT INTO curriculum (subject_id, name, model, year)
-                VALUES (?, ?, ?, ?)
-                RETURNING id
-                """, Long.class, subjectId, identifier, "LEGACY", 2018);
-        return jdbcTemplate.queryForObject("""
-                INSERT INTO curriculum_unit (curriculum_id, grade, unit_no, title)
-                VALUES (?, ?, ?, ?)
-                RETURNING id
-                """, Long.class, curriculumId, 12, 1, identifier);
+        Long curriculumId = jdbcTemplate.queryForObject(
+                "INSERT INTO curriculum (subject_id, name, model, year) VALUES (?, ?, ?, ?) RETURNING id",
+                Long.class,
+                subjectId,
+                identifier,
+                "LEGACY",
+                2018);
+        return jdbcTemplate.queryForObject(
+                "INSERT INTO curriculum_unit (curriculum_id, grade, unit_no, title) VALUES (?, ?, ?, ?) RETURNING id",
+                Long.class,
+                curriculumId,
+                12,
+                1,
+                identifier);
     }
 
     /** Yayındaki test kaydını oluşturur. */
     private Long insertExam(String examStatus) {
+        String title = "Test " + UUID.randomUUID();
         return jdbcTemplate.queryForObject(
-                "INSERT INTO exam (title, status) VALUES (?, ?) RETURNING id",
-                Long.class,
-                "Test " + UUID.randomUUID(),
-                examStatus);
-    }
-
-    /** İçerik ve doğru şık içeren yayınlanmış bir soru oluşturur. */
-    private Long insertQuestion(Long unitId, String questionStatus) {
-        String content = """
-                {"stem":[{"type":"paragraph","md":"Question"}],
-                 "options":[
-                   {"label":"A","blocks":[{"type":"paragraph","md":"Option A"}]},
-                   {"label":"B","blocks":[{"type":"paragraph","md":"Option B"}]},
-                   {"label":"C","blocks":[{"type":"paragraph","md":"Option C"}]},
-                   {"label":"D","blocks":[{"type":"paragraph","md":"Option D"}]},
-                   {"label":"E","blocks":[{"type":"paragraph","md":"Option E"}]}
-                 ]}
-                """;
-        String contentHash = UUID.randomUUID().toString().replace("-", "")
-                + UUID.randomUUID().toString().replace("-", "");
-        return jdbcTemplate.queryForObject("""
-                INSERT INTO question (
-                    curriculum_unit_id, origin, content, correct_option, content_hash, status
-                ) VALUES (?, 'SOURCE', ?::jsonb, 'B', ?, ?)
-                RETURNING id
-                """, Long.class, unitId, content, contentHash, questionStatus);
+                "INSERT INTO exam (title, status) VALUES (?, ?) RETURNING id", Long.class, title, examStatus);
     }
 
     /** Teste soruyu belirtilen sırada ekler. */
@@ -177,12 +225,46 @@ class SessionControllerIT {
                 """, Long.class, userId, examId, currentPosition);
     }
 
-    /** Oturumdaki bir sorunun cevabını kaydeder. */
-    private void insertAnswer(Long sessionId, Long questionId, String selectedOption) {
+    /** Soruya iki kazanım ekler. */
+    private void insertOutcomes(Long unitId, Long questionId) {
+        String identifier = UUID.randomUUID().toString();
         jdbcTemplate.update("""
-                INSERT INTO student_answer (study_session_id, question_id, selected_option, is_correct)
-                VALUES (?, ?, ?, false)
-                """, sessionId, questionId, selectedOption);
+                WITH outcome_group AS (INSERT INTO learning_outcome_group (curriculum_id, code, name)
+                    VALUES ((SELECT curriculum_id FROM curriculum_unit WHERE id = ?), ?, ?) RETURNING id),
+                outcomes AS (INSERT INTO learning_outcome (learning_outcome_group_id, code, title, search_text)
+                    SELECT outcome_group.id, outcome.code, outcome.title, outcome.title FROM outcome_group
+                    CROSS JOIN (VALUES ('A.2.7', 'Learning outcome seven'),
+                                       ('A.2.8', 'Learning outcome eight')) AS outcome(code, title) RETURNING id)
+                INSERT INTO question_outcome (question_id, learning_outcome_id, mapped_by)
+                SELECT ?, outcomes.id, 'SOURCE' FROM outcomes
+                """, unitId, identifier, identifier, questionId);
+    }
+
+    /** Cevabın güncellendiğini ve ilerlemenin bir kez arttığını doğrular. */
+    private void assertThatAnswerWasOverwritten(Long sessionId, Long questionId) {
+        var storedAnswer = jdbcTemplate.queryForMap("""
+                        SELECT count(*) AS answer_count, max(selected_option::text) AS selected_option,
+                               bool_or(is_correct) AS is_correct, max(duration_ms) AS duration_ms,
+                               bool_or(hint_used) AS hint_used,
+                               (SELECT current_position FROM study_session WHERE id = ?) AS current_position
+                        FROM student_answer WHERE study_session_id = ? AND question_id = ?
+                        """, sessionId, sessionId, questionId);
+        assertThat(storedAnswer)
+                .containsEntry("answer_count", 1L)
+                .containsEntry("selected_option", "A")
+                .containsEntry("is_correct", false)
+                .containsEntry("duration_ms", 2400)
+                .containsEntry("hint_used", false)
+                .containsEntry("current_position", 2);
+    }
+
+    /** Cevap isteğini test öğrencisi olarak gönderir. */
+    private ResultActions submitAnswer(Long sessionId, Long questionId, Long userId, String request) throws Exception {
+        return mockMvc.perform(put("/api/sessions/{id}/answers/{questionId}", sessionId, questionId)
+                .with(student(userId))
+                .with(csrf())
+                .contentType(MediaType.APPLICATION_JSON)
+                .content(request));
     }
 
     /** İstek için test öğrencisinin kimliğini hazırlar. */

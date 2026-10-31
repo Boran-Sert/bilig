@@ -30,6 +30,8 @@ public final class AppConstants {
 
     // oturum
     public static final String SESSION_STATUS_IN_PROGRESS = "IN_PROGRESS";
+    public static final String SESSION_STATUS_COMPLETED = "COMPLETED";
+    public static final String ANSWER_OPTION_PATTERN = "A|B|C|D|E";
     public static final int MAX_WRONG_PER_TEST = 2;
     public static final int MAX_WRONG_TOTAL = 5;
 
