@@ -17,6 +17,7 @@ from psycopg.rows import TupleRow
 from pydantic import ValidationError
 
 from app.schemas.search import SearchFilters, SearchTarget
+from app.search.bm25 import search_bm25
 from app.search.vector import search_vector
 
 Connection = psycopg.AsyncConnection[TupleRow]
@@ -104,6 +105,11 @@ def vector(*weights: float) -> list[float]:
     return [weight / norm for weight in weights] + [0.0] * (DIMENSIONS - len(weights))
 
 
+QUERY_TEXT = "Tarık Buğra"
+QUERY_VECTOR = vector(1, 0)
+SEARCH_METHODS = ["vector", "bm25"]
+
+
 @pytest_asyncio.fixture
 async def connection(db: Connection) -> Connection:
     """Test bağlantısına vector tipini tanıtır."""
@@ -183,6 +189,23 @@ async def add_node(
     return await insert_returning_id(connection, INSERT_NODE, values)
 
 
+async def add_matching_block(
+    connection: Connection, seed: Seed, unit_id: int, label: str, status: str = "PUBLISHED"
+) -> int:
+    """Hem sorgu kelimelerini hem sorgu vektörünü taşıyan blok yazar."""
+    text = f"{QUERY_TEXT} {label}"
+    return await add_block(connection, seed, unit_id, text, QUERY_VECTOR, status)
+
+
+async def search_ids(connection: Connection, method: str, filters: SearchFilters) -> list[int]:
+    """Ortak sorguyu seçilen yöntemle arar ve sonuçların kimliklerini sırasıyla döner."""
+    if method == "vector":
+        hits = await search_vector(connection, QUERY_VECTOR, filters)
+    else:
+        hits = await search_bm25(connection, QUERY_TEXT, filters)
+    return [hit.id for hit in hits]
+
+
 def test_knowledge_node_search_rejects_filters() -> None:
     """knowledge_node aramasına verilen ünite filtresi reddedilir."""
     with pytest.raises(ValidationError):
@@ -207,16 +230,33 @@ async def test_vector_search_orders_by_distance_and_skips_missing_embedding(
 
 
 @pytest.mark.asyncio
-async def test_vector_search_returns_only_published_blocks_inside_filters(
+async def test_bm25_orders_by_matching_words_and_skips_blocks_without_them(
     connection: Connection, seed: Seed
 ) -> None:
-    """Taslak, başka ünitedeki ve kazanıma bağlı olmayan blok, vektörü aynı olsa da dönmez."""
-    query = vector(1, 0)
+    """İki sorgu kelimesini içeren blok tekini içerenden önce gelir; hiçbirini içermeyen dönmez."""
+    one_word = await add_block(connection, seed, seed.unit_id, "Tarık Bey romanı okudu.", None)
+    both_words = await add_block(
+        connection, seed, seed.unit_id, "Küçük Ağa romanını Tarık Buğra yazdı.", None
+    )
+    await add_block(connection, seed, seed.unit_id, "Bilinç akışı iç dünyayı yansıtır.", None)
+    filters = SearchFilters(target=SearchTarget.CONTENT_BLOCK, curriculum_unit_id=seed.unit_id)
+
+    hits = await search_bm25(connection, QUERY_TEXT, filters)
+
+    assert [hit.id for hit in hits] == [both_words, one_word]
+
+
+@pytest.mark.asyncio
+@pytest.mark.parametrize("method", SEARCH_METHODS)
+async def test_search_returns_only_published_blocks_inside_filters(
+    connection: Connection, seed: Seed, method: str
+) -> None:
+    """Taslak, başka ünitedeki ve kazanıma bağlı olmayan blok, sorguyla eşleşse de dönmez."""
     outcome = await add_outcome(connection, seed, seed.unit_id, "A.2.1", "kazanım", None)
-    linked = await add_block(connection, seed, seed.unit_id, "bağlı", query)
-    draft = await add_block(connection, seed, seed.unit_id, "taslak", query, status="DRAFT")
-    other_unit = await add_block(connection, seed, seed.other_unit_id, "başka ünite", query)
-    await add_block(connection, seed, seed.unit_id, "bağsız", query)
+    linked = await add_matching_block(connection, seed, seed.unit_id, "bağlı")
+    draft = await add_matching_block(connection, seed, seed.unit_id, "taslak", status="DRAFT")
+    other_unit = await add_matching_block(connection, seed, seed.other_unit_id, "başka ünite")
+    await add_matching_block(connection, seed, seed.unit_id, "bağsız")
     for block_id in (linked, draft, other_unit):
         await link_block(connection, block_id, outcome)
     filters = SearchFilters(
@@ -225,36 +265,34 @@ async def test_vector_search_returns_only_published_blocks_inside_filters(
         learning_outcome_ids=[outcome],
     )
 
-    hits = await search_vector(connection, query, filters)
-
-    assert [hit.id for hit in hits] == [linked]
+    assert await search_ids(connection, method, filters) == [linked]
 
 
 @pytest.mark.asyncio
-async def test_vector_search_returns_learning_outcomes_of_unit(
-    connection: Connection, seed: Seed
+@pytest.mark.parametrize("method", SEARCH_METHODS)
+async def test_search_returns_learning_outcomes_of_unit(
+    connection: Connection, seed: Seed, method: str
 ) -> None:
     """Kazanım araması ünite filtresiyle sadece o ünitenin kazanımlarını döner."""
-    query = vector(1, 0)
-    inside = await add_outcome(connection, seed, seed.unit_id, "A.2.1", "roman", query)
-    await add_outcome(connection, seed, seed.other_unit_id, "A.2.2", "hikâye", query)
+    inside = await add_outcome(
+        connection, seed, seed.unit_id, "A.2.1", f"{QUERY_TEXT} roman", QUERY_VECTOR
+    )
+    await add_outcome(
+        connection, seed, seed.other_unit_id, "A.2.2", f"{QUERY_TEXT} hikâye", QUERY_VECTOR
+    )
     filters = SearchFilters(target=SearchTarget.LEARNING_OUTCOME, curriculum_unit_id=seed.unit_id)
 
-    hits = await search_vector(connection, query, filters)
-
-    assert [hit.id for hit in hits] == [inside]
+    assert await search_ids(connection, method, filters) == [inside]
 
 
 @pytest.mark.asyncio
-async def test_vector_search_skips_draft_knowledge_nodes(connection: Connection) -> None:
-    """Taslak bilgi düğümü vektörü aynı olsa da dönmez."""
-    published = await add_node(connection, "Arama Testi Yayında", vector(1, 0))
-    draft = await add_node(connection, "Arama Testi Taslak", vector(1, 0), status="DRAFT")
+@pytest.mark.parametrize("method", SEARCH_METHODS)
+async def test_search_skips_draft_knowledge_nodes(connection: Connection, method: str) -> None:
+    """Taslak bilgi düğümü sorguyla eşleşse de dönmez."""
+    published = await add_node(connection, f"{QUERY_TEXT} yayında", QUERY_VECTOR)
+    draft = await add_node(connection, f"{QUERY_TEXT} taslak", QUERY_VECTOR, status="DRAFT")
 
-    hits = await search_vector(
-        connection, vector(1, 0), SearchFilters(target=SearchTarget.KNOWLEDGE_NODE)
-    )
+    ids = await search_ids(connection, method, SearchFilters(target=SearchTarget.KNOWLEDGE_NODE))
 
-    ids = [hit.id for hit in hits]
     assert published in ids
     assert draft not in ids
