@@ -21,7 +21,8 @@ public enum ErrorCode {
     EMAIL_TAKEN(HttpStatus.CONFLICT),
     INVALID_CREDENTIALS(HttpStatus.UNAUTHORIZED),
 
-// sınav
+    // sınav
+    EXAM_NOT_FOUND(HttpStatus.NOT_FOUND),
 
 // oturum
 
