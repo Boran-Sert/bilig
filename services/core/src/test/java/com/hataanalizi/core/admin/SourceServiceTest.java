@@ -2,9 +2,7 @@ package com.hataanalizi.core.admin;
 
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
-import static org.mockito.ArgumentMatchers.any;
-import static org.mockito.ArgumentMatchers.anyString;
-import static org.mockito.ArgumentMatchers.eq;
+import static org.mockito.ArgumentMatchers.*;
 import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.times;
 import static org.mockito.Mockito.verify;
@@ -23,7 +21,6 @@ import java.io.InputStream;
 import java.nio.charset.StandardCharsets;
 import java.util.List;
 import java.util.Optional;
-import java.util.concurrent.atomic.AtomicLong;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
@@ -63,11 +60,9 @@ class SourceServiceTest {
     @Test
     void uploadsNewPdfAndEnqueuesIngestJob() throws Exception {
         when(sourceDocumentRepository.findBySha256(anyString())).thenReturn(Optional.empty());
-        when(sourceDocumentRepository.save(any(SourceDocument.class))).thenAnswer(invocation -> {
-            SourceDocument sourceDocument = invocation.getArgument(0);
-            sourceDocument.setId(42L);
-            return sourceDocument;
-        });
+        when(sourceDocumentRepository.insertIfAbsent(anyString(), anyString(), anyString(), eq(UPLOADER_ID)))
+                .thenReturn(Optional.of(42L));
+
         MockMultipartFile file = pdfFile("ders-kitabi.pdf", "tiny.pdf");
 
         UploadResponse response = sourceService.upload(List.of(file), UPLOADER_ID);
@@ -77,7 +72,9 @@ class SourceServiceTest {
             assertThat(uploadedFile.fileName()).isEqualTo("ders-kitabi.pdf");
             assertThat(uploadedFile.duplicate()).isFalse();
         });
-        verify(sourceDocumentRepository).save(any(SourceDocument.class));
+        verify(sourceDocumentRepository)
+                .insertIfAbsent(eq("ders-kitabi.pdf"), anyString(), eq("sources/pending.pdf"), eq(UPLOADER_ID));
+        verify(sourceDocumentRepository, never()).save(any(SourceDocument.class));
         verify(fileStorage).save(eq("sources/42.pdf"), any(InputStream.class));
         verify(jobQueue)
                 .enqueue(
@@ -90,11 +87,8 @@ class SourceServiceTest {
     @Test
     void acceptsPdfContentWithNonPdfExtension() throws Exception {
         when(sourceDocumentRepository.findBySha256(anyString())).thenReturn(Optional.empty());
-        when(sourceDocumentRepository.save(any(SourceDocument.class))).thenAnswer(invocation -> {
-            SourceDocument sourceDocument = invocation.getArgument(0);
-            sourceDocument.setId(42L);
-            return sourceDocument;
-        });
+        when(sourceDocumentRepository.insertIfAbsent(anyString(), anyString(), anyString(), eq(UPLOADER_ID)))
+                .thenReturn(Optional.of(42L));
 
         UploadResponse response = sourceService.upload(List.of(pdfFile("ders-kitabi.txt", "tiny.pdf")), UPLOADER_ID);
 
@@ -119,21 +113,50 @@ class SourceServiceTest {
         verifyNoInteractions(fileStorage, jobQueue);
     }
 
+    /** Atomik insert sırasında oluşan duplicate durumunu mevcut kaynakla çözer. */
+    @Test
+    void returnsExistingSourceWhenConcurrentInsertWins() throws Exception {
+        SourceDocument existing = new SourceDocument();
+        existing.setId(99L);
+
+        when(sourceDocumentRepository.findBySha256(anyString())).thenReturn(Optional.empty(), Optional.of(existing));
+
+        when(sourceDocumentRepository.insertIfAbsent(anyString(), anyString(), anyString(), eq(UPLOADER_ID)))
+                .thenReturn(Optional.empty());
+
+        UploadResponse response = sourceService.upload(List.of(pdfFile("tekrar.pdf", "tiny.pdf")), UPLOADER_ID);
+
+        assertThat(response.files()).singleElement().satisfies(uploadedFile -> {
+            assertThat(uploadedFile.sourceId()).isEqualTo(99L);
+            assertThat(uploadedFile.fileName()).isEqualTo("tekrar.pdf");
+            assertThat(uploadedFile.duplicate()).isTrue();
+        });
+
+        verify(sourceDocumentRepository, times(2)).findBySha256(anyString());
+
+        verify(sourceDocumentRepository).insertIfAbsent(anyString(), anyString(), anyString(), eq(UPLOADER_ID));
+
+        verify(sourceDocumentRepository, never()).updateFilePath(anyLong(), anyString());
+
+        verify(sourceDocumentRepository, never()).save(any(SourceDocument.class));
+
+        verifyNoInteractions(fileStorage, jobQueue);
+    }
+
     /** Aynı batch içindeki tekrar için tek kayıt ve iş oluşturur. */
     @Test
     void deduplicatesRepeatedFilesWithinBatch() throws Exception {
         when(sourceDocumentRepository.findBySha256(anyString())).thenReturn(Optional.empty());
-        when(sourceDocumentRepository.save(any(SourceDocument.class))).thenAnswer(invocation -> {
-            SourceDocument sourceDocument = invocation.getArgument(0);
-            sourceDocument.setId(42L);
-            return sourceDocument;
-        });
+        when(sourceDocumentRepository.insertIfAbsent(anyString(), anyString(), anyString(), eq(UPLOADER_ID)))
+                .thenReturn(Optional.of(42L));
         List<MultipartFile> files = List.of(pdfFile("ilk.pdf", "tiny.pdf"), pdfFile("tekrar.pdf", "tiny.pdf"));
 
         UploadResponse response = sourceService.upload(files, UPLOADER_ID);
 
         assertThat(response.files()).extracting(UploadedFile::duplicate).containsExactly(false, true);
-        verify(sourceDocumentRepository).save(any(SourceDocument.class));
+        verify(sourceDocumentRepository, times(1))
+                .insertIfAbsent(anyString(), anyString(), anyString(), eq(UPLOADER_ID));
+        verify(sourceDocumentRepository).updateFilePath(42L, "sources/42.pdf");
         verify(fileStorage).save(eq("sources/42.pdf"), any(InputStream.class));
         verify(jobQueue).enqueue(eq(JobType.INGEST_SOURCE), any());
     }
@@ -141,13 +164,9 @@ class SourceServiceTest {
     /** Bir batch içindeki farklı PDF dosyalarını ayrı kaynaklar ve işler olarak ekler. */
     @Test
     void uploadsMultipleDistinctPdfs() throws Exception {
-        AtomicLong nextId = new AtomicLong(41L);
         when(sourceDocumentRepository.findBySha256(anyString())).thenReturn(Optional.empty());
-        when(sourceDocumentRepository.save(any(SourceDocument.class))).thenAnswer(invocation -> {
-            SourceDocument sourceDocument = invocation.getArgument(0);
-            sourceDocument.setId(nextId.incrementAndGet());
-            return sourceDocument;
-        });
+        when(sourceDocumentRepository.insertIfAbsent(anyString(), anyString(), anyString(), eq(UPLOADER_ID)))
+                .thenReturn(Optional.of(42L), Optional.of(43L));
         List<MultipartFile> files = List.of(
                 pdfFile("ilk.pdf", "tiny.pdf"),
                 new MockMultipartFile(
@@ -160,9 +179,8 @@ class SourceServiceTest {
 
         assertThat(response.files()).extracting(UploadedFile::duplicate).containsExactly(false, false);
         assertThat(response.files()).extracting(UploadedFile::sourceId).containsExactly(42L, 43L);
-        verify(sourceDocumentRepository, times(2)).save(any(SourceDocument.class));
-        verify(fileStorage).save(eq("sources/42.pdf"), any(InputStream.class));
-        verify(fileStorage).save(eq("sources/43.pdf"), any(InputStream.class));
+        verify(sourceDocumentRepository).updateFilePath(42L, "sources/42.pdf");
+        verify(sourceDocumentRepository).updateFilePath(43L, "sources/43.pdf");
         verify(jobQueue, times(2)).enqueue(eq(JobType.INGEST_SOURCE), any());
     }
 

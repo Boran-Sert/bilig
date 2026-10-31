@@ -12,12 +12,7 @@ import java.io.InputStream;
 import java.nio.charset.StandardCharsets;
 import java.security.MessageDigest;
 import java.security.NoSuchAlgorithmException;
-import java.util.ArrayList;
-import java.util.Arrays;
-import java.util.HashMap;
-import java.util.HexFormat;
-import java.util.List;
-import java.util.Map;
+import java.util.*;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
@@ -122,28 +117,29 @@ public class SourceService {
             if (existingId != null) {
                 knownSourceIds.put(file.sha256(), existingId);
                 uploadedFiles.add(new UploadedFile(existingId, file.fileName(), true));
-            } else {
-                SourceDocument sourceDocument = createSourceDocument(file, uploadedBy);
-                long sourceId = sourceDocumentRepository.save(sourceDocument).getId();
-                String filePath = "sources/" + sourceId + ".pdf";
-                sourceDocument.setFilePath(filePath);
-                saveFile(file, filePath);
-                enqueueIngestJob(sourceId);
-                knownSourceIds.put(file.sha256(), sourceId);
-                uploadedFiles.add(new UploadedFile(sourceId, file.fileName(), false));
+                continue;
             }
+            Optional<Long> insertedId = sourceDocumentRepository.insertIfAbsent(
+                    file.fileName(), file.sha256(), "sources/pending.pdf", uploadedBy);
+            if (insertedId.isEmpty()) {
+                existingId = sourceDocumentRepository
+                        .findBySha256(file.sha256())
+                        .map(SourceDocument::getId)
+                        .orElseThrow(() -> new ApiException(ErrorCode.INTERNAL_ERROR));
+                knownSourceIds.put(file.sha256(), existingId);
+                uploadedFiles.add(new UploadedFile(existingId, file.fileName(), true));
+                continue;
+            }
+
+            long sourceId = insertedId.get();
+            String filePath = "sources/" + sourceId + ".pdf";
+            sourceDocumentRepository.updateFilePath(sourceId, filePath);
+            saveFile(file, filePath);
+            enqueueIngestJob(sourceId);
+            knownSourceIds.put(file.sha256(), sourceId);
+            uploadedFiles.add(new UploadedFile(sourceId, file.fileName(), false));
         }
         return new UploadResponse(uploadedFiles);
-    }
-
-    /** Kaynak satırını varsayılan tür, durum ve geçici dosya yolu ile hazırlar. */
-    private SourceDocument createSourceDocument(ValidatedFile file, Long uploadedBy) {
-        SourceDocument sourceDocument = new SourceDocument();
-        sourceDocument.setTitle(file.fileName());
-        sourceDocument.setSha256(file.sha256());
-        sourceDocument.setFilePath("sources/pending.pdf");
-        sourceDocument.setUploadedBy(uploadedBy);
-        return sourceDocument;
     }
 
     /** Doğrulanmış dosya akışını depolama arayüzüne yazar. */
