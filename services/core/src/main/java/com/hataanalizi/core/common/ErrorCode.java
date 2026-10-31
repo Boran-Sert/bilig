@@ -22,6 +22,7 @@ public enum ErrorCode {
     INVALID_CREDENTIALS(HttpStatus.UNAUTHORIZED),
 
     // sınav
+    EXAM_NOT_FOUND(HttpStatus.NOT_FOUND),
 
     // oturum
 

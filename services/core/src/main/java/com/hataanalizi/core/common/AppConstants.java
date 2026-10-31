@@ -23,8 +23,13 @@ public final class AppConstants {
     public static final int MAX_PASSWORD_BYTES = 72;
 
     // sınav
+    public static final String EXAM_STATUS_PUBLISHED = "PUBLISHED";
+
+    // soru
+    public static final String QUESTION_STATUS_PUBLISHED = "PUBLISHED";
 
     // oturum
+    public static final String SESSION_STATUS_IN_PROGRESS = "IN_PROGRESS";
     public static final int MAX_WRONG_PER_TEST = 2;
     public static final int MAX_WRONG_TOTAL = 5;
 
