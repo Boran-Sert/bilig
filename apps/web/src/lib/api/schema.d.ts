@@ -106,33 +106,33 @@ export interface components {
   schemas: {
     Block: {
       /** @enum {string} */
-      type?: "paragraph" | "table" | "list" | "numbered_items";
-      md?: string;
+      type: "paragraph" | "table" | "list" | "numbered_items";
+      md: string;
     };
     QuestionContent: {
-      passage?: components["schemas"]["Block"][] | null;
-      stem?: components["schemas"]["Block"][];
-      options?: components["schemas"]["QuestionOption"][];
+      passage: components["schemas"]["Block"][] | null;
+      stem: components["schemas"]["Block"][];
+      options: components["schemas"]["QuestionOption"][];
     };
     QuestionOption: {
       /** @enum {string} */
-      label?: "A" | "B" | "C" | "D" | "E";
-      blocks?: components["schemas"]["Block"][];
+      label: "A" | "B" | "C" | "D" | "E";
+      blocks: components["schemas"]["Block"][];
     };
     SessionQuestionResponse: {
       /** Format: int64 */
-      id?: number;
+      id: number;
       /** Format: int32 */
-      position?: number;
-      content?: components["schemas"]["QuestionContent"];
-      selectedOption?: string | null;
+      position: number;
+      content: components["schemas"]["QuestionContent"];
+      selectedOption: string | null;
     };
     SessionResponse: {
       /** Format: int64 */
-      sessionId?: number;
+      sessionId: number;
       /** Format: int32 */
-      currentPosition?: number;
-      questions?: components["schemas"]["SessionQuestionResponse"][];
+      currentPosition: number;
+      questions: components["schemas"]["SessionQuestionResponse"][];
     };
     RegisterRequest: {
       /** Format: email */
@@ -146,13 +146,13 @@ export interface components {
     };
     MeResponse: {
       /** Format: int64 */
-      id?: number;
-      email?: string;
-      displayName?: string;
-      role?: string;
+      id: number;
+      email: string;
+      displayName: string;
+      role: string;
       /** Format: int32 */
-      grade?: number;
-      explainStyle?: string;
+      grade: number | null;
+      explainStyle: string;
     };
     LoginRequest: {
       /** Format: email */
@@ -162,15 +162,15 @@ export interface components {
     };
     ExamSummaryResponse: {
       /** Format: int64 */
-      id?: number;
-      title?: string;
+      id: number;
+      title: string;
       /** Format: int64 */
-      questionCount?: number;
+      questionCount: number;
       /** Format: int64 */
-      answeredCount?: number;
+      answeredCount: number;
       /** Format: int64 */
-      sessionId?: number | null;
-      status?: string | null;
+      sessionId: number | null;
+      status: string | null;
     };
   };
   responses: never;

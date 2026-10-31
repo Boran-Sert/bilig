@@ -2,9 +2,19 @@ package com.hataanalizi.core.auth.dto;
 
 import com.hataanalizi.core.auth.AppUser;
 import com.hataanalizi.core.auth.AppUserPrincipal;
+import io.swagger.v3.oas.annotations.media.Schema;
 
 /** Giriş yapmış kullanıcının gizli olmayan profil bilgilerini taşır. */
-public record MeResponse(Long id, String email, String displayName, String role, Short grade, String explainStyle) {
+public record MeResponse(
+        @Schema(requiredMode = Schema.RequiredMode.REQUIRED) Long id,
+        @Schema(requiredMode = Schema.RequiredMode.REQUIRED) String email,
+        @Schema(requiredMode = Schema.RequiredMode.REQUIRED) String displayName,
+        @Schema(requiredMode = Schema.RequiredMode.REQUIRED) String role,
+
+        @Schema(requiredMode = Schema.RequiredMode.REQUIRED, nullable = true)
+        Short grade,
+
+        @Schema(requiredMode = Schema.RequiredMode.REQUIRED) String explainStyle) {
 
     /** Kullanıcı varlığından parola içermeyen yanıtı üretir. */
     public static MeResponse from(AppUser appUser) {

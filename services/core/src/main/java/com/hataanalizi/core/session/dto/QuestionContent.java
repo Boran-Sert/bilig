@@ -7,21 +7,31 @@ import java.util.List;
 /** Soru kökünü, ortak parçayı ve seçenekleri API şemasıyla tanımlar. */
 @JsonIgnoreProperties(ignoreUnknown = true)
 public record QuestionContent(
-        @Schema(nullable = true) List<Block> passage, List<Block> stem, List<QuestionOption> options) {
+        @Schema(requiredMode = Schema.RequiredMode.REQUIRED, nullable = true)
+        List<Block> passage,
+
+        @Schema(requiredMode = Schema.RequiredMode.REQUIRED) List<Block> stem,
+        @Schema(requiredMode = Schema.RequiredMode.REQUIRED) List<QuestionOption> options) {
 
     /** Soru içeriğindeki biçimlendirilmiş metin parçasını tanımlar. */
     @JsonIgnoreProperties(ignoreUnknown = true)
     public record Block(
-            @Schema(allowableValues = {"paragraph", "table", "list", "numbered_items"})
+            @Schema(
+                    requiredMode = Schema.RequiredMode.REQUIRED,
+                    allowableValues = {"paragraph", "table", "list", "numbered_items"})
             String type,
 
+            @Schema(requiredMode = Schema.RequiredMode.REQUIRED)
             String md) {}
 
     /** Soru seçeneğinin etiketini ve metin parçalarını tanımlar. */
     @JsonIgnoreProperties(ignoreUnknown = true)
     public record QuestionOption(
-            @Schema(allowableValues = {"A", "B", "C", "D", "E"})
+            @Schema(
+                    requiredMode = Schema.RequiredMode.REQUIRED,
+                    allowableValues = {"A", "B", "C", "D", "E"})
             String label,
 
+            @Schema(requiredMode = Schema.RequiredMode.REQUIRED)
             List<Block> blocks) {}
 }
