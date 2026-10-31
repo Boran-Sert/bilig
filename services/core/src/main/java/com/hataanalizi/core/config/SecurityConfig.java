@@ -1,5 +1,6 @@
 package com.hataanalizi.core.config;
 
+import com.hataanalizi.core.auth.AppPersistentTokenRememberMeServices;
 import com.hataanalizi.core.common.AppConstants;
 import com.hataanalizi.core.common.ErrorCode;
 import com.hataanalizi.core.common.RequestIdFilter;
@@ -39,7 +40,8 @@ public class SecurityConfig {
 
     /** API erişimini sınırlar ve CSRF token'ını çerez ile başlık üzerinden doğrular. */
     @Bean
-    public SecurityFilterChain securityFilterChain(HttpSecurity http) throws Exception {
+    public SecurityFilterChain securityFilterChain(
+            HttpSecurity http, AppPersistentTokenRememberMeServices rememberMeServices) throws Exception {
         http.authorizeHttpRequests(authorize -> authorize
                         .requestMatchers("/api/auth/**", "/v3/api-docs/**", "/swagger-ui/**", "/swagger-ui.html")
                         .permitAll()
@@ -51,6 +53,7 @@ public class SecurityConfig {
                         .permitAll())
                 .csrf(csrf -> csrf.csrfTokenRepository(csrfTokenRepository())
                         .csrfTokenRequestHandler(new CsrfTokenRequestAttributeHandler()))
+                .rememberMe(rememberMe -> rememberMe.rememberMeServices(rememberMeServices))
                 .addFilterAfter(new CsrfCookieFilter(), CsrfFilter.class)
                 .exceptionHandling(exceptionHandling -> exceptionHandling
                         .authenticationEntryPoint(

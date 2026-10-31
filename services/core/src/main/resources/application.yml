@@ -16,6 +16,8 @@ spring:
 
 app:
   job-queue: ${JOB_QUEUE:}
+  auth:
+    remember-me-days: 30
   ai:
     connect-timeout: 2s
     read-timeout: 5s

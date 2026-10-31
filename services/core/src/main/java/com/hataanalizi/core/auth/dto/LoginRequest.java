@@ -9,4 +9,6 @@ public record LoginRequest(
         String email,
 
         @NotBlank(message = "{validation.password.required}")
-        String password) {}
+        String password,
+
+        Boolean rememberMe) {}

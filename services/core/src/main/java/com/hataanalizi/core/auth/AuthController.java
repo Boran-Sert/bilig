@@ -24,11 +24,13 @@ import org.springframework.web.bind.annotation.RestController;
 public class AuthController {
 
     private final AuthService authService;
+    private final AppPersistentTokenRememberMeServices rememberMeServices;
     private final SecurityContextLogoutHandler logoutHandler = new SecurityContextLogoutHandler();
 
     /** Auth iş kurallarını saklar. */
-    public AuthController(AuthService authService) {
+    public AuthController(AuthService authService, AppPersistentTokenRememberMeServices rememberMeServices) {
         this.authService = authService;
+        this.rememberMeServices = rememberMeServices;
     }
 
     /** Yeni öğrenci hesabı oluşturur. */
@@ -50,6 +52,7 @@ public class AuthController {
     @PostMapping("/auth/logout")
     public ResponseEntity<Void> logout(HttpServletRequest request, HttpServletResponse response) {
         Authentication authentication = SecurityContextHolder.getContext().getAuthentication();
+        rememberMeServices.logout(request, response, authentication);
         logoutHandler.logout(request, response, authentication);
         return ResponseEntity.noContent().build();
     }

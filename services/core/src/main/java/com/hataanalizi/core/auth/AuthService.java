@@ -32,19 +32,22 @@ public class AuthService {
     private final AuthenticationManager authenticationManager;
     private final PasswordEncoder passwordEncoder;
     private final SecurityContextRepository securityContextRepository;
+    private final AppPersistentTokenRememberMeServices rememberMeServices;
 
     /** Auth işlemlerinin gerekli servislerini ve depolarını saklar. */
     public AuthService(
             AppUserRepository appUserRepository,
             TenantRepository tenantRepository,
             AuthenticationConfiguration authenticationConfiguration,
-            PasswordEncoder passwordEncoder)
+            PasswordEncoder passwordEncoder,
+            AppPersistentTokenRememberMeServices rememberMeServices)
             throws Exception {
         this.appUserRepository = appUserRepository;
         this.tenantRepository = tenantRepository;
         this.authenticationManager = authenticationConfiguration.getAuthenticationManager();
         this.passwordEncoder = passwordEncoder;
         this.securityContextRepository = new HttpSessionSecurityContextRepository();
+        this.rememberMeServices = rememberMeServices;
     }
 
     /** Yeni öğrenciyi kaydeder ve parola özeti dışında hiçbir parola bilgisi döndürmez. */
@@ -96,6 +99,9 @@ public class AuthService {
         servletRequest.changeSessionId();
         SecurityContextHolder.setContext(context);
         securityContextRepository.saveContext(context, servletRequest, servletResponse);
+        if (Boolean.TRUE.equals(request.rememberMe())) {
+            rememberMeServices.issueRememberMeCookie(authentication, servletRequest, servletResponse);
+        }
         return MeResponse.from(principal);
     }
 

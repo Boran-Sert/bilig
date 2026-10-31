@@ -30,11 +30,12 @@ class AuthServiceTest {
         tenantRepository = mock(TenantRepository.class);
         AuthenticationConfiguration authenticationConfiguration = mock(AuthenticationConfiguration.class);
         PasswordEncoder passwordEncoder = mock(PasswordEncoder.class);
+        AppPersistentTokenRememberMeServices rememberMeServices = mock(AppPersistentTokenRememberMeServices.class);
         Tenant tenant = mockTenant();
         when(tenantRepository.findByName(AppConstants.DEFAULT_TENANT_NAME)).thenReturn(Optional.of(tenant));
         when(passwordEncoder.encode("Valid-password-123")).thenReturn("encoded-password");
-        authService =
-                new AuthService(appUserRepository, tenantRepository, authenticationConfiguration, passwordEncoder);
+        authService = new AuthService(
+                appUserRepository, tenantRepository, authenticationConfiguration, passwordEncoder, rememberMeServices);
     }
 
     /** E-posta dışındaki benzersizlik kısıtı hatasını aynen yeniden fırlatır. */
