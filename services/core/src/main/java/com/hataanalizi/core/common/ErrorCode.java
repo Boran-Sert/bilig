@@ -19,11 +19,13 @@ public enum ErrorCode {
     AUTH_REQUIRED(HttpStatus.UNAUTHORIZED),
     ACCESS_DENIED(HttpStatus.FORBIDDEN),
 
-// sınav
+    // sınav
 
-// oturum
+    // oturum
 
-// kaynak
+    // kaynak
+    FILE_NOT_PDF(HttpStatus.BAD_REQUEST),
+    FILE_TOO_LARGE(HttpStatus.CONTENT_TOO_LARGE),
 
 // iş
 
