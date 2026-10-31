@@ -1,5 +1,6 @@
 package com.hataanalizi.core.config;
 
+import static org.assertj.core.api.Assertions.assertThat;
 import static org.springframework.security.test.web.servlet.request.SecurityMockMvcRequestPostProcessors.testSecurityContext;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.post;
@@ -7,17 +8,20 @@ import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.jsonPath;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
 
+import com.hataanalizi.core.auth.AuthService;
 import com.hataanalizi.core.auth.WithAuthUser;
+import com.hataanalizi.core.common.AppConstants;
 import com.hataanalizi.core.common.GlobalExceptionHandler;
 import com.hataanalizi.core.common.RequestIdFilter;
 import jakarta.servlet.http.Cookie;
-import java.util.UUID;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.webmvc.test.autoconfigure.WebMvcTest;
 import org.springframework.context.annotation.Import;
 import org.springframework.http.MediaType;
+import org.springframework.test.context.bean.override.mockito.MockitoBean;
 import org.springframework.test.web.servlet.MockMvc;
+import org.springframework.test.web.servlet.MvcResult;
 
 /** Güvenlik yollarının, rollerin ve CSRF başlık sözleşmesinin HTTP davranışını doğrular. */
 @WebMvcTest
@@ -25,6 +29,9 @@ import org.springframework.test.web.servlet.MockMvc;
 class SecurityConfigIT {
 
     private final MockMvc mockMvc;
+
+    @MockitoBean
+    private AuthService authService;
 
     /** HTTP test aracını saklar. */
     @Autowired
@@ -62,14 +69,14 @@ class SecurityConfigIT {
 
     /** İçerik yöneticisinin yönetici yolundaki yetki kontrolünü geçtiğini doğrular. */
     @Test
-    @WithAuthUser(role = "CONTENT_ADMIN")
+    @WithAuthUser(role = AppConstants.CONTENT_ADMIN_ROLE)
     void contentAdminPassesAdminAuthorization() throws Exception {
         mockMvc.perform(get("/api/admin/private").with(testSecurityContext())).andExpect(status().isNotFound());
     }
 
     /** Yöneticinin yönetici yolundaki yetki kontrolünü geçtiğini doğrular. */
     @Test
-    @WithAuthUser(role = "ADMIN")
+    @WithAuthUser(role = AppConstants.ADMIN_ROLE)
     void adminPassesAdminAuthorization() throws Exception {
         mockMvc.perform(get("/api/admin/private").with(testSecurityContext())).andExpect(status().isNotFound());
     }
@@ -89,12 +96,18 @@ class SecurityConfigIT {
     /** CSRF çereziyle eşleşen özel başlığın isteği CSRF kontrolünden geçirdiğini doğrular. */
     @Test
     void postWithCsrfCookieAndHeaderPassesCsrfCheck() throws Exception {
-        String token = UUID.randomUUID().toString();
+        MvcResult csrfResult = mockMvc.perform(get("/api/auth/public"))
+                .andExpect(status().isNotFound())
+                .andReturn();
+        Cookie tokenCookie = csrfResult.getResponse().getCookie("XSRF-TOKEN");
+        assertThat(tokenCookie).isNotNull();
+
         mockMvc.perform(post("/api/auth/login")
-                        .cookie(new Cookie("XSRF-TOKEN", token))
-                        .header("X-XSRF-TOKEN", token)
+                        .cookie(tokenCookie)
+                        .header("X-XSRF-TOKEN", tokenCookie.getValue())
                         .contentType(MediaType.APPLICATION_JSON)
                         .content("{}"))
-                .andExpect(status().isNotFound());
+                .andExpect(status().isBadRequest())
+                .andExpect(jsonPath("$.code").value("VALIDATION_FAILED"));
     }
 }

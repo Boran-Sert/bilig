@@ -1,5 +1,6 @@
 package com.hataanalizi.core.auth;
 
+import com.hataanalizi.core.common.AppConstants;
 import java.util.List;
 import org.springframework.security.authentication.UsernamePasswordAuthenticationToken;
 import org.springframework.security.core.authority.SimpleGrantedAuthority;
@@ -16,7 +17,7 @@ public class WithAuthUserSecurityContextFactory implements WithSecurityContextFa
         SecurityContext context = SecurityContextHolder.createEmptyContext();
         AuthUser user = new AuthUser(annotation.id(), annotation.email(), annotation.role());
         UsernamePasswordAuthenticationToken authentication = new UsernamePasswordAuthenticationToken(
-                user, "test", List.of(new SimpleGrantedAuthority("ROLE_" + annotation.role())));
+                user, "test", List.of(new SimpleGrantedAuthority(AppConstants.ROLE_PREFIX + annotation.role())));
         context.setAuthentication(authentication);
         return context;
     }
