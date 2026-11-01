@@ -32,6 +32,7 @@ export function getProblemMessage(error: unknown): string {
 
     if (typeof problem.code === "string" && problem.code.length > 0) {
       return i18n.t(`errors.${problem.code}`, {
+        ns: ["auth", "common"],
         defaultValue:
           (typeof problem.detail === "string" && problem.detail) ||
           (typeof problem.title === "string" && problem.title) ||

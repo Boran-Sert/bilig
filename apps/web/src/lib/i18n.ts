@@ -4,12 +4,14 @@
  */
 import i18n from "i18next";
 import { initReactI18next } from "react-i18next";
+import auth from "../locales/tr/auth.json";
 import common from "../locales/tr/common.json";
 
 void i18n.use(initReactI18next).init({
   resources: {
     tr: {
       common,
+      auth,
     },
   },
   lng: "tr",

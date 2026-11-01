@@ -1,12 +1,14 @@
 /**
- * Uygulamanın sayfa yönlendirmeleri.
- * Ortak yerleşimi, ana sayfayı ve bulunamayan sayfa görünümünü tanımlar.
+ * Uygulamanın sayfa yönlendirmelerini tanımlar.
  */
 import { createBrowserRouter, Link } from "react-router";
 import { useTranslation } from "react-i18next";
 import AppLayout from "./components/AppLayout";
+import RequireAuth from "./features/auth/components/RequireAuth";
+import LoginPage from "./features/auth/pages/LoginPage";
+import RegisterPage from "./features/auth/pages/RegisterPage";
 
-/** Uygulamanın ana sayfasını gösterir. */
+/** Ana sayfayı gösterir. */
 function HomePage() {
   const { t } = useTranslation();
 
@@ -18,7 +20,7 @@ function HomePage() {
   );
 }
 
-/** Geçersiz adresler için bulunamayan sayfa görünümünü gösterir. */
+/** Bulunamayan sayfa görünümünü gösterir. */
 function NotFoundPage() {
   const { t } = useTranslation();
 
@@ -39,7 +41,19 @@ export const router = createBrowserRouter([
     children: [
       {
         path: "/",
-        element: <HomePage />,
+        element: (
+          <RequireAuth>
+            <HomePage />
+          </RequireAuth>
+        ),
+      },
+      {
+        path: "/login",
+        element: <LoginPage />,
+      },
+      {
+        path: "/register",
+        element: <RegisterPage />,
       },
       {
         path: "*",
