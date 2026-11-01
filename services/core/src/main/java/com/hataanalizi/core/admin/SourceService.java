@@ -4,6 +4,7 @@ import com.hataanalizi.core.admin.dto.SourceListItem;
 import com.hataanalizi.core.admin.dto.UploadResponse;
 import com.hataanalizi.core.admin.dto.UploadedFile;
 import com.hataanalizi.core.common.ApiException;
+import com.hataanalizi.core.common.AppConstants;
 import com.hataanalizi.core.common.ErrorCode;
 import com.hataanalizi.core.common.PageResponse;
 import com.hataanalizi.core.job.JobQueue;
@@ -52,7 +53,7 @@ public class SourceService {
             LEFT JOIN LATERAL (
                 SELECT last_completed_step, last_error
                 FROM background_job
-                WHERE job_type = 'INGEST_SOURCE'
+                WHERE job_type = :jobType
                   AND payload->>'sourceId' = CAST(source.id AS text)
                 ORDER BY created_at DESC, id DESC
                 LIMIT 1
@@ -103,12 +104,13 @@ public class SourceService {
     /** Kaynakları ve en güncel hazırlık işlerini tek sorguyla sayfalı döner. */
     @Transactional(readOnly = true)
     public PageResponse<SourceListItem> listSources(int page, int size) {
-        if (page < 0 || size < 1 || size > 100) {
+        if (page < 0 || size < 1 || size > AppConstants.MAX_SOURCE_PAGE_SIZE) {
             throw new ApiException(ErrorCode.VALIDATION_FAILED);
         }
 
         List<?> rows = entityManager
                 .createNativeQuery(SOURCE_LIST_QUERY)
+                .setParameter("jobType", JobType.INGEST_SOURCE.name())
                 .setParameter("size", size)
                 .setParameter("offset", (long) page * size)
                 .getResultList();
