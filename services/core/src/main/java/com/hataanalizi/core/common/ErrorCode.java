@@ -24,9 +24,11 @@ public enum ErrorCode {
     // sınav
     EXAM_NOT_FOUND(HttpStatus.NOT_FOUND),
 
-// oturum
+    // oturum
 
-// kaynak
+    // kaynak
+    FILE_NOT_PDF(HttpStatus.BAD_REQUEST),
+    FILE_TOO_LARGE(HttpStatus.CONTENT_TOO_LARGE),
 
 // iş
 

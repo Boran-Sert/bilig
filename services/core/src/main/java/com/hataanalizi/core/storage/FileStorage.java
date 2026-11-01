@@ -13,4 +13,7 @@ public interface FileStorage {
 
     /** Verilen yolda dosya olup olmadığını bildirir. */
     boolean exists(String path);
+
+    /** Verilen yoldaki dosyayı siler; dosya yoksa işlem yapmaz. */
+    void delete(String path);
 }

@@ -16,6 +16,7 @@ import org.springframework.web.bind.MethodArgumentNotValidException;
 import org.springframework.web.bind.annotation.ExceptionHandler;
 import org.springframework.web.bind.annotation.RestControllerAdvice;
 import org.springframework.web.context.request.WebRequest;
+import org.springframework.web.multipart.MaxUploadSizeExceededException;
 import org.springframework.web.servlet.mvc.method.annotation.ResponseEntityExceptionHandler;
 
 /**
@@ -75,6 +76,14 @@ public class GlobalExceptionHandler extends ResponseEntityExceptionHandler {
         return handleExceptionInternal(exception, problem, headers, status, request);
     }
 
+    /** Multipart dosya sınırı aşıldığında ortak FILE_TOO_LARGE cevabını döndürür. */
+    @Override
+    protected ResponseEntity<Object> handleMaxUploadSizeExceededException(
+            MaxUploadSizeExceededException exception, HttpHeaders headers, HttpStatusCode status, WebRequest request) {
+        ProblemDetail problem = createProblem(ErrorCode.FILE_TOO_LARGE);
+        return handleExceptionInternal(exception, problem, headers, ErrorCode.FILE_TOO_LARGE.getStatus(), request);
+    }
+
     /** Spring'in kendi hata cevaplarına da requestId ve mümkünse code ekler. */
     @Override
     protected ResponseEntity<Object> handleExceptionInternal(
@@ -115,6 +124,9 @@ public class GlobalExceptionHandler extends ResponseEntityExceptionHandler {
         }
         if (statusCode.value() == HttpStatus.NOT_FOUND.value()) {
             return Optional.of(ErrorCode.NOT_FOUND);
+        }
+        if (statusCode.value() == HttpStatus.CONTENT_TOO_LARGE.value()) {
+            return Optional.of(ErrorCode.FILE_TOO_LARGE);
         }
         if (statusCode.is5xxServerError()) {
             return Optional.of(ErrorCode.INTERNAL_ERROR);
