@@ -46,6 +46,47 @@ public interface StudentAnswerRepository extends JpaRepository<StudentAnswer, Lo
                     """, nativeQuery = true)
     List<LearningOutcome> findLearningOutcomesByQuestionId(@Param("questionId") Long questionId);
 
+    /** Testteki doğru, yanlış ve boş cevap sayılarını döndürür. */
+    @Query(value = """
+                    SELECT COUNT(student_answer.id)
+                               FILTER (WHERE student_answer.is_correct) AS "correctCount",
+                           COUNT(student_answer.id)
+                               FILTER (WHERE student_answer.id IS NOT NULL AND NOT student_answer.is_correct)
+                               AS "wrongCount",
+                           COUNT(exam_question.question_id)
+                               FILTER (WHERE question.id IS NOT NULL AND student_answer.id IS NULL)
+                               AS "blankCount"
+                    FROM study_session
+                    LEFT JOIN exam_question ON exam_question.exam_id = study_session.exam_id
+                    LEFT JOIN question ON question.id = exam_question.question_id
+                        AND question.status = :publishedStatus
+                    LEFT JOIN student_answer ON student_answer.study_session_id = study_session.id
+                        AND student_answer.question_id = exam_question.question_id
+                        AND question.id IS NOT NULL
+                    WHERE study_session.id = :sessionId
+                    """, nativeQuery = true)
+    SessionAnswerCounts findSessionAnswerCounts(
+            @Param("sessionId") Long sessionId, @Param("publishedStatus") String publishedStatus);
+
+    /** Testte yanlış cevaplanan soruların kazanım bazlı sayılarını döndürür. */
+    @Query(value = """
+                    SELECT learning_outcome.code AS code, learning_outcome.title AS title,
+                           COUNT(student_answer.id)
+                               FILTER (WHERE student_answer.is_correct = false) AS "wrongCount"
+                    FROM study_session
+                    JOIN exam_question ON exam_question.exam_id = study_session.exam_id
+                    JOIN question ON question.id = exam_question.question_id
+                        AND question.status = :publishedStatus
+                    JOIN question_outcome ON question_outcome.question_id = question.id
+                    JOIN learning_outcome ON learning_outcome.id = question_outcome.learning_outcome_id
+                    LEFT JOIN student_answer ON student_answer.study_session_id = study_session.id
+                        AND student_answer.question_id = exam_question.question_id
+                    WHERE study_session.id = :sessionId
+                    GROUP BY learning_outcome.code, learning_outcome.title
+                    """, nativeQuery = true)
+    List<OutcomeWrongCount> findOutcomeWrongCountsBySessionId(
+            @Param("sessionId") Long sessionId, @Param("publishedStatus") String publishedStatus);
+
     /** Konumu cevaplanmamış ilk yayımlanmış soruya, hepsi cevaplıysa son sıranın sonrasına taşır. */
     @Modifying(flushAutomatically = true)
     @Query(value = """
@@ -80,6 +121,32 @@ public interface StudentAnswerRepository extends JpaRepository<StudentAnswer, Lo
 
         /** Sorunun doğru şıkkını döndürür. */
         String getCorrectOption();
+    }
+
+    /** Oturumun cevap sayımlarını taşır. */
+    interface SessionAnswerCounts {
+
+        /** Doğru cevap sayısını döndürür. */
+        Long getCorrectCount();
+
+        /** Yanlış cevap sayısını döndürür. */
+        Long getWrongCount();
+
+        /** Boş cevap sayısını döndürür. */
+        Long getBlankCount();
+    }
+
+    /** Kazanımın yanlış cevap sayısını taşır. */
+    interface OutcomeWrongCount {
+
+        /** Kazanım kodunu döndürür. */
+        String getCode();
+
+        /** Kazanım başlığını döndürür. */
+        String getTitle();
+
+        /** Kazanımdaki yanlış cevap sayısını döndürür. */
+        Long getWrongCount();
     }
 
     /** Bir kazanımın API yanıtında gereken alanlarını taşır. */

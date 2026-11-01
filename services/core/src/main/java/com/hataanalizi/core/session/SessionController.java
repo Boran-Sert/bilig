@@ -3,6 +3,7 @@ package com.hataanalizi.core.session;
 import com.hataanalizi.core.auth.AuthUser;
 import com.hataanalizi.core.session.dto.AnswerRequest;
 import com.hataanalizi.core.session.dto.AnswerResponse;
+import com.hataanalizi.core.session.dto.SessionCompletionResponse;
 import com.hataanalizi.core.session.dto.SessionResponse;
 import jakarta.validation.Valid;
 import org.springframework.security.core.annotation.AuthenticationPrincipal;
@@ -37,5 +38,12 @@ public class SessionController {
             @AuthenticationPrincipal AuthUser authUser,
             @Valid @RequestBody AnswerRequest request) {
         return sessionService.submitAnswer(id, questionId, authUser, request);
+    }
+
+    /** Oturumu tamamlar ve AYT netiyle kazanım özetini döndürür. */
+    @PostMapping("/api/sessions/{id}/complete")
+    public SessionCompletionResponse completeSession(
+            @PathVariable Long id, @AuthenticationPrincipal AuthUser authUser) {
+        return sessionService.completeSession(id, authUser);
     }
 }

@@ -11,8 +11,10 @@ import com.hataanalizi.core.question.QuestionRepository;
 import com.hataanalizi.core.session.dto.AnswerRequest;
 import com.hataanalizi.core.session.dto.AnswerResponse;
 import com.hataanalizi.core.session.dto.QuestionContent;
+import com.hataanalizi.core.session.dto.SessionCompletionResponse;
 import com.hataanalizi.core.session.dto.SessionQuestionResponse;
 import com.hataanalizi.core.session.dto.SessionResponse;
+import java.math.BigDecimal;
 import java.util.Collection;
 import java.util.List;
 import java.util.Map;
@@ -22,7 +24,7 @@ import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 import tools.jackson.databind.ObjectMapper;
 
-/** Öğrenci test oturumunu başlatır ya da kaldığı yerden sürdürür. */
+/** Öğrenci test oturumunu başlatır, sürdürür veya tamamlar. */
 @Service
 public class SessionService {
 
@@ -31,6 +33,7 @@ public class SessionService {
     private final QuestionRepository questionRepository;
     private final StudentAnswerRepository studentAnswerRepository;
     private final ObjectMapper objectMapper;
+    private final ScoringPolicy scoringPolicy;
 
     /** Oturum ve test veritabanı bağımlılıklarını saklar. */
     public SessionService(
@@ -38,12 +41,14 @@ public class SessionService {
             StudySessionRepository studySessionRepository,
             QuestionRepository questionRepository,
             StudentAnswerRepository studentAnswerRepository,
-            ObjectMapper objectMapper) {
+            ObjectMapper objectMapper,
+            ScoringPolicy scoringPolicy) {
         this.examRepository = examRepository;
         this.studySessionRepository = studySessionRepository;
         this.questionRepository = questionRepository;
         this.studentAnswerRepository = studentAnswerRepository;
         this.objectMapper = objectMapper;
+        this.scoringPolicy = scoringPolicy;
     }
 
     /** Yayındaki test için öğrencinin açık oturumunu döndürür veya yenisini açar. */
@@ -82,6 +87,28 @@ public class SessionService {
         return new AnswerResponse(correct, correctOption, outcomes);
     }
 
+    /** Oturumu tamamlar ve test puanıyla kazanım bazlı yanlışları döndürür. */
+    @Transactional
+    public SessionCompletionResponse completeSession(Long sessionId, AuthUser authUser) {
+        requireOwnedInProgressSession(sessionId, authUser.id());
+        StudentAnswerRepository.SessionAnswerCounts counts =
+                studentAnswerRepository.findSessionAnswerCounts(sessionId, AppConstants.QUESTION_STATUS_PUBLISHED);
+        BigDecimal net = scoringPolicy.calculateNet(counts.getCorrectCount(), counts.getWrongCount());
+        if (studySessionRepository.completeSession(
+                        sessionId, net, AppConstants.SESSION_STATUS_COMPLETED, AppConstants.SESSION_STATUS_IN_PROGRESS)
+                != 1) {
+            throw new IllegalStateException("In-progress study session was not completed.");
+        }
+        List<SessionCompletionResponse.SessionCompletionOutcome> outcomes =
+                studentAnswerRepository
+                        .findOutcomeWrongCountsBySessionId(sessionId, AppConstants.QUESTION_STATUS_PUBLISHED)
+                        .stream()
+                        .map(this::toOutcomeResponse)
+                        .toList();
+        return new SessionCompletionResponse(
+                counts.getCorrectCount(), counts.getWrongCount(), counts.getBlankCount(), net, outcomes);
+    }
+
     /** Oturumun varlığını ve sahibini doğrular, tamamlanmış oturumu reddeder. */
     private void requireOwnedInProgressSession(Long sessionId, Long userId) {
         StudentAnswerRepository.SessionContext session = studentAnswerRepository
@@ -93,6 +120,14 @@ public class SessionService {
         if (AppConstants.SESSION_STATUS_COMPLETED.equals(session.getStatus())) {
             throw new ApiException(ErrorCode.SESSION_ALREADY_COMPLETED);
         }
+    }
+
+    /** Kazanım yanlış sayısını yanıt başarısızlık alanına dönüştürür. */
+    private SessionCompletionResponse.SessionCompletionOutcome toOutcomeResponse(
+            StudentAnswerRepository.OutcomeWrongCount outcome) {
+        long wrong = outcome.getWrongCount();
+        return new SessionCompletionResponse.SessionCompletionOutcome(
+                outcome.getCode(), outcome.getTitle(), wrong, wrong > AppConstants.MAX_WRONG_PER_TEST);
     }
 
     /** Soruya ilk cevabı ekler, aynı soruya ikinci cevabı reddeder. */

@@ -41,6 +41,9 @@ class SessionServiceTest {
     @Mock
     private StudentAnswerRepository studentAnswerRepository;
 
+    @Mock
+    private ScoringPolicy scoringPolicy;
+
     @InjectMocks
     private SessionService sessionService;
 
