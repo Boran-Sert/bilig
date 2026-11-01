@@ -2,6 +2,7 @@ package com.hataanalizi.core.admin;
 
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.springframework.security.test.web.servlet.request.SecurityMockMvcRequestPostProcessors.testSecurityContext;
+import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.multipart;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.jsonPath;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
@@ -12,6 +13,7 @@ import jakarta.persistence.EntityManager;
 import jakarta.servlet.http.Cookie;
 import java.io.IOException;
 import java.io.InputStream;
+import java.nio.charset.StandardCharsets;
 import java.nio.file.Files;
 import java.nio.file.Path;
 import java.util.UUID;
@@ -118,6 +120,79 @@ class SourceControllerITTest {
                 """;
         assertThat(jdbcTemplate.queryForObject(jobQuery, Long.class, Long.toString(sourceId)))
                 .isEqualTo(1L);
+    }
+
+    /** Yüklenen kaynağın ilk adımını ve sayfalama sözleşmesini doğrular. */
+    @Test
+    @WithAuthUser(role = "CONTENT_ADMIN", id = 1001)
+    void listsNewSourceAtZeroProgress() throws Exception {
+        uploadAsAdmin(pdfFile("tde12-ders-kitabi.pdf", "tiny.pdf")).andExpect(status().isAccepted());
+
+        mockMvc.perform(get("/api/admin/sources").with(testSecurityContext()))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.items[0].fileName").value("tde12-ders-kitabi.pdf"))
+                .andExpect(jsonPath("$.items[0].status").value("UPLOADED"))
+                .andExpect(jsonPath("$.items[0].lastCompletedStep").doesNotExist())
+                .andExpect(jsonPath("$.items[0].stepIndex").value(0))
+                .andExpect(jsonPath("$.items[0].totalSteps").value(6))
+                .andExpect(jsonPath("$.page").value(0))
+                .andExpect(jsonPath("$.size").value(20))
+                .andExpect(jsonPath("$.total").value(1));
+    }
+
+    /** Kaydedilmiş iş adımını ve hata metnini kaynak listesine taşır. */
+    @Test
+    @WithAuthUser(role = "CONTENT_ADMIN", id = 1001)
+    void listsLatestCompletedStepAndJobError() throws Exception {
+        MvcResult upload = uploadAsAdmin(pdfFile("tde12-ders-kitabi.pdf", "tiny.pdf"))
+                .andExpect(status().isAccepted())
+                .andReturn();
+        long sourceId = sourceIdFrom(upload);
+        assertThat(jdbcTemplate.update("""
+                UPDATE background_job
+                SET last_completed_step = 'EXTRACT', last_error = 'validation failed'
+                WHERE job_type = 'INGEST_SOURCE' AND payload->>'sourceId' = ?
+                """, Long.toString(sourceId))).isEqualTo(1);
+        entityManager.clear();
+
+        mockMvc.perform(get("/api/admin/sources?page=0&size=20").with(testSecurityContext()))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.items[0].lastCompletedStep").value("EXTRACT"))
+                .andExpect(jsonPath("$.items[0].stepIndex").value(2))
+                .andExpect(jsonPath("$.items[0].totalSteps").value(6))
+                .andExpect(jsonPath("$.items[0].error").value("validation failed"));
+    }
+
+    /** Adım sırasının Python sözleşmesiyle aynı olduğunu doğrular. */
+    @Test
+    void definesIngestStepsInPythonOrder() {
+        assertThat(IngestStep.values())
+                .containsExactly(
+                        IngestStep.REGISTERED,
+                        IngestStep.EXTRACT,
+                        IngestStep.VALIDATE,
+                        IngestStep.ENTITIES,
+                        IngestStep.OUTCOMES,
+                        IngestStep.INDEX);
+    }
+
+    /** Kaynak listesinin boyut ve toplam kayıt sayısına göre sayfalandığını doğrular. */
+    @Test
+    @WithAuthUser(role = "CONTENT_ADMIN", id = 1001)
+    void paginatesSourceList() throws Exception {
+        uploadAsAdmin(pdfFile("ilk.pdf", "tiny.pdf"));
+        uploadAsAdmin(new MockMultipartFile(
+                "files",
+                "ikinci.pdf",
+                "application/pdf",
+                "%PDF-1.4 second test PDF".getBytes(StandardCharsets.US_ASCII)));
+
+        mockMvc.perform(get("/api/admin/sources?page=0&size=1").with(testSecurityContext()))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.items.length()").value(1))
+                .andExpect(jsonPath("$.page").value(0))
+                .andExpect(jsonPath("$.size").value(1))
+                .andExpect(jsonPath("$.total").value(2));
     }
 
     /**
