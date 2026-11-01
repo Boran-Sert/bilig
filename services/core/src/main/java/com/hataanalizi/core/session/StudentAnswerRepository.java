@@ -19,10 +19,9 @@ public interface StudentAnswerRepository extends JpaRepository<StudentAnswer, Lo
                     """, nativeQuery = true)
     Optional<SessionContext> lockSessionById(@Param("sessionId") Long sessionId);
 
-    /** Yayımlanmış test sorusunun doğru cevabını ve sırasını bulur. */
+    /** Yayımlanmış test sorusunun doğru cevabını bulur. */
     @Query(value = """
-                    SELECT exam_question.position AS position,
-                           question.correct_option AS "correctOption"
+                    SELECT question.correct_option AS "correctOption"
                     FROM study_session
                     JOIN exam_question ON exam_question.exam_id = study_session.exam_id
                         AND exam_question.question_id = :questionId
@@ -47,14 +46,24 @@ public interface StudentAnswerRepository extends JpaRepository<StudentAnswer, Lo
                     """, nativeQuery = true)
     List<LearningOutcome> findLearningOutcomesByQuestionId(@Param("questionId") Long questionId);
 
-    /** Yanıtlanan soru mevcut konumsa sonraki konuma ilerletir. */
-    @Modifying
+    /** Konumu cevaplanmamış ilk yayımlanmış soruya, hepsi cevaplıysa son sıranın sonrasına taşır. */
+    @Modifying(flushAutomatically = true)
     @Query(value = """
                     UPDATE study_session
-                    SET current_position = current_position + 1
-                    WHERE id = :sessionId AND current_position = :questionPosition
+                    SET current_position = (
+                        SELECT COALESCE(
+                                   MIN(exam_question.position) FILTER (WHERE student_answer.id IS NULL),
+                                   MAX(exam_question.position) + 1)
+                        FROM exam_question
+                        JOIN question ON question.id = exam_question.question_id
+                            AND question.status = :publishedStatus
+                        LEFT JOIN student_answer ON student_answer.study_session_id = study_session.id
+                            AND student_answer.question_id = exam_question.question_id
+                        WHERE exam_question.exam_id = study_session.exam_id)
+                    WHERE id = :sessionId
                     """, nativeQuery = true)
-    int advanceCurrentPosition(@Param("sessionId") Long sessionId, @Param("questionPosition") Short questionPosition);
+    int moveToFirstUnansweredPosition(
+            @Param("sessionId") Long sessionId, @Param("publishedStatus") String publishedStatus);
 
     /** Cevap isteği için oturum bilgisini taşır. */
     interface SessionContext {
@@ -66,11 +75,8 @@ public interface StudentAnswerRepository extends JpaRepository<StudentAnswer, Lo
         String getStatus();
     }
 
-    /** Testteki sorunun sırasını ve doğru cevabını taşır. */
+    /** Testteki sorunun doğru cevabını taşır. */
     interface QuestionContext {
-
-        /** Sorunun test içindeki konumunu döndürür. */
-        Short getPosition();
 
         /** Sorunun doğru şıkkını döndürür. */
         String getCorrectOption();

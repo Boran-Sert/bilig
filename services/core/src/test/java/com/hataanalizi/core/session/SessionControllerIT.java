@@ -134,6 +134,52 @@ class SessionControllerIT {
         assertThatFirstAnswerWasKept(sessionId, questionId);
     }
 
+    /** Taslak soruyu ve sıra boşluğunu atlayarak sonraki soruya ilerler. */
+    @Test
+    void skipsDraftQuestionsAndPositionGaps() throws Exception {
+        Long userId = insertUser();
+        Long unitId = insertCurriculumUnit();
+        Long examId = insertExam("PUBLISHED");
+        Long firstQuestionId = questionFixture.insertQuestion(unitId);
+        Long draftQuestionId = questionFixture.insertQuestion(unitId);
+        Long lastQuestionId = questionFixture.insertQuestion(unitId);
+        jdbcTemplate.update("UPDATE question SET status = 'DRAFT' WHERE id = ?", draftQuestionId);
+        insertExamQuestion(examId, firstQuestionId, (short) 1);
+        insertExamQuestion(examId, draftQuestionId, (short) 2);
+        insertExamQuestion(examId, lastQuestionId, (short) 4);
+        Long sessionId = insertStudySession(userId, examId, (short) 1);
+        String request = "{\"selectedOption\":\"B\",\"durationMs\":100,\"hintUsed\":false}";
+
+        submitAnswer(sessionId, firstQuestionId, userId, request).andExpect(status().isOk());
+        assertThat(currentPosition(sessionId)).isEqualTo(4);
+
+        submitAnswer(sessionId, lastQuestionId, userId, request).andExpect(status().isOk());
+        assertThat(currentPosition(sessionId)).isEqualTo(5);
+    }
+
+    /** Atlanan soru cevaplanana kadar konumu o soruda tutar. */
+    @Test
+    void keepsPositionOnSkippedQuestionUntilAnswered() throws Exception {
+        Long userId = insertUser();
+        Long unitId = insertCurriculumUnit();
+        Long examId = insertExam("PUBLISHED");
+        Long firstQuestionId = questionFixture.insertQuestion(unitId);
+        Long skippedQuestionId = questionFixture.insertQuestion(unitId);
+        Long lastQuestionId = questionFixture.insertQuestion(unitId);
+        insertExamQuestion(examId, firstQuestionId, (short) 1);
+        insertExamQuestion(examId, skippedQuestionId, (short) 2);
+        insertExamQuestion(examId, lastQuestionId, (short) 3);
+        Long sessionId = insertStudySession(userId, examId, (short) 1);
+        String request = "{\"selectedOption\":\"B\",\"durationMs\":100,\"hintUsed\":false}";
+
+        submitAnswer(sessionId, firstQuestionId, userId, request).andExpect(status().isOk());
+        submitAnswer(sessionId, lastQuestionId, userId, request).andExpect(status().isOk());
+        assertThat(currentPosition(sessionId)).isEqualTo(2);
+
+        submitAnswer(sessionId, skippedQuestionId, userId, request).andExpect(status().isOk());
+        assertThat(currentPosition(sessionId)).isEqualTo(4);
+    }
+
     /** Başkasının oturumunu ve tamamlanmış oturumu cevaplamaya kapatır. */
     @Test
     void rejectsAnotherUsersAndCompletedSessions() throws Exception {
@@ -256,6 +302,12 @@ class SessionControllerIT {
                 .containsEntry("duration_ms", 1200)
                 .containsEntry("hint_used", true)
                 .containsEntry("current_position", 2);
+    }
+
+    /** Oturumun kayıtlı konumunu okur. */
+    private Integer currentPosition(Long sessionId) {
+        return jdbcTemplate.queryForObject(
+                "SELECT current_position FROM study_session WHERE id = ?", Integer.class, sessionId);
     }
 
     /** Cevap isteğini test öğrencisi olarak gönderir. */

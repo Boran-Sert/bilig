@@ -74,7 +74,7 @@ public class SessionService {
         String correctOption = question.getCorrectOption().trim();
         boolean correct = request.selectedOption().equals(correctOption);
         saveAnswer(sessionId, questionId, request, correct);
-        studentAnswerRepository.advanceCurrentPosition(sessionId, question.getPosition());
+        studentAnswerRepository.moveToFirstUnansweredPosition(sessionId, AppConstants.QUESTION_STATUS_PUBLISHED);
         List<AnswerResponse.Outcome> outcomes =
                 studentAnswerRepository.findLearningOutcomesByQuestionId(questionId).stream()
                         .map(outcome -> new AnswerResponse.Outcome(outcome.getCode(), outcome.getTitle()))

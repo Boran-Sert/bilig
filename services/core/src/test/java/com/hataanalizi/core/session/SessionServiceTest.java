@@ -89,7 +89,7 @@ class SessionServiceTest {
     @Test
     void submitsAnswerAndReturnsLearningOutcomes() {
         StudentAnswerRepository.SessionContext sessionContext = sessionContext(7L, "IN_PROGRESS");
-        StudentAnswerRepository.QuestionContext questionContext = questionContext((short) 1, "B");
+        StudentAnswerRepository.QuestionContext questionContext = questionContext("B");
         when(studentAnswerRepository.lockSessionById(31L)).thenReturn(Optional.of(sessionContext));
         when(studentAnswerRepository.findPublishedQuestionInSession(31L, 42L, AppConstants.QUESTION_STATUS_PUBLISHED))
                 .thenReturn(Optional.of(questionContext));
@@ -104,7 +104,7 @@ class SessionServiceTest {
         assertThat(response.correctOption()).isEqualTo("B");
         assertThat(response.outcomes()).isEmpty();
         verify(studentAnswerRepository).save(any(StudentAnswer.class));
-        verify(studentAnswerRepository).advanceCurrentPosition(31L, (short) 1);
+        verify(studentAnswerRepository).moveToFirstUnansweredPosition(31L, AppConstants.QUESTION_STATUS_PUBLISHED);
     }
 
     /** Başka öğrencinin oturumuna cevap kaydetmeyi engeller. */
@@ -155,9 +155,8 @@ class SessionServiceTest {
     }
 
     /** Soru sorgusu için test projeksiyonunu hazırlar. */
-    private StudentAnswerRepository.QuestionContext questionContext(short position, String correctOption) {
+    private StudentAnswerRepository.QuestionContext questionContext(String correctOption) {
         StudentAnswerRepository.QuestionContext context = mock(StudentAnswerRepository.QuestionContext.class);
-        when(context.getPosition()).thenReturn(position);
         when(context.getCorrectOption()).thenReturn(correctOption);
         return context;
     }
