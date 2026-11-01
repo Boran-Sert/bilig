@@ -68,6 +68,22 @@ export interface paths {
     patch?: never;
     trace?: never;
   };
+  "/api/admin/sources": {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    get?: never;
+    put?: never;
+    post: operations["upload"];
+    delete?: never;
+    options?: never;
+    head?: never;
+    patch?: never;
+    trace?: never;
+  };
   "/api/tests": {
     parameters: {
       query?: never;
@@ -159,6 +175,15 @@ export interface components {
       email: string;
       password: string;
       rememberMe?: boolean;
+    };
+    UploadResponse: {
+      files?: components["schemas"]["UploadedFile"][];
+    };
+    UploadedFile: {
+      /** Format: int64 */
+      sourceId?: number;
+      fileName?: string;
+      duplicate?: boolean;
     };
     ExamSummaryResponse: {
       /** Format: int64 */
@@ -265,6 +290,32 @@ export interface operations {
         };
         content: {
           "*/*": components["schemas"]["MeResponse"];
+        };
+      };
+    };
+  };
+  upload: {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    requestBody?: {
+      content: {
+        "multipart/form-data": {
+          files: string[];
+        };
+      };
+    };
+    responses: {
+      /** @description OK */
+      200: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          "*/*": components["schemas"]["UploadResponse"];
         };
       };
     };
