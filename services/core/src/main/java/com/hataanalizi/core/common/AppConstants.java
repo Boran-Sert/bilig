@@ -36,6 +36,8 @@ public final class AppConstants {
     public static final int MAX_WRONG_TOTAL = 5;
 
     // kaynak
+    public static final String DEFAULT_SOURCE_PAGE_SIZE = "20";
+    public static final int MAX_SOURCE_PAGE_SIZE = 100;
 
     // iş
 

@@ -1,17 +1,23 @@
 package com.hataanalizi.core.admin;
 
+import com.hataanalizi.core.admin.dto.SourceListItem;
 import com.hataanalizi.core.admin.dto.UploadResponse;
 import com.hataanalizi.core.admin.dto.UploadedFile;
 import com.hataanalizi.core.common.ApiException;
+import com.hataanalizi.core.common.AppConstants;
 import com.hataanalizi.core.common.ErrorCode;
+import com.hataanalizi.core.common.PageResponse;
 import com.hataanalizi.core.job.JobQueue;
 import com.hataanalizi.core.job.JobType;
 import com.hataanalizi.core.storage.FileStorage;
+import jakarta.persistence.EntityManager;
+import jakarta.persistence.PersistenceContext;
 import java.io.IOException;
 import java.io.InputStream;
 import java.nio.charset.StandardCharsets;
 import java.security.MessageDigest;
 import java.security.NoSuchAlgorithmException;
+import java.time.Instant;
 import java.util.*;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -28,9 +34,38 @@ import tools.jackson.databind.ObjectMapper;
 @Service
 public class SourceService {
 
+    private static final String SOURCE_LIST_QUERY = """
+            SELECT totals.total,
+                   source.id,
+                   source.title,
+                   source.kind,
+                   source.status,
+                   source.created_at,
+                   job.last_completed_step,
+                   job.last_error
+            FROM (SELECT count(*) AS total FROM source_document) totals
+            LEFT JOIN (
+                SELECT id, title, kind, status, created_at
+                FROM source_document
+                ORDER BY created_at DESC, id DESC
+                LIMIT :size OFFSET :offset
+            ) source ON true
+            LEFT JOIN LATERAL (
+                SELECT last_completed_step, last_error
+                FROM background_job
+                WHERE job_type = :jobType
+                  AND payload->>'sourceId' = CAST(source.id AS text)
+                ORDER BY created_at DESC, id DESC
+                LIMIT 1
+            ) job ON true
+            ORDER BY source.created_at DESC, source.id DESC
+            """;
     private static final Logger log = LoggerFactory.getLogger(SourceService.class);
     private static final byte[] PDF_SIGNATURE = "%PDF".getBytes(StandardCharsets.US_ASCII);
     private static final int DIGEST_BUFFER_SIZE = 8192;
+
+    @PersistenceContext
+    private EntityManager entityManager;
 
     private final SourceDocumentRepository sourceDocumentRepository;
     private final FileStorage fileStorage;
@@ -64,6 +99,46 @@ public class SourceService {
         List<String> filesToCleanup = new ArrayList<>();
         registerRollbackCleanup(filesToCleanup);
         return persistFiles(validatedFiles, uploadedBy, filesToCleanup);
+    }
+
+    /** Kaynakları ve en güncel hazırlık işlerini tek sorguyla sayfalı döner. */
+    @Transactional(readOnly = true)
+    public PageResponse<SourceListItem> listSources(int page, int size) {
+        if (page < 0 || size < 1 || size > AppConstants.MAX_SOURCE_PAGE_SIZE) {
+            throw new ApiException(ErrorCode.VALIDATION_FAILED);
+        }
+
+        List<?> rows = entityManager
+                .createNativeQuery(SOURCE_LIST_QUERY)
+                .setParameter("jobType", JobType.INGEST_SOURCE.name())
+                .setParameter("size", size)
+                .setParameter("offset", (long) page * size)
+                .getResultList();
+        Object[] firstRow = (Object[]) rows.getFirst();
+        long total = ((Number) firstRow[0]).longValue();
+        List<SourceListItem> items = rows.stream()
+                .map(Object[].class::cast)
+                .filter(row -> row[1] != null)
+                .map(this::toSourceListItem)
+                .toList();
+        return new PageResponse<>(items, page, size, total);
+    }
+
+    /** Sorgu satırını kaynak listesi DTO'suna dönüştürür. */
+    private SourceListItem toSourceListItem(Object[] row) {
+        String lastCompletedStepName = (String) row[6];
+        IngestStep lastCompletedStep = lastCompletedStepName == null ? null : IngestStep.valueOf(lastCompletedStepName);
+        int stepIndex = lastCompletedStep == null ? 0 : lastCompletedStep.ordinal() + 1;
+        return new SourceListItem(
+                ((Number) row[1]).longValue(),
+                (String) row[2],
+                SourceKind.valueOf((String) row[3]),
+                SourceStatus.valueOf((String) row[4]),
+                lastCompletedStep,
+                stepIndex,
+                IngestStep.values().length,
+                (String) row[7],
+                (Instant) row[5]);
     }
 
     /** Transaction rollback olduğunda yazılan dosyaları temizlemek üzere kayıt eder. */

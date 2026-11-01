@@ -107,7 +107,7 @@ export interface paths {
       path?: never;
       cookie?: never;
     };
-    get?: never;
+    get: operations["listSources"];
     put?: never;
     post: operations["upload"];
     delete?: never;
@@ -261,6 +261,34 @@ export interface components {
       sessionId: number | null;
       status: string | null;
     };
+    PageResponseSourceListItem: {
+      items: components["schemas"]["SourceListItem"][];
+      /** Format: int32 */
+      page: number;
+      /** Format: int32 */
+      size: number;
+      /** Format: int64 */
+      total: number;
+    };
+    SourceListItem: {
+      /** Format: int64 */
+      sourceId: number;
+      fileName: string;
+      /** @enum {string} */
+      kind: "UNKNOWN" | "PROGRAM" | "TEXTBOOK" | "TEST" | "QUESTION_BANK" | "ANSWER_KEY";
+      /** @enum {string} */
+      status: "UPLOADED" | "PROCESSING" | "REVIEW" | "PUBLISHED" | "FAILED";
+      /** @enum {string|null} */
+      lastCompletedStep:
+        "REGISTERED" | "EXTRACT" | "VALIDATE" | "ENTITIES" | "OUTCOMES" | "INDEX" | null;
+      /** Format: int32 */
+      stepIndex: number;
+      /** Format: int32 */
+      totalSteps: number;
+      error: string | null;
+      /** Format: date-time */
+      createdAt: string;
+    };
   };
   responses: never;
   parameters: never;
@@ -403,6 +431,29 @@ export interface operations {
         };
         content: {
           "*/*": components["schemas"]["MeResponse"];
+        };
+      };
+    };
+  };
+  listSources: {
+    parameters: {
+      query?: {
+        page?: number;
+        size?: number;
+      };
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    requestBody?: never;
+    responses: {
+      /** @description OK */
+      200: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          "*/*": components["schemas"]["PageResponseSourceListItem"];
         };
       };
     };
