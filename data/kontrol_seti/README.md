@@ -16,7 +16,7 @@ Satır başına bir soru, UTF-8, Unicode NFC.
 | `stem` | metin | Soru kökü; okuma parçası, dizeler ve soru cümlesi. Satır sonu `\n`. |
 | `options` | nesne | `A`-`E` şıkları, düz metin; dize olan şıklarda satır sonu `\n`. |
 | `correct` | metin | ÖDSGM cevap anahtarındaki doğru şık. |
-| `outcomes` | liste | Sorunun ölçtüğü kazanım kodları; #99'a kadar boş. Sıra ya da ağırlık yok. |
+| `outcomes` | liste | Sorunun ölçtüğü bütün kazanım kodları (`A.2.7`), en az bir. Sıra ya da ağırlık yok. |
 
 ## Kaynak
 
