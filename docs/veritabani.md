@@ -400,7 +400,7 @@ Sorunun kazanım kolonu yoktur; kazanımlar `question_outcome`'da.
 | answered_at | timestamptz | hayır | now() | |
 | updated_at | timestamptz | hayır | now() | |
 
-- `uq_student_answer_study_session_id_question_id` UNIQUE (study_session_id, question_id) · cevap değişirse üstüne yazılır
+- `uq_student_answer_study_session_id_question_id` UNIQUE (study_session_id, question_id) · ilk cevaptan sonra cevap değiştirilemez
 - `idx_student_answer_question_id` (question_id)
 - Boş bırakılan sorunun satırı olmaz.
 

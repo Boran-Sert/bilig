@@ -4,6 +4,54 @@
  */
 
 export interface paths {
+  "/api/sessions/{id}/answers/{questionId}": {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    get?: never;
+    put: operations["submitAnswer"];
+    post?: never;
+    delete?: never;
+    options?: never;
+    head?: never;
+    patch?: never;
+    trace?: never;
+  };
+  "/api/tests/{id}/sessions": {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    get?: never;
+    put?: never;
+    post: operations["startOrResume"];
+    delete?: never;
+    options?: never;
+    head?: never;
+    patch?: never;
+    trace?: never;
+  };
+  "/api/sessions/{id}/complete": {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    get?: never;
+    put?: never;
+    post: operations["completeSession"];
+    delete?: never;
+    options?: never;
+    head?: never;
+    patch?: never;
+    trace?: never;
+  };
   "/api/auth/register": {
     parameters: {
       query?: never;
@@ -52,6 +100,38 @@ export interface paths {
     patch?: never;
     trace?: never;
   };
+  "/api/admin/sources": {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    get?: never;
+    put?: never;
+    post: operations["upload"];
+    delete?: never;
+    options?: never;
+    head?: never;
+    patch?: never;
+    trace?: never;
+  };
+  "/api/tests": {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    get: operations["listTests"];
+    put?: never;
+    post?: never;
+    delete?: never;
+    options?: never;
+    head?: never;
+    patch?: never;
+    trace?: never;
+  };
   "/api/me": {
     parameters: {
       query?: never;
@@ -72,6 +152,68 @@ export interface paths {
 export type webhooks = Record<string, never>;
 export interface components {
   schemas: {
+    AnswerRequest: {
+      selectedOption: string;
+      /** Format: int32 */
+      durationMs?: number;
+      hintUsed?: boolean;
+    };
+    AnswerResponse: {
+      isCorrect: boolean;
+      correctOption: string;
+      outcomes: components["schemas"]["Outcome"][];
+    };
+    Outcome: {
+      code: string;
+      title: string;
+    };
+    Block: {
+      /** @enum {string} */
+      type: "paragraph" | "table" | "list" | "numbered_items";
+      md: string;
+    };
+    QuestionContent: {
+      passage: components["schemas"]["Block"][] | null;
+      stem: components["schemas"]["Block"][];
+      options: components["schemas"]["QuestionOption"][];
+    };
+    QuestionOption: {
+      /** @enum {string} */
+      label: "A" | "B" | "C" | "D" | "E";
+      blocks: components["schemas"]["Block"][];
+    };
+    SessionQuestionResponse: {
+      /** Format: int64 */
+      id: number;
+      /** Format: int32 */
+      position: number;
+      content: components["schemas"]["QuestionContent"];
+      selectedOption: string | null;
+    };
+    SessionResponse: {
+      /** Format: int64 */
+      sessionId: number;
+      /** Format: int32 */
+      currentPosition: number;
+      questions: components["schemas"]["SessionQuestionResponse"][];
+    };
+    SessionCompletionOutcome: {
+      code: string;
+      title: string;
+      /** Format: int64 */
+      wrong: number;
+      failed: boolean;
+    };
+    SessionCompletionResponse: {
+      /** Format: int64 */
+      correct: number;
+      /** Format: int64 */
+      wrong: number;
+      /** Format: int64 */
+      blank: number;
+      net: number;
+      outcomes: components["schemas"]["SessionCompletionOutcome"][];
+    };
     RegisterRequest: {
       /** Format: email */
       email: string;
@@ -84,19 +226,40 @@ export interface components {
     };
     MeResponse: {
       /** Format: int64 */
-      id?: number;
-      email?: string;
-      displayName?: string;
-      role?: string;
+      id: number;
+      email: string;
+      displayName: string;
+      role: string;
       /** Format: int32 */
-      grade?: number;
-      explainStyle?: string;
+      grade: number | null;
+      explainStyle: string;
     };
     LoginRequest: {
       /** Format: email */
       email: string;
       password: string;
       rememberMe?: boolean;
+    };
+    UploadResponse: {
+      files?: components["schemas"]["UploadedFile"][];
+    };
+    UploadedFile: {
+      /** Format: int64 */
+      sourceId?: number;
+      fileName?: string;
+      duplicate?: boolean;
+    };
+    ExamSummaryResponse: {
+      /** Format: int64 */
+      id: number;
+      title: string;
+      /** Format: int64 */
+      questionCount: number;
+      /** Format: int64 */
+      answeredCount: number;
+      /** Format: int64 */
+      sessionId: number | null;
+      status: string | null;
     };
   };
   responses: never;
@@ -107,6 +270,77 @@ export interface components {
 }
 export type $defs = Record<string, never>;
 export interface operations {
+  submitAnswer: {
+    parameters: {
+      query?: never;
+      header?: never;
+      path: {
+        id: number;
+        questionId: number;
+      };
+      cookie?: never;
+    };
+    requestBody: {
+      content: {
+        "application/json": components["schemas"]["AnswerRequest"];
+      };
+    };
+    responses: {
+      /** @description OK */
+      200: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          "*/*": components["schemas"]["AnswerResponse"];
+        };
+      };
+    };
+  };
+  startOrResume: {
+    parameters: {
+      query?: never;
+      header?: never;
+      path: {
+        id: number;
+      };
+      cookie?: never;
+    };
+    requestBody?: never;
+    responses: {
+      /** @description OK */
+      200: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          "*/*": components["schemas"]["SessionResponse"];
+        };
+      };
+    };
+  };
+  completeSession: {
+    parameters: {
+      query?: never;
+      header?: never;
+      path: {
+        id: number;
+      };
+      cookie?: never;
+    };
+    requestBody?: never;
+    responses: {
+      /** @description OK */
+      200: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          "*/*": components["schemas"]["SessionCompletionResponse"];
+        };
+      };
+    };
+  };
   register: {
     parameters: {
       query?: never;
@@ -169,6 +403,52 @@ export interface operations {
         };
         content: {
           "*/*": components["schemas"]["MeResponse"];
+        };
+      };
+    };
+  };
+  upload: {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    requestBody?: {
+      content: {
+        "multipart/form-data": {
+          files: string[];
+        };
+      };
+    };
+    responses: {
+      /** @description OK */
+      200: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          "*/*": components["schemas"]["UploadResponse"];
+        };
+      };
+    };
+  };
+  listTests: {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    requestBody?: never;
+    responses: {
+      /** @description OK */
+      200: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          "*/*": components["schemas"]["ExamSummaryResponse"][];
         };
       };
     };

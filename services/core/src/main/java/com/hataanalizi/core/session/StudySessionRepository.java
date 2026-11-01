@@ -1,5 +1,6 @@
 package com.hataanalizi.core.session;
 
+import java.math.BigDecimal;
 import java.util.List;
 import java.util.Optional;
 import org.springframework.data.jpa.repository.JpaRepository;
@@ -22,6 +23,19 @@ public interface StudySessionRepository extends JpaRepository<StudySession, Long
                     DO NOTHING
                     """, nativeQuery = true)
     int createInProgressSessionIfAbsent(@Param("userId") Long userId, @Param("examId") Long examId);
+
+    /** Oturumun netini yazar ve tamamlanma zamanını kaydeder. */
+    @Modifying
+    @Query(value = """
+                    UPDATE study_session
+                    SET status = :completedStatus, net = :net, completed_at = now()
+                    WHERE id = :sessionId AND status = :inProgressStatus
+                    """, nativeQuery = true)
+    int completeSession(
+            @Param("sessionId") Long sessionId,
+            @Param("net") BigDecimal net,
+            @Param("completedStatus") String completedStatus,
+            @Param("inProgressStatus") String inProgressStatus);
 
     /** Oturumdaki cevaplanan soruların seçimlerini döndürür. */
     @Query(value = """
