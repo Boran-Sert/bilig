@@ -28,13 +28,19 @@ class RenderedPrompt(BaseModel):
 def render_prompt(directory: Path, name: str, variables: Mapping[str, object]) -> RenderedPrompt:
     """Prompt dosyasını okur, sürümünü alır ve bloklarını değişkenlerle doldurur."""
     source = (directory / name).read_text(encoding="utf-8")
-    version = re.fullmatch(PROMPT_VERSION_PATTERN, source.partition("\n")[0])
-    if version is None:
-        raise ValueError(f"Prompt {name} must start with a version line")
+    version = prompt_version(name, source)
     template = _ENVIRONMENT.from_string(source)
     context = template.new_context(dict(variables))
     blocks = {block: "".join(render(context)).strip() for block, render in template.blocks.items()}
     missing = [block for block in PROMPT_BLOCKS if block not in blocks]
     if missing:
         raise ValueError(f"Prompt {name} has no block: {', '.join(missing)}")
-    return RenderedPrompt(version=int(version[1]), system=blocks["system"], user=blocks["user"])
+    return RenderedPrompt(version=version, system=blocks["system"], user=blocks["user"])
+
+
+def prompt_version(name: str, source: str) -> int:
+    """Prompt metninin ilk satırındaki sürümü döner; sürüm satırı yoksa hata verir."""
+    version = re.fullmatch(PROMPT_VERSION_PATTERN, source.partition("\n")[0])
+    if version is None:
+        raise ValueError(f"Prompt {name} must start with a version line")
+    return int(version[1])

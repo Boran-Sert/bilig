@@ -52,6 +52,15 @@ RRF_K = 60
 RRF_RESULT_LIMIT = 20
 OUTCOME_QUESTION_CANDIDATES = 16
 OUTCOME_PARAGRAPH_CANDIDATES = 5
+CONTROL_SET_GRADE = 12
+CONTROL_SET_UNIT_TITLES = {
+    "Giriş": "Giriş",
+    "Hikâye": "Hikâye",
+    "Şiir": "Şiir",
+    "Roman": "Roman",
+    "Tiyatro": "Tiyatro",
+    "Deneme - Söylev (Nutuk)": "Deneme",
+}
 
 SERVICE_ROOT = Path(__file__).resolve().parents[1]
 LLM_TASKS_PATH = SERVICE_ROOT / "llm_tasks.yaml"
@@ -62,6 +71,9 @@ MILLISECONDS_PER_SECOND = 1000
 PROMPTS_DIR = SERVICE_ROOT / "prompts" / "tde"
 PROMPT_VERSION_PATTERN = r"\{# version: (\d+) #\}"
 PROMPT_BLOCKS = ("system", "user")
+REPOSITORY_DATA_DIR = SERVICE_ROOT.parent.parent / "data"
+CONTROL_SET_PATH = REPOSITORY_DATA_DIR / "kontrol_seti" / "sorular.jsonl"
+EVAL_OUTPUT_DIR = REPOSITORY_DATA_DIR / "eval"
 
 JOB_POLL_INTERVAL_SECONDS = 2.0
 JOB_MAX_ATTEMPTS = 3
