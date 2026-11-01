@@ -93,8 +93,8 @@ class SessionServiceTest {
         when(studentAnswerRepository.lockSessionById(31L)).thenReturn(Optional.of(sessionContext));
         when(studentAnswerRepository.findPublishedQuestionInSession(31L, 42L, AppConstants.QUESTION_STATUS_PUBLISHED))
                 .thenReturn(Optional.of(questionContext));
-        when(studentAnswerRepository.findByStudySessionIdAndQuestionId(31L, 42L))
-                .thenReturn(Optional.empty());
+        when(studentAnswerRepository.existsByStudySessionIdAndQuestionId(31L, 42L))
+                .thenReturn(false);
         when(studentAnswerRepository.findLearningOutcomesByQuestionId(42L)).thenReturn(List.of());
 
         var response = sessionService.submitAnswer(

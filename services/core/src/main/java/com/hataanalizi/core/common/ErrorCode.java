@@ -27,6 +27,7 @@ public enum ErrorCode {
     // oturum
     SESSION_NOT_FOUND(HttpStatus.NOT_FOUND),
     SESSION_ALREADY_COMPLETED(HttpStatus.CONFLICT),
+    ANSWER_ALREADY_SUBMITTED(HttpStatus.CONFLICT),
 
     // kaynak
     FILE_NOT_PDF(HttpStatus.BAD_REQUEST),

@@ -95,11 +95,12 @@ public class SessionService {
         }
     }
 
-    /** Yeni cevabı ekler veya önceki cevabın alanlarını günceller. */
+    /** Soruya ilk cevabı ekler, aynı soruya ikinci cevabı reddeder. */
     private void saveAnswer(Long sessionId, Long questionId, AnswerRequest request, boolean correct) {
-        StudentAnswer answer = studentAnswerRepository
-                .findByStudySessionIdAndQuestionId(sessionId, questionId)
-                .orElseGet(StudentAnswer::new);
+        if (studentAnswerRepository.existsByStudySessionIdAndQuestionId(sessionId, questionId)) {
+            throw new ApiException(ErrorCode.ANSWER_ALREADY_SUBMITTED);
+        }
+        StudentAnswer answer = new StudentAnswer();
         answer.setStudySessionId(sessionId);
         answer.setQuestionId(questionId);
         answer.setSelectedOption(request.selectedOption());

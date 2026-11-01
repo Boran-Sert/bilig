@@ -35,8 +35,8 @@ public interface StudentAnswerRepository extends JpaRepository<StudentAnswer, Lo
             @Param("questionId") Long questionId,
             @Param("publishedStatus") String publishedStatus);
 
-    /** Daha önce kaydedilen cevabı aynı oturum ve soru için bulur. */
-    Optional<StudentAnswer> findByStudySessionIdAndQuestionId(Long studySessionId, Long questionId);
+    /** Aynı oturumda soruya daha önce cevap verilip verilmediğini söyler. */
+    boolean existsByStudySessionIdAndQuestionId(Long studySessionId, Long questionId);
 
     /** Sorunun bütün kazanımlarını sıra belirtmeden döndürür. */
     @Query(value = """

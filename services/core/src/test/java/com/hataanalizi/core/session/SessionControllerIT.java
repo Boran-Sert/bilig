@@ -107,9 +107,9 @@ class SessionControllerIT {
                 .andExpect(jsonPath("$.code").value("EXAM_NOT_FOUND"));
     }
 
-    /** Cevabı üstüne yazar, doğruluğu ve tüm kazanımları döndürür. */
+    /** İlk cevabı kaydeder, kazanımları döndürür ve ikinci cevabı reddeder. */
     @Test
-    void savesAndOverwritesAnswerWithOutcomes() throws Exception {
+    void savesFirstAnswerWithOutcomesAndRejectsSecondAnswer() throws Exception {
         Long userId = insertUser();
         Long unitId = insertCurriculumUnit();
         Long examId = insertExam("PUBLISHED");
@@ -127,11 +127,11 @@ class SessionControllerIT {
                 .andExpect(jsonPath("$.outcomes[1].title").exists());
 
         submitAnswer(sessionId, questionId, userId, "{\"selectedOption\":\"A\",\"durationMs\":2400,\"hintUsed\":false}")
-                .andExpect(status().isOk())
-                .andExpect(jsonPath("$.isCorrect").value(false))
-                .andExpect(jsonPath("$.correctOption").value("B"));
+                .andExpect(status().isConflict())
+                .andExpect(jsonPath("$.code").value("ANSWER_ALREADY_SUBMITTED"))
+                .andExpect(jsonPath("$.correctOption").doesNotExist());
 
-        assertThatAnswerWasOverwritten(sessionId, questionId);
+        assertThatFirstAnswerWasKept(sessionId, questionId);
     }
 
     /** Başkasının oturumunu ve tamamlanmış oturumu cevaplamaya kapatır. */
@@ -240,8 +240,8 @@ class SessionControllerIT {
                 """, unitId, identifier, identifier, questionId);
     }
 
-    /** Cevabın güncellendiğini ve ilerlemenin bir kez arttığını doğrular. */
-    private void assertThatAnswerWasOverwritten(Long sessionId, Long questionId) {
+    /** İlk cevabın değişmeden kaldığını ve ilerlemenin bir kez arttığını doğrular. */
+    private void assertThatFirstAnswerWasKept(Long sessionId, Long questionId) {
         var storedAnswer = jdbcTemplate.queryForMap("""
                         SELECT count(*) AS answer_count, max(selected_option::text) AS selected_option,
                                bool_or(is_correct) AS is_correct, max(duration_ms) AS duration_ms,
@@ -251,10 +251,10 @@ class SessionControllerIT {
                         """, sessionId, sessionId, questionId);
         assertThat(storedAnswer)
                 .containsEntry("answer_count", 1L)
-                .containsEntry("selected_option", "A")
-                .containsEntry("is_correct", false)
-                .containsEntry("duration_ms", 2400)
-                .containsEntry("hint_used", false)
+                .containsEntry("selected_option", "B")
+                .containsEntry("is_correct", true)
+                .containsEntry("duration_ms", 1200)
+                .containsEntry("hint_used", true)
                 .containsEntry("current_position", 2);
     }
 
