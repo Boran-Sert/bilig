@@ -46,7 +46,7 @@ import tools.jackson.databind.ObjectMapper;
 @Import(TestcontainersConfiguration.class)
 @TestPropertySource(properties = "app.job-queue=postgres")
 @Transactional
-class SourceControllerITTest {
+class SourceControllerIT {
 
     @TempDir
     private static Path storageDirectory;
@@ -58,7 +58,7 @@ class SourceControllerITTest {
 
     /** HTTP, veritabanı ve JSON test bileşenlerini saklar. */
     @Autowired
-    SourceControllerITTest(
+    SourceControllerIT(
             MockMvc mockMvc, JdbcTemplate jdbcTemplate, ObjectMapper objectMapper, EntityManager entityManager) {
         this.mockMvc = mockMvc;
         this.jdbcTemplate = jdbcTemplate;
