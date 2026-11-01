@@ -15,6 +15,7 @@ FIELDS = {"id", "source", "unit", "stem", "options", "correct", "outcomes"}
 OPTION_KEYS = ["A", "B", "C", "D", "E"]
 UNITS = {"Giriş", "Hikâye", "Şiir", "Roman", "Tiyatro", "Deneme - Söylev (Nutuk)"}
 SOURCE_PATTERN = re.compile(r"^ÖDSGM 12 (?P<unit>.+) Kazanım Testi \d{1,2}, Soru \d{1,2}$")
+OUTCOME_CODE_PATTERN = re.compile(r"^(A\.[1-4]\.\d{1,2}|B\.\d{1,2}|C\.[12]\.\d{1,2})$")
 
 
 def read_lines() -> list[str]:
@@ -81,11 +82,11 @@ def test_correct_answer_is_an_option(questions: list[dict[str, Any]]) -> None:
 
 
 def test_outcomes_is_a_list_of_codes(questions: list[dict[str, Any]]) -> None:
-    """Kazanımlar tekrarsız metin listesidir; işaretleme #99'da yapılır."""
+    """Her soruda en az bir kazanım vardır; kodlar tekrarsızdır ve programın biçimindedir."""
     for question in questions:
         outcomes = question["outcomes"]
-        assert isinstance(outcomes, list), question["id"]
-        assert all(isinstance(code, str) and code for code in outcomes), question["id"]
+        assert isinstance(outcomes, list) and outcomes, question["id"]
+        assert all(OUTCOME_CODE_PATTERN.match(code) for code in outcomes), question["id"]
         assert len(outcomes) == len(set(outcomes)), question["id"]
 
 
