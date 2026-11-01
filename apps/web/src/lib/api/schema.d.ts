@@ -4,6 +4,22 @@
  */
 
 export interface paths {
+  "/api/sessions/{id}/answers/{questionId}": {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    get?: never;
+    put: operations["submitAnswer"];
+    post?: never;
+    delete?: never;
+    options?: never;
+    head?: never;
+    patch?: never;
+    trace?: never;
+  };
   "/api/tests/{id}/sessions": {
     parameters: {
       query?: never;
@@ -120,6 +136,21 @@ export interface paths {
 export type webhooks = Record<string, never>;
 export interface components {
   schemas: {
+    AnswerRequest: {
+      selectedOption: string;
+      /** Format: int32 */
+      durationMs?: number;
+      hintUsed?: boolean;
+    };
+    AnswerResponse: {
+      isCorrect: boolean;
+      correctOption: string;
+      outcomes: components["schemas"]["Outcome"][];
+    };
+    Outcome: {
+      code: string;
+      title: string;
+    };
     Block: {
       /** @enum {string} */
       type: "paragraph" | "table" | "list" | "numbered_items";
@@ -206,6 +237,33 @@ export interface components {
 }
 export type $defs = Record<string, never>;
 export interface operations {
+  submitAnswer: {
+    parameters: {
+      query?: never;
+      header?: never;
+      path: {
+        id: number;
+        questionId: number;
+      };
+      cookie?: never;
+    };
+    requestBody: {
+      content: {
+        "application/json": components["schemas"]["AnswerRequest"];
+      };
+    };
+    responses: {
+      /** @description OK */
+      200: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          "*/*": components["schemas"]["AnswerResponse"];
+        };
+      };
+    };
+  };
   startOrResume: {
     parameters: {
       query?: never;

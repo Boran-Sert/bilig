@@ -546,7 +546,7 @@ Ekranlardaki veriler örnektir. Soru ve alıntı, ders kitabının "Roman Türle
 | --- | --- | --- |
 | Test listesi | `GET /api/tests` | Java testleri ve öğrencinin ilerlemesini tek SQL'le getirir. |
 | Başla / devam | `POST /api/tests/{id}/sessions` | Yarım oturum varsa onu, yoksa yenisini döner. Sorular cevapsız gönderilir. |
-| Cevap | `PUT /api/sessions/{id}/answers/{qId}` | Java cevabı veritabanındaki doğruyla karşılaştırır, kaydeder (üstüne yazar), ilerleme sayacını, süreyi ve ipucu bilgisini günceller. Yanıtta sorunun kazanımları döner. Yanlışsa Python'a hata türü işi düşer (Haiku, arka planda). |
+| Cevap | `PUT /api/sessions/{id}/answers/{qId}` | Java cevabı veritabanındaki doğruyla karşılaştırır, kaydeder (aynı soruya ikinci cevap 409 döner), ilerleme sayacını cevaplanmamış ilk soruya taşır, süreyi ve ipucu bilgisini kaydeder. Yanıtta sorunun kazanımları döner. Yanlışsa Python'a hata türü işi düşer (Haiku, arka planda). |
 | İpucu | `GET /api/questions/{id}/hint` | Kayıtlıysa döner; yoksa Haiku üretir ve soruya kaydedilir. |
 | Neden yanlış? | `POST /api/tutor/explanations` | Aşağıda adım adım. |
 | Sohbet | `POST /api/tutor/conversations/{id}/messages` | Aynı akış, artı üç okuma tool'u. |
@@ -646,7 +646,7 @@ Tek PostgreSQL veritabanı, bilgi tabanının dört katmanı ve işletim tablola
 ### Önemli kurallar
 
 - Bir öğrencinin aynı testte tek yarım oturumu olur: `UNIQUE (user_id, test_id) WHERE status = 'IN_PROGRESS'`.
-- Bir oturumda her soruya tek cevap satırı olur; cevap değişirse üstüne yazılır.
+- Bir oturumda her soruya tek cevap satırı olur; ilk cevaptan sonra cevap değiştirilemez (doğru şık hemen gösterildiği için).
 - Aynı dosya (`source.sha256`) ve aynı soru (`question.content_hash`) iki kez eklenmez.
 - Öğrenciye sadece `status = 'PUBLISHED'` olan içerik gösterilir.
 - Vektör kolonlarına HNSW index'i, arama metinlerine BM25 index'i (`pg_textsearch`, `text_config='turkish'`) eklenir.
