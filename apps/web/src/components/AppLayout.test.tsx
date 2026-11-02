@@ -1,4 +1,4 @@
-/**
+﻿/**
  * Ortak sayfa düzeninin başlık ve çıkış davranışını test eder.
  * @vitest-environment jsdom
  */

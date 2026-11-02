@@ -4,6 +4,7 @@
  */
 import i18n from "i18next";
 import { initReactI18next } from "react-i18next";
+import admin from "../locales/tr/admin.json";
 import auth from "../locales/tr/auth.json";
 import common from "../locales/tr/common.json";
 
@@ -12,6 +13,7 @@ void i18n.use(initReactI18next).init({
     tr: {
       common,
       auth,
+      admin,
     },
   },
   lng: "tr",
