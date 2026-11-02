@@ -148,6 +148,22 @@ export interface paths {
     patch?: never;
     trace?: never;
   };
+  "/api/me/dashboard": {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    get: operations["dashboard"];
+    put?: never;
+    post?: never;
+    delete?: never;
+    options?: never;
+    head?: never;
+    patch?: never;
+    trace?: never;
+  };
   "/api/auth/register-options": {
     parameters: {
       query?: never;
@@ -279,6 +295,54 @@ export interface components {
       /** Format: int64 */
       sessionId: number | null;
       status: string | null;
+    };
+    ActiveSession: {
+      /** Format: int64 */
+      sessionId: number;
+      examTitle: string;
+      /** Format: int64 */
+      questionCount: number;
+      /** Format: int64 */
+      answeredCount: number;
+      /** Format: int32 */
+      currentPosition: number;
+    };
+    DashboardResponse: {
+      summary: components["schemas"]["Summary"];
+      activeSessions: components["schemas"]["ActiveSession"][];
+      failedOutcomes: components["schemas"]["FailedOutcome"][];
+      unitAccuracy: components["schemas"]["UnitAccuracy"][];
+      errorTypeDistribution: components["schemas"]["ErrorTypeCount"][];
+    };
+    ErrorTypeCount: {
+      errorType: string;
+      /** Format: int64 */
+      answerCount: number;
+    };
+    FailedOutcome: {
+      code: string;
+      title: string;
+      /** Format: int64 */
+      totalWrongCount: number;
+      testTitle: string | null;
+      /** Format: int64 */
+      testWrongCount: number | null;
+    };
+    Summary: {
+      /** Format: int64 */
+      answeredQuestionCount: number;
+      accuracyPercent: number;
+      latestNet: number | null;
+      /** Format: int64 */
+      latestQuestionCount: number | null;
+    };
+    UnitAccuracy: {
+      unitTitle: string;
+      /** Format: int64 */
+      answeredCount: number;
+      /** Format: int64 */
+      correctCount: number;
+      accuracyPercent: number;
     };
     RegisterOptionsResponse: {
       grades: number[];
@@ -542,6 +606,26 @@ export interface operations {
         };
         content: {
           "*/*": components["schemas"]["MeResponse"];
+        };
+      };
+    };
+  };
+  dashboard: {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    requestBody?: never;
+    responses: {
+      /** @description OK */
+      200: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          "*/*": components["schemas"]["DashboardResponse"];
         };
       };
     };
