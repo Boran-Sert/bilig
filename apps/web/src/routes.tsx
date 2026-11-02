@@ -5,6 +5,7 @@ import { createBrowserRouter, Link } from "react-router";
 import { useTranslation } from "react-i18next";
 import AppLayout from "./components/AppLayout";
 import PageMeta from "./components/PageMeta";
+import SourcesPage from "./features/admin/pages/SourcesPage";
 import RedirectIfAuthenticated from "./features/auth/components/RedirectIfAuthenticated";
 import RequireAuth from "./features/auth/components/RequireAuth";
 import LoginPage from "./features/auth/pages/LoginPage";
@@ -49,6 +50,14 @@ export const router = createBrowserRouter([
         element: (
           <RequireAuth>
             <HomePage />
+          </RequireAuth>
+        ),
+      },
+      {
+        path: ROUTES.adminSources,
+        element: (
+          <RequireAuth>
+            <SourcesPage />
           </RequireAuth>
         ),
       },

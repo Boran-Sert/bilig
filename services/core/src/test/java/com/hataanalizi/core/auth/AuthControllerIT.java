@@ -126,6 +126,23 @@ class AuthControllerIT {
                 .andExpect(jsonPath("$.code").value("INVALID_CREDENTIALS"));
     }
 
+    /** İçerik yönetimi yetkisinin sunucudaki rol listesinden hesaplandığını doğrular. */
+    @ParameterizedTest
+    @CsvSource({"STUDENT, false", "CONTENT_ADMIN, true", "ADMIN, true"})
+    void meReportsContentManagementPermissionByRole(String role, boolean canManageContent) throws Exception {
+        String email = uniqueEmail();
+        register(email);
+        jdbcTemplate.update("UPDATE app_user SET role = ? WHERE email = ?", role, email);
+        MockHttpSession session =
+                (MockHttpSession) login(email, false).getRequest().getSession(false);
+        assertThat(session).isNotNull();
+
+        mockMvc.perform(get("/api/me").session(session))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.role").value(role))
+                .andExpect(jsonPath("$.canManageContent").value(canManageContent));
+    }
+
     /** Kalıcı token'ın oturum olmadan profili açtığını ve kullanımda yenilendiğini doğrular. */
     @Test
     void rememberMeLoginSurvivesSessionExpiryAndRotatesToken() throws Exception {

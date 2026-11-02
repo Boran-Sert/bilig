@@ -7,6 +7,7 @@ export const ROUTES = {
   home: "/",
   login: "/login",
   register: "/register",
+  adminSources: "/admin/sources",
 } as const;
 
 export const HTTP_STATUS_UNAUTHORIZED = 401;
