@@ -7,7 +7,14 @@ import { cleanup, renderHook, waitFor } from "@testing-library/react";
 import type { ReactNode } from "react";
 import { afterEach, beforeEach, describe, expect, test, vi } from "vitest";
 import { ApiError } from "../../lib/api/problem";
-import { authKeys, clearSessionOnUnauthorized, useLogin, useLogout, useMe } from "./api";
+import {
+  authKeys,
+  clearSessionOnUnauthorized,
+  useLogin,
+  useLogout,
+  useMe,
+  useRegisterOptions,
+} from "./api";
 
 const { getMock, postMock } = vi.hoisted(() => ({
   getMock: vi.fn(),
@@ -69,6 +76,19 @@ describe("auth api", () => {
     await waitFor(() => expect(result.current.isError).toBe(true));
     expect(result.current.error).toBeInstanceOf(ApiError);
     expect((result.current.error as ApiError).status).toBe(500);
+  });
+
+  test("kayıt seçeneklerini sunucudan getirir", async () => {
+    getMock.mockResolvedValue({ data: { grades: [9, 10, 11, 12, 13] }, response: { status: 200 } });
+    const queryClient = new QueryClient();
+
+    const { result } = renderHook(() => useRegisterOptions(), {
+      wrapper: createWrapper(queryClient),
+    });
+
+    await waitFor(() => expect(result.current.isSuccess).toBe(true));
+    expect(getMock).toHaveBeenCalledWith("/api/auth/register-options");
+    expect(result.current.data?.grades).toEqual([9, 10, 11, 12, 13]);
   });
 
   test("girişte önceki kullanıcının önbelleğini siler", async () => {

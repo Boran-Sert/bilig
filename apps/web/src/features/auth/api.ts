@@ -15,6 +15,7 @@ import type { CurrentUser, LoginRequest, RegisterRequest } from "./types";
 
 export const authKeys = {
   me: ["auth", "me"] as const,
+  registerOptions: ["auth", "registerOptions"] as const,
 };
 
 /**
@@ -69,6 +70,27 @@ export function useMe() {
       return data;
     },
     retry: false,
+  });
+}
+
+/**
+ * Kayıt formunda seçilebilecek değerleri sunucudan getirir.
+ */
+export function useRegisterOptions() {
+  return useQuery({
+    queryKey: authKeys.registerOptions,
+    /** Kayıt seçeneklerini sunucudan okur. */
+    queryFn: async () => {
+      const { data, error, response } = await client.GET("/api/auth/register-options");
+      const status = response.status;
+
+      if (error || !data) {
+        throw new ApiError(error, status);
+      }
+
+      return data;
+    },
+    staleTime: Infinity,
   });
 }
 

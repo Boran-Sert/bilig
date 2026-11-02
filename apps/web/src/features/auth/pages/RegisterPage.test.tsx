@@ -10,13 +10,15 @@ import "../../../lib/i18n";
 import { ApiError } from "../../../lib/api/problem";
 import RegisterPage from "./RegisterPage";
 
-const { mutateMock, useRegisterMock } = vi.hoisted(() => ({
+const { mutateMock, useRegisterMock, useRegisterOptionsMock } = vi.hoisted(() => ({
   mutateMock: vi.fn(),
   useRegisterMock: vi.fn(),
+  useRegisterOptionsMock: vi.fn(),
 }));
 
 vi.mock("../api", () => ({
   useRegister: useRegisterMock,
+  useRegisterOptions: useRegisterOptionsMock,
 }));
 
 /** Kayıt sayfasını test yönlendiricisiyle oluşturur. */
@@ -61,14 +63,18 @@ describe("RegisterPage", () => {
   beforeEach(() => {
     mutateMock.mockReset();
     mockRegisterState(null);
+    useRegisterOptionsMock.mockReturnValue({
+      data: { grades: [9, 10, 11, 12, 13] },
+      isPending: false,
+      isError: false,
+    });
   });
 
-  test("sayfa başlığını ayarlar ve anlatım tarzı ile sınıf sormaz", () => {
+  test("sayfa başlığını ayarlar ve anlatım tarzı sormaz", () => {
     renderRegisterPage();
 
     expect(document.title).toBe("Hesap oluştur · Bilig");
     expect(screen.queryByText("Sade")).not.toBeInTheDocument();
-    expect(screen.queryByLabelText("Sınıf")).not.toBeInTheDocument();
     expect(screen.getByLabelText(/aydınlatma metnini okudum/)).not.toBeChecked();
     expect(screen.getByLabelText(/açık rıza veriyorum/)).not.toBeChecked();
   });
@@ -81,6 +87,38 @@ describe("RegisterPage", () => {
 
     expect(await screen.findByText("Şifre en az 8 karakter olmalıdır.")).toBeInTheDocument();
     expect(mutateMock).not.toHaveBeenCalled();
+  });
+
+  test("sunucunun verdiği sınıfları seçili olmadan listeler", () => {
+    renderRegisterPage();
+
+    const gradeSelect = screen.getByLabelText("Sınıf");
+    const optionLabels = Array.from((gradeSelect as HTMLSelectElement).options).map(
+      (option) => option.textContent,
+    );
+
+    expect(gradeSelect).toHaveValue("");
+    expect(optionLabels).toEqual([
+      "Sınıfını seç",
+      "9. sınıf",
+      "10. sınıf",
+      "11. sınıf",
+      "12. sınıf",
+      "Mezun",
+    ]);
+  });
+
+  test("sınıf listesi gelmezse hatayı gösterir", () => {
+    useRegisterOptionsMock.mockReturnValue({
+      data: undefined,
+      isPending: false,
+      isError: true,
+      error: new ApiError({ code: "INTERNAL_ERROR", detail: "Liste alınamadı." }, 500),
+    });
+
+    renderRegisterPage();
+
+    expect(screen.getByRole("alert")).toHaveTextContent("Liste alınamadı.");
   });
 
   test("72 baytı aşan parolayı istek atmadan uyarır", async () => {
@@ -96,6 +134,7 @@ describe("RegisterPage", () => {
   test("diğer alanları arayüzde denetlemeden iki onayı ayrı gönderir", async () => {
     renderRegisterPage();
     fillRegisterForm();
+    fireEvent.change(screen.getByLabelText("Sınıf"), { target: { value: "13" } });
     fireEvent.click(screen.getByLabelText(/açık rıza veriyorum/));
 
     submitRegisterForm();
@@ -106,6 +145,7 @@ describe("RegisterPage", () => {
           displayName: "Kitapkurdu",
           email: "test@example.com",
           password: "Test1234",
+          grade: 13,
           privacyNoticeAccepted: false,
           consentAccepted: true,
         },
@@ -132,6 +172,7 @@ describe("RegisterPage", () => {
           { field: "privacyNoticeAccepted", message: "Aydınlatma metnini onaylamalısın." },
           { field: "consentAccepted", message: "Açık rıza vermelisin." },
           { field: "email", message: "Geçerli bir e-posta adresi gir." },
+          { field: "grade", message: "Listeden sınıfını seç." },
         ],
       },
       400,
@@ -150,6 +191,8 @@ describe("RegisterPage", () => {
     expect(screen.getByText("Açık rıza vermelisin.")).toBeInTheDocument();
     expect(screen.getByLabelText(/açık rıza veriyorum/)).toHaveAttribute("aria-invalid", "true");
     expect(screen.getByText("Geçerli bir e-posta adresi gir.")).toBeInTheDocument();
+    expect(screen.getByText("Listeden sınıfını seç.")).toBeInTheDocument();
+    expect(screen.getByLabelText("Sınıf")).toHaveAttribute("aria-invalid", "true");
   });
 
   test("kayıtlı e-postada sunucunun hata kodunu mesaja çevirir", () => {

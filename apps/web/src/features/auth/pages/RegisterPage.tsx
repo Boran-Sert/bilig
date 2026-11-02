@@ -15,17 +15,19 @@ import { getFieldErrors, getProblemMessage } from "../../../lib/api/problem";
 import { PASSWORD_MAX_BYTES, PASSWORD_MIN_LENGTH, ROUTES } from "../../../lib/constants";
 import { applyServerFieldErrors } from "../../../lib/forms";
 import { useRegister } from "../api";
+import GradeSelect from "../components/GradeSelect";
 
 const REGISTER_FIELDS = [
   "displayName",
   "email",
   "password",
+  "grade",
   "privacyNoticeAccepted",
   "consentAccepted",
 ] as const;
 
 /**
- * Sadece parola uzunluğunu anında denetleyen form şemasını üretir.
+ * Sadece parola uzunluğunu anında denetleyen form şemasını üretir; sınıf sunucuda denetlenir.
  * @param messages Parola uzunluğu hata mesajları.
  * @returns Kayıt formu şeması.
  */
@@ -40,6 +42,7 @@ function createRegisterSchema(messages: { passwordMin: string; passwordMax: stri
         (value) => new TextEncoder().encode(value).length <= PASSWORD_MAX_BYTES,
         messages.passwordMax,
       ),
+    grade: z.string(),
     privacyNoticeAccepted: z.boolean(),
     consentAccepted: z.boolean(),
   });
@@ -75,18 +78,22 @@ export default function RegisterPage() {
       displayName: "",
       email: "",
       password: "",
+      grade: "",
       privacyNoticeAccepted: false,
       consentAccepted: false,
     },
   });
 
   const onSubmit = handleSubmit((values) => {
-    registerMutation.mutate(values, {
-      /** Sunucu oturumu açtığı için ana sayfaya gider. */
-      onSuccess: () => navigate(ROUTES.home, { replace: true }),
-      /** Sunucunun alan hatalarını forma yazar. */
-      onError: (error) => applyServerFieldErrors(error, REGISTER_FIELDS, setError),
-    });
+    registerMutation.mutate(
+      { ...values, grade: Number(values.grade) },
+      {
+        /** Sunucu oturumu açtığı için ana sayfaya gider. */
+        onSuccess: () => navigate(ROUTES.home, { replace: true }),
+        /** Sunucunun alan hatalarını forma yazar. */
+        onError: (error) => applyServerFieldErrors(error, REGISTER_FIELDS, setError),
+      },
+    );
   });
 
   const showGeneralError =
@@ -127,6 +134,7 @@ export default function RegisterPage() {
           {...register("password")}
         />
 
+        <GradeSelect error={errors.grade?.message} {...register("grade")} />
         <CheckboxField
           id="privacyNoticeAccepted"
           label={t("register.privacyNotice")}
