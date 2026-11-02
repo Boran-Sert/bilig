@@ -28,6 +28,7 @@ app:
 
 server:
   port: 8081
+  forward-headers-strategy: native
   servlet:
     session:
       timeout: 2h

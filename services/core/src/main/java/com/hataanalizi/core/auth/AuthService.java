@@ -13,6 +13,8 @@ import java.time.OffsetDateTime;
 import java.time.ZoneOffset;
 import java.util.Locale;
 import org.hibernate.exception.ConstraintViolationException;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 import org.springframework.dao.DataIntegrityViolationException;
 import org.springframework.security.authentication.AuthenticationManager;
 import org.springframework.security.authentication.BadCredentialsException;
@@ -29,6 +31,8 @@ import org.springframework.stereotype.Service;
 /** Öğrenci kaydını, girişini ve oturum principal'ını yönetir. */
 @Service
 public class AuthService {
+
+    private static final Logger log = LoggerFactory.getLogger(AuthService.class);
 
     private final AppUserRepository appUserRepository;
     private final TenantRepository tenantRepository;
@@ -85,6 +89,7 @@ public class AuthService {
             throw exception;
         }
         startSession(principal, servletRequest, servletResponse);
+        log.info("User registered userId={} ip={}", principal.id(), servletRequest.getRemoteAddr());
         return MeResponse.from(principal);
     }
 
@@ -97,6 +102,10 @@ public class AuthService {
             authentication = authenticationManager.authenticate(
                     UsernamePasswordAuthenticationToken.unauthenticated(email, request.password()));
         } catch (BadCredentialsException exception) {
+            log.warn(
+                    "Login failed userId={} ip={}",
+                    appUserRepository.findByEmail(email).map(AppUser::getId).orElse(null),
+                    servletRequest.getRemoteAddr());
             throw new ApiException(ErrorCode.INVALID_CREDENTIALS);
         }
 
@@ -107,6 +116,7 @@ public class AuthService {
         if (Boolean.TRUE.equals(request.rememberMe())) {
             rememberMeServices.issueRememberMeCookie(authentication, servletRequest, servletResponse);
         }
+        log.info("User logged in userId={} ip={}", principal.id(), servletRequest.getRemoteAddr());
         return MeResponse.from(principal);
     }
 

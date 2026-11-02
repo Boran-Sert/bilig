@@ -7,6 +7,8 @@ import com.hataanalizi.core.auth.dto.RegisterRequest;
 import jakarta.servlet.http.HttpServletRequest;
 import jakarta.servlet.http.HttpServletResponse;
 import jakarta.validation.Valid;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
 import org.springframework.security.core.Authentication;
@@ -23,6 +25,8 @@ import org.springframework.web.bind.annotation.RestController;
 @RestController
 @RequestMapping("/api")
 public class AuthController {
+
+    private static final Logger log = LoggerFactory.getLogger(AuthController.class);
 
     private final AuthService authService;
     private final AppPersistentTokenRememberMeServices rememberMeServices;
@@ -65,6 +69,12 @@ public class AuthController {
         Authentication authentication = SecurityContextHolder.getContext().getAuthentication();
         rememberMeServices.logout(request, response, authentication);
         logoutHandler.logout(request, response, authentication);
+        log.info(
+                "User logged out userId={} ip={}",
+                authentication != null && authentication.getPrincipal() instanceof AuthUser authUser
+                        ? authUser.id()
+                        : null,
+                request.getRemoteAddr());
         return ResponseEntity.noContent().build();
     }
 
