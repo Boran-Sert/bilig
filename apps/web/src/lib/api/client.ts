@@ -23,7 +23,6 @@ function getCookie(name: string): string | undefined {
  */
 interface ApiClientOptions {
   baseUrl?: string;
-  onUnauthorized?: (url: string) => void;
 }
 
 /**
@@ -53,14 +52,6 @@ export function createApiClient(options: ApiClientOptions = {}) {
     },
 
     onResponse({ response }) {
-      if (response.status === 401) {
-        if (options.onUnauthorized) {
-          options.onUnauthorized("/login");
-        } else if (window.location.pathname !== "/login") {
-          window.location.assign("/login");
-        }
-      }
-
       return response;
     },
   });

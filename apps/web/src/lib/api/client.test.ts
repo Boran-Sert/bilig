@@ -1,5 +1,5 @@
 /**
- * API istemcisinin CSRF ve kimlik doğrulama davranışlarını test eder.
+ * API istemcisinin CSRF ve yetkisiz yanıt davranışlarını test eder.
  * @vitest-environment jsdom
  */
 import { afterEach, beforeEach, expect, test, vi } from "vitest";
@@ -19,18 +19,17 @@ afterEach(() => {
 
 /**
  * Testlerde kullanılacak API istemcisini oluşturur.
- * @param onUnauthorized Yetkisiz yanıtlar için isteğe bağlı geri çağırım.
  * @returns Yapılandırılmış API istemcisi.
  */
-function createTestClient(onUnauthorized?: (url: string) => void) {
+function createTestClient() {
   return createApiClient({
     baseUrl: "http://localhost",
-    onUnauthorized,
   });
 }
 
 test("GET isteğine CSRF başlığı eklemez", async () => {
   document.cookie = "XSRF-TOKEN=test-token; path=/";
+
   fetchMock.mockResolvedValue(
     new Response(JSON.stringify({}), {
       status: 200,
@@ -48,6 +47,7 @@ test("GET isteğine CSRF başlığı eklemez", async () => {
 
 test("POST isteğine CSRF başlığı ekler", async () => {
   document.cookie = "XSRF-TOKEN=test-token; path=/";
+
   fetchMock.mockResolvedValue(
     new Response(JSON.stringify({}), {
       status: 200,
@@ -56,19 +56,19 @@ test("POST isteğine CSRF başlığı ekler", async () => {
   );
 
   const client = createTestClient();
+
   await client.POST("/test" as never);
 
   const request = fetchMock.mock.calls[0]?.[0] as Request;
   expect(request.headers.get("X-XSRF-TOKEN")).toBe("test-token");
 });
 
-test("401 yanıtında giriş sayfasına yönlendirme isteği gönderir", async () => {
+test("401 yanıtını otomatik yönlendirme yapmadan döndürür", async () => {
   fetchMock.mockResolvedValue(new Response(null, { status: 401 }));
 
-  const onUnauthorized = vi.fn();
-  const client = createTestClient(onUnauthorized);
+  const client = createTestClient();
 
-  await client.GET("/test" as never);
+  const { response } = await client.GET("/test" as never);
 
-  expect(onUnauthorized).toHaveBeenCalledWith("/login");
+  expect(response.status).toBe(401);
 });

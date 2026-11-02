@@ -148,6 +148,22 @@ export interface paths {
     patch?: never;
     trace?: never;
   };
+  "/api/auth/register-options": {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    get: operations["registerOptions"];
+    put?: never;
+    post?: never;
+    delete?: never;
+    options?: never;
+    head?: never;
+    patch?: never;
+    trace?: never;
+  };
 }
 export type webhooks = Record<string, never>;
 export interface components {
@@ -220,8 +236,10 @@ export interface components {
       password: string;
       displayName: string;
       /** Format: int32 */
-      grade?: number;
+      grade: number;
       explainStyle?: string;
+      privacyNoticeAccepted: boolean;
+      consentAccepted: boolean;
       passwordWithinBcryptLimit?: boolean;
     };
     MeResponse: {
@@ -260,6 +278,9 @@ export interface components {
       /** Format: int64 */
       sessionId: number | null;
       status: string | null;
+    };
+    RegisterOptionsResponse: {
+      grades: number[];
     };
     PageResponseSourceListItem: {
       items: components["schemas"]["SourceListItem"][];
@@ -520,6 +541,26 @@ export interface operations {
         };
         content: {
           "*/*": components["schemas"]["MeResponse"];
+        };
+      };
+    };
+  };
+  registerOptions: {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    requestBody?: never;
+    responses: {
+      /** @description OK */
+      200: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          "*/*": components["schemas"]["RegisterOptionsResponse"];
         };
       };
     };

@@ -1,6 +1,7 @@
 package com.hataanalizi.core.auth;
 
 import static org.assertj.core.api.Assertions.assertThat;
+import static org.hamcrest.Matchers.contains;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.post;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.jsonPath;
@@ -14,6 +15,9 @@ import java.util.Locale;
 import java.util.UUID;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
+import org.junit.jupiter.params.ParameterizedTest;
+import org.junit.jupiter.params.provider.CsvSource;
+import org.junit.jupiter.params.provider.ValueSource;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.context.SpringBootTest;
 import org.springframework.boot.test.system.CapturedOutput;
@@ -213,6 +217,90 @@ class AuthControllerIT {
                 .andExpect(jsonPath("$.errors[0].message").value("Geçerli bir anlatım tarzı seç."));
     }
 
+    /** Kayıt seçeneklerinin girişsiz alındığını ve 9-12 ile mezunu içerdiğini doğrular. */
+    @Test
+    void registerOptionsArePublic() throws Exception {
+        mockMvc.perform(get("/api/auth/register-options"))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.grades").value(contains(9, 10, 11, 12, 13)));
+    }
+
+    /** Sınıf seçilmeyen ya da listede olmayan kaydı sınıf alanının hatasıyla reddeder. */
+    @ParameterizedTest
+    @ValueSource(strings = {"", ",\"grade\":8", ",\"grade\":14"})
+    void missingOrInvalidGradeReturnsBadRequest(String gradeProperty) throws Exception {
+        mockMvc.perform(post("/api/auth/register")
+                        .with(csrfHeaders())
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("""
+                                {"email":"%s","password":"%s","displayName":"Test student",\
+                                "privacyNoticeAccepted":true,"consentAccepted":true%s}
+                                """.formatted(uniqueEmail(), PASSWORD, gradeProperty)))
+                .andExpect(status().isBadRequest())
+                .andExpect(jsonPath("$.errors.length()").value(1))
+                .andExpect(jsonPath("$.errors[0].field").value("grade"))
+                .andExpect(jsonPath("$.errors[0].message").value("Listeden sınıfını seç."));
+    }
+
+    /** Onaylardan biri eksik ya da hayırsa kaydı yalnız o alanın hatasıyla reddeder. */
+    @ParameterizedTest
+    @CsvSource(
+            nullValues = "null",
+            value = {
+                "null,  true,  privacyNoticeAccepted, Devam etmek için aydınlatma metnini okuduğunu onaylamalısın.",
+                "false, true,  privacyNoticeAccepted, Devam etmek için aydınlatma metnini okuduğunu onaylamalısın.",
+                "true,  null,  consentAccepted, Devam etmek için kişisel verilerinin işlenmesine açık rıza vermelisin.",
+                "true,  false, consentAccepted, Devam etmek için kişisel verilerinin işlenmesine açık rıza vermelisin."
+            })
+    void missingApprovalReturnsBadRequest(
+            Boolean privacyNoticeAccepted, Boolean consentAccepted, String field, String message) throws Exception {
+        String email = uniqueEmail();
+        mockMvc.perform(post("/api/auth/register")
+                        .with(csrfHeaders())
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("""
+                                {"email":"%s","password":"%s","displayName":"Test student","grade":12%s%s}
+                                """.formatted(
+                                        email,
+                                        PASSWORD,
+                                        approvalJson("privacyNoticeAccepted", privacyNoticeAccepted),
+                                        approvalJson("consentAccepted", consentAccepted))))
+                .andExpect(status().isBadRequest())
+                .andExpect(jsonPath("$.errors.length()").value(1))
+                .andExpect(jsonPath("$.errors[0].field").value(field))
+                .andExpect(jsonPath("$.errors[0].message").value(message));
+
+        assertThat(appUserRepository.findByEmail(email)).isEmpty();
+    }
+
+    /** Kaydın oturumu açtığını, iki onayı ayrı sakladığını ve mezun seçimini koruduğunu doğrular. */
+    @Test
+    void registerStartsSessionAndStoresConsent() throws Exception {
+        String email = uniqueEmail();
+        MvcResult result = mockMvc.perform(post("/api/auth/register")
+                        .with(csrfHeaders())
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("""
+                                {"email":"%s","password":"%s","displayName":"Test student","grade":13,\
+                                "privacyNoticeAccepted":true,"consentAccepted":true}
+                                """.formatted(email, PASSWORD)))
+                .andExpect(status().isCreated())
+                .andExpect(jsonPath("$.grade").value(AppConstants.GRADUATE_GRADE))
+                .andExpect(jsonPath("$.explainStyle").value(AppConstants.DEFAULT_EXPLAIN_STYLE))
+                .andReturn();
+
+        MockHttpSession session = (MockHttpSession) result.getRequest().getSession(false);
+        assertThat(session).isNotNull();
+        mockMvc.perform(get("/api/me").session(session))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.email").value(email));
+        AppUser appUser = appUserRepository.findByEmail(email).orElseThrow();
+        assertThat(appUser.getPrivacyNoticeVersion()).isEqualTo(AppConstants.PRIVACY_NOTICE_VERSION);
+        assertThat(appUser.getPrivacyNoticeAcceptedAt()).isNotNull();
+        assertThat(appUser.getConsentVersion()).isEqualTo(AppConstants.CONSENT_VERSION);
+        assertThat(appUser.getConsentAcceptedAt()).isNotNull();
+    }
+
     /** BCrypt sınırını aşan UTF-8 parolayı 400 olarak reddeder. */
     @Test
     void oversizedUtf8PasswordReturnsBadRequest() throws Exception {
@@ -243,8 +331,14 @@ class AuthControllerIT {
     /** Kayıt isteğinin JSON gövdesini üretir. */
     private String registerJson(String email, String password, String explainStyle) {
         return """
-                {"email":"%s","password":"%s","displayName":"Test student","grade":12,"explainStyle":"%s"}
+                {"email":"%s","password":"%s","displayName":"Test student","grade":12,"explainStyle":"%s",\
+                "privacyNoticeAccepted":true,"consentAccepted":true}
                 """.formatted(email, password, explainStyle);
+    }
+
+    /** Onay alanını JSON parçası olarak üretir; değer yoksa alanı hiç yazmaz. */
+    private String approvalJson(String field, Boolean accepted) {
+        return accepted == null ? "" : ",\"%s\":%s".formatted(field, accepted);
     }
 
     /** Kalıcı oturum alanı olmayan eski giriş gövdesini üretir. */

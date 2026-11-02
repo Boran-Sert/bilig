@@ -1,7 +1,12 @@
 ﻿{
   "app": {
     "name": "Bilig",
-    "description": "Yapay zekâ destekli öğrenme platformu"
+    "description": "Yapay zekâ destekli öğrenme platformu",
+    "pageTitle": "{{page}} · Bilig"
+  },
+  "home": {
+    "title": "Ana sayfa",
+    "metaDescription": "AYT Türk Dili ve Edebiyatı yanlışlarını kazanım bazında analiz eden çalışma asistanı."
   },
   "navigation": {
     "home": "Ana sayfa"

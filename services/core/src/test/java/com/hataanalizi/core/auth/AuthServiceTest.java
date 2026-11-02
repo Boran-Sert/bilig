@@ -13,6 +13,8 @@ import org.hibernate.exception.ConstraintViolationException;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.springframework.dao.DataIntegrityViolationException;
+import org.springframework.mock.web.MockHttpServletRequest;
+import org.springframework.mock.web.MockHttpServletResponse;
 import org.springframework.security.config.annotation.authentication.configuration.AuthenticationConfiguration;
 import org.springframework.security.crypto.password.PasswordEncoder;
 
@@ -47,7 +49,9 @@ class AuthServiceTest {
                 new DataIntegrityViolationException("constraint violation", constraintViolation);
         doThrow(databaseException).when(appUserRepository).saveAndFlush(any(AppUser.class));
 
-        assertThatThrownBy(() -> authService.register(validRequest())).isSameAs(databaseException);
+        assertThatThrownBy(() -> authService.register(
+                        validRequest(), new MockHttpServletRequest(), new MockHttpServletResponse()))
+                .isSameAs(databaseException);
     }
 
     /** Tenant repository için test kurum kaydı oluşturur. */
@@ -59,6 +63,7 @@ class AuthServiceTest {
 
     /** Kayıt servisine geçerli profil değerleri sağlar. */
     private RegisterRequest validRequest() {
-        return new RegisterRequest("student@example.test", "Valid-password-123", "Test student", (short) 12, "SIMPLE");
+        return new RegisterRequest(
+                "student@example.test", "Valid-password-123", "Test student", (short) 12, "SIMPLE", true, true);
     }
 }

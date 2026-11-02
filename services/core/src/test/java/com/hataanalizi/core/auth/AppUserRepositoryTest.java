@@ -54,6 +54,18 @@ class AppUserRepositoryTest {
         assertNotNull(savedUser.getId());
     }
 
+    /** Veritabanının 9-13 dışındaki sınıfı reddettiğini doğrular. */
+    @Test
+    void rejectsGradeOutsideAllowedRange() {
+        AppUser graduate = createUser(UUID.randomUUID() + "@example.test");
+        graduate.setGrade((short) 13);
+        appUserRepository.saveAndFlush(graduate);
+
+        AppUser invalidUser = createUser(UUID.randomUUID() + "@example.test");
+        invalidUser.setGrade((short) 14);
+        assertThrows(DataIntegrityViolationException.class, () -> appUserRepository.saveAndFlush(invalidUser));
+    }
+
     /** Zorunlu alanları doldurulmuş kullanıcı oluşturur. */
     private AppUser createUser(String email) {
         Long tenantId = jdbcTemplate.queryForObject("SELECT id FROM tenant LIMIT 1", Long.class);
