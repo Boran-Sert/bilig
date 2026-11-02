@@ -5,6 +5,7 @@ import com.hataanalizi.core.common.ErrorCode;
 import java.util.function.Supplier;
 import org.springframework.beans.factory.annotation.Qualifier;
 import org.springframework.http.HttpStatusCode;
+import org.springframework.http.MediaType;
 import org.springframework.stereotype.Component;
 import org.springframework.web.client.ResourceAccessException;
 import org.springframework.web.client.RestClient;
@@ -38,6 +39,28 @@ public class AiClient {
                 .toBodilessEntity());
     }
 
+    /** Python'dan soru ipucunu alır. */
+    public String hint(Long questionId) {
+        HintResponse response = execute(() -> restClient
+                .post()
+                .uri("/internal/hints")
+                .contentType(MediaType.APPLICATION_JSON)
+                .body(new HintRequest(questionId))
+                .retrieve()
+                .onStatus(HttpStatusCode::isError, (request, result) -> {
+                    throw new ApiException(
+                            ErrorCode.AI_UNAVAILABLE,
+                            new IllegalStateException("AI service returned status "
+                                    + result.getStatusCode().value()));
+                })
+                .body(HintResponse.class));
+        if (response == null || response.hint() == null || response.hint().isBlank()) {
+            throw new ApiException(
+                    ErrorCode.AI_UNAVAILABLE, new IllegalStateException("AI service returned an empty hint."));
+        }
+        return response.hint();
+    }
+
     /** Çağrıyı çalıştırır, bağlantı hatasını AI_UNAVAILABLE'a çevirir. */
     private <T> T execute(Supplier<T> call) {
         try {
@@ -46,4 +69,10 @@ public class AiClient {
             throw new ApiException(ErrorCode.AI_UNAVAILABLE, exception);
         }
     }
+
+    /** Python ipucu isteğinin gövdesini tanımlar. */
+    private record HintRequest(Long questionId) {}
+
+    /** Python ipucu yanıtının gövdesini tanımlar. */
+    private record HintResponse(String hint) {}
 }
