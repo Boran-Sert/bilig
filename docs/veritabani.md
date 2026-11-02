@@ -360,7 +360,7 @@ Sorunun kazanım kolonu yoktur; kazanımlar `question_outcome`'da.
 | password_hash | text | evet | | BCrypt · kurumdan gelen kullanıcıda boş |
 | display_name | text | hayır | | |
 | role | text | hayır | 'STUDENT' | CHECK IN ('STUDENT', 'CONTENT_ADMIN', 'ADMIN') |
-| grade | smallint | evet | | |
+| grade | smallint | evet | | CHECK (grade BETWEEN 9 AND 13) · 13 mezun · yöneticide boş |
 | explain_style | text | hayır | 'SIMPLE' | CHECK IN ('SIMPLE', 'EXAMPLES', 'STEP_BY_STEP') |
 | external_user_id | text | evet | | Kurumun kendi kullanıcı numarası |
 | privacy_notice_version | text | evet | | Okunduğu onaylanan aydınlatma metninin sürümü |
