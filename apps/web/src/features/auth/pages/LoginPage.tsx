@@ -6,6 +6,7 @@ import { useForm } from "react-hook-form";
 import { useTranslation } from "react-i18next";
 import { Link, useLocation, useNavigate } from "react-router";
 import { z } from "zod";
+import CheckboxField from "../../../components/CheckboxField";
 import FormField from "../../../components/FormField";
 import PageMeta from "../../../components/PageMeta";
 import { Button } from "../../../components/ui/button";
@@ -81,15 +82,12 @@ export default function LoginPage() {
           {...register("password")}
         />
 
-        <div className="space-y-1">
-          <label className="flex items-center gap-2 text-sm">
-            <input type="checkbox" aria-describedby="rememberMe-hint" {...register("rememberMe")} />
-            {t("login.rememberMe")}
-          </label>
-          <p id="rememberMe-hint" className="text-xs text-muted-foreground">
-            {t("login.rememberMeHint")}
-          </p>
-        </div>
+        <CheckboxField
+          id="rememberMe"
+          label={t("login.rememberMe")}
+          hint={t("login.rememberMeHint")}
+          {...register("rememberMe")}
+        />
 
         {showGeneralError && (
           <p role="alert" className="text-sm text-destructive">

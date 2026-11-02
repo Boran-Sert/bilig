@@ -69,7 +69,8 @@ describe("RegisterPage", () => {
     expect(document.title).toBe("Hesap oluştur · Bilig");
     expect(screen.queryByText("Sade")).not.toBeInTheDocument();
     expect(screen.queryByLabelText("Sınıf")).not.toBeInTheDocument();
-    expect(screen.getByRole("checkbox")).not.toBeChecked();
+    expect(screen.getByLabelText(/aydınlatma metnini okudum/)).not.toBeChecked();
+    expect(screen.getByLabelText(/açık rıza veriyorum/)).not.toBeChecked();
   });
 
   test("kısa parolayı istek atmadan uyarır", async () => {
@@ -92,10 +93,10 @@ describe("RegisterPage", () => {
     expect(mutateMock).not.toHaveBeenCalled();
   });
 
-  test("diğer alanları arayüzde denetlemeden rızayla birlikte gönderir", async () => {
+  test("diğer alanları arayüzde denetlemeden iki onayı ayrı gönderir", async () => {
     renderRegisterPage();
     fillRegisterForm();
-    fireEvent.click(screen.getByRole("checkbox"));
+    fireEvent.click(screen.getByLabelText(/açık rıza veriyorum/));
 
     submitRegisterForm();
 
@@ -105,6 +106,7 @@ describe("RegisterPage", () => {
           displayName: "Kitapkurdu",
           email: "test@example.com",
           password: "Test1234",
+          privacyNoticeAccepted: false,
           consentAccepted: true,
         },
         expect.anything(),
@@ -122,12 +124,13 @@ describe("RegisterPage", () => {
     expect(await screen.findByText("Ana sayfa")).toBeInTheDocument();
   });
 
-  test("sunucunun rıza ve e-posta hatalarını alanların altında gösterir", async () => {
+  test("sunucunun onay ve e-posta hatalarını kendi alanlarının altında gösterir", async () => {
     const error = new ApiError(
       {
         code: "VALIDATION_FAILED",
         errors: [
-          { field: "consentAccepted", message: "Aydınlatma metnini onaylamalısın." },
+          { field: "privacyNoticeAccepted", message: "Aydınlatma metnini onaylamalısın." },
+          { field: "consentAccepted", message: "Açık rıza vermelisin." },
           { field: "email", message: "Geçerli bir e-posta adresi gir." },
         ],
       },
@@ -140,6 +143,12 @@ describe("RegisterPage", () => {
     submitRegisterForm();
 
     expect(await screen.findByText("Aydınlatma metnini onaylamalısın.")).toBeInTheDocument();
+    expect(screen.getByLabelText(/aydınlatma metnini okudum/)).toHaveAttribute(
+      "aria-invalid",
+      "true",
+    );
+    expect(screen.getByText("Açık rıza vermelisin.")).toBeInTheDocument();
+    expect(screen.getByLabelText(/açık rıza veriyorum/)).toHaveAttribute("aria-invalid", "true");
     expect(screen.getByText("Geçerli bir e-posta adresi gir.")).toBeInTheDocument();
   });
 

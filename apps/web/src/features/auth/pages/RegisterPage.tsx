@@ -7,6 +7,7 @@ import { useForm } from "react-hook-form";
 import { useTranslation } from "react-i18next";
 import { Link, useNavigate } from "react-router";
 import { z } from "zod";
+import CheckboxField from "../../../components/CheckboxField";
 import FormField from "../../../components/FormField";
 import PageMeta from "../../../components/PageMeta";
 import { Button } from "../../../components/ui/button";
@@ -15,7 +16,13 @@ import { PASSWORD_MAX_BYTES, PASSWORD_MIN_LENGTH, ROUTES } from "../../../lib/co
 import { applyServerFieldErrors } from "../../../lib/forms";
 import { useRegister } from "../api";
 
-const REGISTER_FIELDS = ["displayName", "email", "password", "consentAccepted"] as const;
+const REGISTER_FIELDS = [
+  "displayName",
+  "email",
+  "password",
+  "privacyNoticeAccepted",
+  "consentAccepted",
+] as const;
 
 /**
  * Sadece parola uzunluğunu anında denetleyen form şemasını üretir.
@@ -33,6 +40,7 @@ function createRegisterSchema(messages: { passwordMin: string; passwordMax: stri
         (value) => new TextEncoder().encode(value).length <= PASSWORD_MAX_BYTES,
         messages.passwordMax,
       ),
+    privacyNoticeAccepted: z.boolean(),
     consentAccepted: z.boolean(),
   });
 }
@@ -63,7 +71,13 @@ export default function RegisterPage() {
     formState: { errors },
   } = useForm<RegisterFormValues>({
     resolver: zodResolver(schema),
-    defaultValues: { displayName: "", email: "", password: "", consentAccepted: false },
+    defaultValues: {
+      displayName: "",
+      email: "",
+      password: "",
+      privacyNoticeAccepted: false,
+      consentAccepted: false,
+    },
   });
 
   const onSubmit = handleSubmit((values) => {
@@ -113,24 +127,19 @@ export default function RegisterPage() {
           {...register("password")}
         />
 
-        <div className="space-y-1">
-          <label className="flex items-start gap-2 text-sm">
-            <input
-              type="checkbox"
-              className="mt-0.5"
-              aria-invalid={Boolean(errors.consentAccepted)}
-              aria-describedby="consentAccepted-hint"
-              {...register("consentAccepted")}
-            />
-            {t("register.consent")}
-          </label>
-          <p id="consentAccepted-hint" className="text-xs text-muted-foreground">
-            {t("register.consentHint")}
-          </p>
-          {errors.consentAccepted && (
-            <p className="text-sm text-destructive">{errors.consentAccepted.message}</p>
-          )}
-        </div>
+        <CheckboxField
+          id="privacyNoticeAccepted"
+          label={t("register.privacyNotice")}
+          error={errors.privacyNoticeAccepted?.message}
+          {...register("privacyNoticeAccepted")}
+        />
+        <CheckboxField
+          id="consentAccepted"
+          label={t("register.consent")}
+          hint={t("register.consentHint")}
+          error={errors.consentAccepted?.message}
+          {...register("consentAccepted")}
+        />
 
         {showGeneralError && (
           <p role="alert" className="text-sm text-destructive">
