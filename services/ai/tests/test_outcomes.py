@@ -108,6 +108,9 @@ SELECT count(*) FROM review_item
 WHERE reason = 'LOW_CONFIDENCE' AND question_id = %(id)s
 """
 
+READ_QUESTION_STATUS = "SELECT status FROM question WHERE id = %(id)s"
+READ_BLOCK_STATUS = "SELECT status FROM content_block WHERE id = %(id)s"
+
 COUNT_EMBEDDED = """
 SELECT count(*) FROM learning_outcome WHERE search_text LIKE %(marker)s AND embedding IS NOT NULL
 """
@@ -285,7 +288,7 @@ def test_check_sends_empty_result_to_review() -> None:
 async def test_question_is_linked_to_several_outcomes_once(
     connection: Connection, seed: Seed, monkeypatch: pytest.MonkeyPatch
 ) -> None:
-    """Soru birden çok kazanıma MODEL olarak bağlanır; adım iki kez çalışınca kopya bağ olmaz."""
+    """Soru birden çok kazanıma bağlanıp yayına alınır; ikinci çalışmada kopya bağ olmaz."""
     fake = use_picks(monkeypatch, ("A.2.7", Confidence.HIGH), ("A.2.8", Confidence.HIGH))
     question_id = await add_question(connection, seed, seed.unit_id)
 
@@ -294,6 +297,7 @@ async def test_question_is_linked_to_several_outcomes_once(
 
     assert await read_links(connection, question_id) == [("A.2.7", "MODEL"), ("A.2.8", "MODEL")]
     assert await fetch_value(connection, COUNT_REVIEWS, {"id": question_id}) == 0
+    assert await fetch_value(connection, READ_QUESTION_STATUS, {"id": question_id}) == "PUBLISHED"
     assert len(fake.calls) == 1
     assert {item.code for item in fake.calls[0]["candidates"]} == set(CODES)
     assert fake.calls[0]["correct_option"] == "E"
@@ -303,7 +307,7 @@ async def test_question_is_linked_to_several_outcomes_once(
 async def test_low_confidence_result_goes_to_review_once(
     connection: Connection, seed: Seed, monkeypatch: pytest.MonkeyPatch
 ) -> None:
-    """Düşük güvenli sonuç bağlanır ve inceleme listesine bir kez düşer."""
+    """Düşük güvenli sonuç bağlanır, taslak kalır ve inceleme listesine bir kez düşer."""
     fake = use_picks(monkeypatch, ("A.2.3", Confidence.LOW))
     question_id = await add_question(connection, seed, seed.unit_id)
 
@@ -312,6 +316,7 @@ async def test_low_confidence_result_goes_to_review_once(
 
     assert await read_links(connection, question_id) == [("A.2.3", "MODEL")]
     assert await fetch_value(connection, COUNT_REVIEWS, {"id": question_id}) == 1
+    assert await fetch_value(connection, READ_QUESTION_STATUS, {"id": question_id}) == "DRAFT"
     assert len(fake.calls) == 1
 
 
@@ -372,10 +377,10 @@ async def test_unit_without_outcomes_searches_all_outcomes(
 async def test_paragraphs_are_matched_but_activities_are_not(
     connection: Connection, seed: Seed, monkeypatch: pytest.MonkeyPatch
 ) -> None:
-    """Bilgi bloğu kazanıma bağlanır, etkinlik bloğu modele hiç gitmez."""
+    """Bilgi bloğu bağlanıp yayına alınır, etkinlik bloğu modele hiç gitmez."""
     fake = use_picks(monkeypatch, ("A.2.7", Confidence.HIGH))
     info_id = await add_block(connection, seed, "BILGI", 0)
-    await add_block(connection, seed, "ETKINLIK", 1)
+    activity_id = await add_block(connection, seed, "ETKINLIK", 1)
 
     await match_source_outcomes(connection, seed.document_id)
 
@@ -385,6 +390,8 @@ async def test_paragraphs_are_matched_but_activities_are_not(
         {"id": info_id},
     )
     assert links == 1
+    assert await fetch_value(connection, READ_BLOCK_STATUS, {"id": info_id}) == "PUBLISHED"
+    assert await fetch_value(connection, READ_BLOCK_STATUS, {"id": activity_id}) == "DRAFT"
     assert len(fake.calls) == 1
     assert fake.calls[0]["kind"] == "PARAGRAPH"
     assert len(fake.calls[0]["candidates"]) == len(CODES)

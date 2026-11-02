@@ -2,7 +2,8 @@
 
 Kaynağın eşlenmemiş soruları ve paragrafları okunur: kazanım bağı ya da LOW_CONFIDENCE inceleme
 kaydı olan içerik eşlenmiş sayılır. Etkinlik ve başlık blokları eşlenmez. Bağlar MODEL olarak
-yazılır; aynı bağ ve aynı inceleme kaydı ikinci kez eklenmez. Vektörü olmayan kazanımlar da
+yazılır; aynı bağ ve aynı inceleme kaydı ikinci kez eklenmez. İncelemeye düşmeyen taslak
+içerik yayına alınır. Vektörü olmayan kazanımlar da
 buradan okunup yazılır. Tablolar core'un Flyway migration'larıyla kurulur.
 """
 
@@ -72,6 +73,17 @@ ON CONFLICT DO NOTHING
 INSERT INTO content_block_outcome (content_block_id, learning_outcome_id, mapped_by)
 SELECT %(item_id)s, outcome_id, 'MODEL' FROM unnest(%(outcome_ids)s::bigint[]) AS outcome_id
 ON CONFLICT DO NOTHING
+""",
+}
+
+PUBLISH_ITEMS = {
+    ItemKind.QUESTION: """
+UPDATE question SET status = 'PUBLISHED', updated_at = now()
+WHERE id = %(item_id)s AND status = 'DRAFT'
+""",
+    ItemKind.PARAGRAPH: """
+UPDATE content_block SET status = 'PUBLISHED', updated_at = now()
+WHERE id = %(item_id)s AND status = 'DRAFT'
 """,
 }
 
@@ -161,6 +173,11 @@ async def save_links(
     """İçeriği kazanımlara MODEL olarak bağlar; var olan bağı tekrar eklemez."""
     values = {"item_id": item_id, "outcome_ids": outcome_ids}
     await connection.execute(INSERT_LINKS[kind], values)
+
+
+async def publish_item(connection: AsyncConnection, kind: ItemKind, item_id: int) -> None:
+    """Taslak durumdaki içeriği yayına alır."""
+    await connection.execute(PUBLISH_ITEMS[kind], {"item_id": item_id})
 
 
 async def open_review(connection: AsyncConnection, kind: ItemKind, item_id: int) -> None:
