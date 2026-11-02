@@ -5,7 +5,8 @@ kazanımlarından hybrid_search ile bulunur (reranker kapalı; sorularda 16, par
 Ünitenin bağlı kazanımı yoksa (Giriş, Söylev) ya da ünitesi bilinmiyorsa bütün kazanımlarda
 aranır. Seçimi OUTCOME_MATCH yapar; kod, kodların adaylardan geldiğini ve en az bir kazanım
 kaldığını kontrol eder. Herhangi bir kazanımın güveni orta ya da düşükse, aday dışı kod geldiyse
-ya da geçerli kazanım kalmadıysa içerik LOW_CONFIDENCE ile incelemeye düşer. Bağlar MODEL olarak
+ya da geçerli kazanım kalmadıysa içerik LOW_CONFIDENCE ile incelemeye düşer; düşmeyen içerik
+güven eşiğini geçmiştir ve doğrudan yayına alınır (PUBLISHED). Bağlar MODEL olarak
 yazılır; sıra ya da ağırlık yoktur. Bağı ya da inceleme kaydı olan içerik atlanır, bu yüzden adım
 ikinci kez çalışınca kopya bağ ve ikinci model çağrısı olmaz. Vektörü olmayan kazanımların
 vektörü önce hesaplanır. Havuz bağlantısı autocommit olmadığı için her okuma ve yazma kendi
@@ -24,6 +25,7 @@ from app.db.queries.outcomes import (
     fetch_outcomes_without_embedding,
     fetch_unmatched_items,
     open_review,
+    publish_item,
     save_links,
     save_outcome_embeddings,
 )
@@ -125,8 +127,10 @@ def check_match(match: OutcomeMatch, candidates: list[OutcomeCandidate]) -> Outc
 async def save_choice(
     connection: AsyncConnection, kind: ItemKind, item_id: int, choice: OutcomeChoice
 ) -> None:
-    """Seçilen kazanımları bağlar; sonuç incelemeye düşüyorsa inceleme kaydı açar."""
+    """Seçilen kazanımları bağlar; incelemeye düşene kayıt açar, düşmeyeni yayına alır."""
     if choice.outcomes:
         await save_links(connection, kind, item_id, [outcome.id for outcome in choice.outcomes])
     if choice.needs_review:
         await open_review(connection, kind, item_id)
+    else:
+        await publish_item(connection, kind, item_id)

@@ -46,6 +46,15 @@ def test_load_settings_names_invalid_variable(monkeypatch: pytest.MonkeyPatch) -
         load_settings()
 
 
+def test_load_settings_names_missing_internal_token(monkeypatch: pytest.MonkeyPatch) -> None:
+    """INTERNAL_TOKEN yoksa ai-api ayarları değişkenin adını söyleyen hatayla durur."""
+    monkeypatch.setenv("DATABASE_URL", DATABASE_URL)
+    monkeypatch.delenv("INTERNAL_TOKEN", raising=False)
+
+    with pytest.raises(SettingsError, match="INTERNAL_TOKEN is missing"):
+        load_settings()
+
+
 def test_load_settings_rejects_non_postgres_url(monkeypatch: pytest.MonkeyPatch) -> None:
     """Postgres olmayan bağlantı adresi kabul edilmez."""
     monkeypatch.setenv("DATABASE_URL", "mysql://app@localhost/db")

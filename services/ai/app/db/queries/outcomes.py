@@ -2,7 +2,8 @@
 
 Kaynağın eşlenmemiş soruları ve paragrafları okunur: kazanım bağı ya da LOW_CONFIDENCE inceleme
 kaydı olan içerik eşlenmiş sayılır. Etkinlik ve başlık blokları eşlenmez. Bağlar MODEL olarak
-yazılır; aynı bağ ve aynı inceleme kaydı ikinci kez eklenmez. Vektörü olmayan kazanımlar da
+yazılır; aynı bağ ve aynı inceleme kaydı ikinci kez eklenmez. İncelemeye düşmeyen taslak
+içerik yayına alınır. Vektörü olmayan kazanımlar da
 buradan okunup yazılır. Tablolar core'un Flyway migration'larıyla kurulur.
 """
 
@@ -75,6 +76,17 @@ ON CONFLICT DO NOTHING
 """,
 }
 
+PUBLISH_ITEMS = {
+    ItemKind.QUESTION: """
+UPDATE question SET status = 'PUBLISHED', updated_at = now()
+WHERE id = %(item_id)s AND status = 'DRAFT'
+""",
+    ItemKind.PARAGRAPH: """
+UPDATE content_block SET status = 'PUBLISHED', updated_at = now()
+WHERE id = %(item_id)s AND status = 'DRAFT'
+""",
+}
+
 INSERT_REVIEWS = {
     ItemKind.QUESTION: """
 INSERT INTO review_item (reason, question_id)
@@ -144,12 +156,9 @@ def question_item(
     content: QuestionContent, correct_option: str, curriculum_unit_id: int | None
 ) -> MatchItem:
     """Sorunun ortak parçası, kökü ve şıklarından eşleştirme metnini kurar."""
-    lines = [block.md for block in [*(content.passage or []), *content.stem]]
-    for option in content.options:
-        lines.append(f"{option.label}) " + "\n".join(block.md for block in option.blocks))
     return MatchItem(
         kind=ItemKind.QUESTION,
-        text="\n".join(lines),
+        text=content.to_text(),
         curriculum_unit_id=curriculum_unit_id,
         correct_option=correct_option,
     )
@@ -161,6 +170,11 @@ async def save_links(
     """İçeriği kazanımlara MODEL olarak bağlar; var olan bağı tekrar eklemez."""
     values = {"item_id": item_id, "outcome_ids": outcome_ids}
     await connection.execute(INSERT_LINKS[kind], values)
+
+
+async def publish_item(connection: AsyncConnection, kind: ItemKind, item_id: int) -> None:
+    """Taslak durumdaki içeriği yayına alır."""
+    await connection.execute(PUBLISH_ITEMS[kind], {"item_id": item_id})
 
 
 async def open_review(connection: AsyncConnection, kind: ItemKind, item_id: int) -> None:
