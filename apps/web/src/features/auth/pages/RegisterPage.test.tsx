@@ -1,4 +1,3 @@
-/* eslint-disable i18next/no-literal-string */
 /**
  * RegisterPage bileşeninin kayıt davranışlarını test eder.
  * @vitest-environment jsdom
@@ -6,11 +5,13 @@
 import "@testing-library/jest-dom/vitest";
 import { cleanup, fireEvent, render, screen, waitFor } from "@testing-library/react";
 import { afterEach, beforeEach, describe, expect, test, vi } from "vitest";
-import { MemoryRouter, Route, Routes, useLocation } from "react-router";
+import { MemoryRouter, Route, Routes } from "react-router";
+import "../../../lib/i18n";
+import { ApiError } from "../../../lib/api/problem";
 import RegisterPage from "./RegisterPage";
 
-const { mutateAsync, useRegisterMock } = vi.hoisted(() => ({
-  mutateAsync: vi.fn(),
+const { mutateMock, useRegisterMock } = vi.hoisted(() => ({
+  mutateMock: vi.fn(),
   useRegisterMock: vi.fn(),
 }));
 
@@ -18,42 +19,39 @@ vi.mock("../api", () => ({
   useRegister: useRegisterMock,
 }));
 
-/** Giriş rotası. */
-function LoginLocation() {
-  const location = useLocation();
-
-  return (
-    <div>
-      <span>Giriş sayfası</span>
-      <span>{location.state?.message}</span>
-    </div>
-  );
-}
-
-/** Kayıt sayfasını oluşturur. */
+/** Kayıt sayfasını test yönlendiricisiyle oluşturur. */
 function renderRegisterPage() {
   return render(
     <MemoryRouter initialEntries={["/register"]}>
       <Routes>
         <Route path="/register" element={<RegisterPage />} />
-        <Route path="/login" element={<LoginLocation />} />
+        <Route path="/" element={<h1>Ana sayfa</h1>} />
       </Routes>
     </MemoryRouter>,
   );
 }
 
-/** Kayıt formunu doldurur. */
-function fillRegisterForm() {
-  fireEvent.change(screen.getByLabelText(/ad soyad/i), {
-    target: { value: "Test Kullanıcı" },
-  });
-
-  fireEvent.change(screen.getByLabelText(/e-posta/i), {
+/** Kayıt formunu verilen parolayla doldurur. */
+function fillRegisterForm(password = "Test1234") {
+  fireEvent.change(screen.getByLabelText("Görünen ad"), { target: { value: "Kitapkurdu" } });
+  fireEvent.change(screen.getByLabelText("E-posta adresi"), {
     target: { value: "test@example.com" },
   });
+  fireEvent.change(screen.getByLabelText("Şifre"), { target: { value: password } });
+}
 
-  fireEvent.change(screen.getByLabelText(/şifre/i), {
-    target: { value: "Test1234" },
+/** Formu gönderir. */
+function submitRegisterForm() {
+  fireEvent.click(screen.getByRole("button", { name: "Kayıt ol" }));
+}
+
+/** Kayıt hook'unu verilen hata durumuyla taklit eder. */
+function mockRegisterState(error: ApiError | null) {
+  useRegisterMock.mockReturnValue({
+    mutate: mutateMock,
+    isPending: false,
+    isError: error !== null,
+    error,
   });
 }
 
@@ -61,75 +59,95 @@ afterEach(cleanup);
 
 describe("RegisterPage", () => {
   beforeEach(() => {
-    mutateAsync.mockReset();
-    useRegisterMock.mockReturnValue({
-      mutateAsync,
-      isPending: false,
-      isError: false,
-      error: null,
-    });
+    mutateMock.mockReset();
+    mockRegisterState(null);
   });
 
-  test("zorunlu alanlar boşken doğrulama hatalarını gösterir", async () => {
+  test("sayfa başlığını ayarlar ve anlatım tarzı ile sınıf sormaz", () => {
     renderRegisterPage();
 
-    fireEvent.click(screen.getByRole("button", { name: /kayıt ol/i }));
-
-    expect(await screen.findAllByText("Bu alan zorunludur.")).not.toHaveLength(0);
-    expect(screen.getByText(/en az 8 karakter/i)).toBeInTheDocument();
-    expect(mutateAsync).not.toHaveBeenCalled();
+    expect(document.title).toBe("Hesap oluştur · Bilig");
+    expect(screen.queryByText("Sade")).not.toBeInTheDocument();
+    expect(screen.queryByLabelText("Sınıf")).not.toBeInTheDocument();
+    expect(screen.getByRole("checkbox")).not.toBeChecked();
   });
 
-  test("geçerli bilgilerle kayıt isteği gönderir", async () => {
-    mutateAsync.mockResolvedValue({
-      id: "1",
-      email: "test@example.com",
-      displayName: "Test Kullanıcı",
-    });
+  test("kısa parolayı istek atmadan uyarır", async () => {
+    renderRegisterPage();
+    fillRegisterForm("kisa");
 
+    submitRegisterForm();
+
+    expect(await screen.findByText("Şifre en az 8 karakter olmalıdır.")).toBeInTheDocument();
+    expect(mutateMock).not.toHaveBeenCalled();
+  });
+
+  test("72 baytı aşan parolayı istek atmadan uyarır", async () => {
+    renderRegisterPage();
+    fillRegisterForm("ğ".repeat(37));
+
+    submitRegisterForm();
+
+    expect(await screen.findByText("Şifre en fazla 72 bayt olabilir.")).toBeInTheDocument();
+    expect(mutateMock).not.toHaveBeenCalled();
+  });
+
+  test("diğer alanları arayüzde denetlemeden rızayla birlikte gönderir", async () => {
     renderRegisterPage();
     fillRegisterForm();
+    fireEvent.click(screen.getByRole("checkbox"));
 
-    fireEvent.click(screen.getByRole("button", { name: /kayıt ol/i }));
+    submitRegisterForm();
 
     await waitFor(() => {
-      expect(mutateAsync).toHaveBeenCalledWith(
-        expect.objectContaining({
-          displayName: "Test Kullanıcı",
+      expect(mutateMock).toHaveBeenCalledWith(
+        {
+          displayName: "Kitapkurdu",
           email: "test@example.com",
           password: "Test1234",
-        }),
+          consentAccepted: true,
+        },
+        expect.anything(),
       );
     });
   });
 
-  test("başarılı kayıt sonrası giriş sayfasına yönlendirir", async () => {
-    mutateAsync.mockResolvedValue({
-      id: "1",
-      email: "test@example.com",
-      displayName: "Test Kullanıcı",
-    });
-
+  test("başarılı kayıtta oturum açık olarak ana sayfaya gider", async () => {
+    mutateMock.mockImplementation((_values, options) => options.onSuccess());
     renderRegisterPage();
     fillRegisterForm();
 
-    fireEvent.click(screen.getByRole("button", { name: /kayıt ol/i }));
+    submitRegisterForm();
 
-    expect(await screen.findByText("Giriş sayfası")).toBeInTheDocument();
-
-    expect(await screen.findByText("Hesabın oluşturuldu. Giriş yapabilirsin.")).toBeInTheDocument();
+    expect(await screen.findByText("Ana sayfa")).toBeInTheDocument();
   });
 
-  test("kayıt hatasını gösterir", async () => {
-    useRegisterMock.mockReturnValue({
-      mutateAsync,
-      isPending: false,
-      isError: true,
-      error: { code: "EMAIL_TAKEN" },
-    });
+  test("sunucunun rıza ve e-posta hatalarını alanların altında gösterir", async () => {
+    const error = new ApiError(
+      {
+        code: "VALIDATION_FAILED",
+        errors: [
+          { field: "consentAccepted", message: "Aydınlatma metnini onaylamalısın." },
+          { field: "email", message: "Geçerli bir e-posta adresi gir." },
+        ],
+      },
+      400,
+    );
+    mutateMock.mockImplementation((_values, options) => options.onError(error));
+    renderRegisterPage();
+    fillRegisterForm();
+
+    submitRegisterForm();
+
+    expect(await screen.findByText("Aydınlatma metnini onaylamalısın.")).toBeInTheDocument();
+    expect(screen.getByText("Geçerli bir e-posta adresi gir.")).toBeInTheDocument();
+  });
+
+  test("kayıtlı e-postada sunucunun hata kodunu mesaja çevirir", () => {
+    mockRegisterState(new ApiError({ code: "EMAIL_TAKEN" }, 409));
 
     renderRegisterPage();
 
-    expect(screen.getByRole("alert")).toBeInTheDocument();
+    expect(screen.getByRole("alert")).toHaveTextContent("Bu e-posta adresi zaten kayıtlı.");
   });
 });

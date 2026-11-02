@@ -222,6 +222,7 @@ export interface components {
       /** Format: int32 */
       grade?: number;
       explainStyle?: string;
+      consentAccepted: boolean;
       passwordWithinBcryptLimit?: boolean;
     };
     MeResponse: {

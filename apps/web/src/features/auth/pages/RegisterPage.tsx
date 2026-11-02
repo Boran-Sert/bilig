@@ -2,167 +2,150 @@
  * Kullanıcı kayıt formunu gösterir.
  */
 import { zodResolver } from "@hookform/resolvers/zod";
+import { useMemo } from "react";
 import { useForm } from "react-hook-form";
-import { Link, useNavigate } from "react-router";
 import { useTranslation } from "react-i18next";
+import { Link, useNavigate } from "react-router";
 import { z } from "zod";
-import { getProblemMessage } from "../../../lib/api/problem";
+import FormField from "../../../components/FormField";
+import PageMeta from "../../../components/PageMeta";
+import { Button } from "../../../components/ui/button";
+import { getFieldErrors, getProblemMessage } from "../../../lib/api/problem";
+import { PASSWORD_MAX_BYTES, PASSWORD_MIN_LENGTH, ROUTES } from "../../../lib/constants";
+import { applyServerFieldErrors } from "../../../lib/forms";
 import { useRegister } from "../api";
 
-const registerSchema = z.object({
-  displayName: z.string().trim().min(1, "required"),
-  email: z.string().trim().min(1, "required").email("email"),
-  password: z
-    .string()
-    .min(8, "passwordMin")
-    .refine((value) => new TextEncoder().encode(value).length <= 72, "passwordMax"),
-  grade: z.literal(12),
-  explainStyle: z.enum(["SIMPLE", "EXAMPLES", "STEP_BY_STEP"]),
-});
-
-type RegisterFormValues = z.infer<typeof registerSchema>;
+const REGISTER_FIELDS = ["displayName", "email", "password", "consentAccepted"] as const;
 
 /**
- * Yeni kullanıcı kayıt formunu yönetir.
+ * Sadece parola uzunluğunu anında denetleyen form şemasını üretir.
+ * @param messages Parola uzunluğu hata mesajları.
+ * @returns Kayıt formu şeması.
+ */
+function createRegisterSchema(messages: { passwordMin: string; passwordMax: string }) {
+  return z.object({
+    displayName: z.string(),
+    email: z.string(),
+    password: z
+      .string()
+      .min(PASSWORD_MIN_LENGTH, messages.passwordMin)
+      .refine(
+        (value) => new TextEncoder().encode(value).length <= PASSWORD_MAX_BYTES,
+        messages.passwordMax,
+      ),
+    consentAccepted: z.boolean(),
+  });
+}
+
+type RegisterFormValues = z.infer<ReturnType<typeof createRegisterSchema>>;
+
+/**
+ * Kayıt formunu yönetir; parola dışındaki doğrulamayı sunucuya bırakır.
  */
 export default function RegisterPage() {
   const navigate = useNavigate();
   const registerMutation = useRegister();
   const { t } = useTranslation("auth");
 
+  const schema = useMemo(
+    () =>
+      createRegisterSchema({
+        passwordMin: t("validation.passwordMin", { min: PASSWORD_MIN_LENGTH }),
+        passwordMax: t("validation.passwordMax", { max: PASSWORD_MAX_BYTES }),
+      }),
+    [t],
+  );
+
   const {
     register,
     handleSubmit,
-    formState: { errors, isSubmitting },
+    setError,
+    formState: { errors },
   } = useForm<RegisterFormValues>({
-    resolver: zodResolver(registerSchema),
-    defaultValues: {
-      displayName: "",
-      email: "",
-      password: "",
-      grade: 12,
-      explainStyle: "SIMPLE",
-    },
+    resolver: zodResolver(schema),
+    defaultValues: { displayName: "", email: "", password: "", consentAccepted: false },
   });
 
-  const onSubmit = handleSubmit(async (values) => {
-    try {
-      await registerMutation.mutateAsync(values);
-      navigate("/login", {
-        state: { message: t("register.success") },
-      });
-    } catch {
-      // Hata mesajı form üzerinde gösterilir.
-    }
+  const onSubmit = handleSubmit((values) => {
+    registerMutation.mutate(values, {
+      /** Sunucu oturumu açtığı için ana sayfaya gider. */
+      onSuccess: () => navigate(ROUTES.home, { replace: true }),
+      /** Sunucunun alan hatalarını forma yazar. */
+      onError: (error) => applyServerFieldErrors(error, REGISTER_FIELDS, setError),
+    });
   });
+
+  const showGeneralError =
+    registerMutation.isError && getFieldErrors(registerMutation.error).length === 0;
 
   return (
     <section className="mx-auto w-full max-w-md space-y-6 py-10">
+      <PageMeta title={t("register.title")} description={t("register.metaDescription")} />
       <header className="space-y-2">
         <h1 className="text-3xl font-semibold tracking-tight">{t("register.title")}</h1>
         <p className="text-sm text-muted-foreground">{t("register.description")}</p>
       </header>
 
-      <form onSubmit={onSubmit} className="space-y-4">
-        <div className="space-y-2">
-          <label htmlFor="displayName" className="text-sm font-medium">
-            {t("register.displayName")}
+      <form onSubmit={onSubmit} noValidate className="space-y-4">
+        <FormField
+          id="displayName"
+          autoComplete="nickname"
+          label={t("register.displayName")}
+          hint={t("register.displayNameHint")}
+          error={errors.displayName?.message}
+          {...register("displayName")}
+        />
+        <FormField
+          id="email"
+          type="email"
+          autoComplete="email"
+          label={t("register.email")}
+          error={errors.email?.message}
+          {...register("email")}
+        />
+        <FormField
+          id="password"
+          type="password"
+          autoComplete="new-password"
+          label={t("register.password")}
+          hint={t("register.passwordHint", { min: PASSWORD_MIN_LENGTH })}
+          error={errors.password?.message}
+          {...register("password")}
+        />
+
+        <div className="space-y-1">
+          <label className="flex items-start gap-2 text-sm">
+            <input
+              type="checkbox"
+              className="mt-0.5"
+              aria-invalid={Boolean(errors.consentAccepted)}
+              aria-describedby="consentAccepted-hint"
+              {...register("consentAccepted")}
+            />
+            {t("register.consent")}
           </label>
-          <input
-            id="displayName"
-            autoComplete="name"
-            {...register("displayName")}
-            aria-invalid={Boolean(errors.displayName)}
-            className="w-full rounded-md border border-input bg-background px-3 py-2 text-sm outline-none focus-visible:ring-2 focus-visible:ring-ring"
-          />
-          {errors.displayName && (
-            <p className="text-sm text-destructive">{t("validation.required")}</p>
+          <p id="consentAccepted-hint" className="text-xs text-muted-foreground">
+            {t("register.consentHint")}
+          </p>
+          {errors.consentAccepted && (
+            <p className="text-sm text-destructive">{errors.consentAccepted.message}</p>
           )}
         </div>
 
-        <div className="space-y-2">
-          <label htmlFor="email" className="text-sm font-medium">
-            {t("register.email")}
-          </label>
-          <input
-            id="email"
-            type="email"
-            autoComplete="email"
-            {...register("email")}
-            aria-invalid={Boolean(errors.email)}
-            className="w-full rounded-md border border-input bg-background px-3 py-2 text-sm outline-none focus-visible:ring-2 focus-visible:ring-ring"
-          />
-          {errors.email && (
-            <p className="text-sm text-destructive">{t(`validation.${errors.email.message}`)}</p>
-          )}
-        </div>
-
-        <div className="space-y-2">
-          <label htmlFor="password" className="text-sm font-medium">
-            {t("register.password")}
-          </label>
-          <input
-            id="password"
-            type="password"
-            autoComplete="new-password"
-            {...register("password")}
-            aria-invalid={Boolean(errors.password)}
-            className="w-full rounded-md border border-input bg-background px-3 py-2 text-sm outline-none focus-visible:ring-2 focus-visible:ring-ring"
-          />
-          {errors.password && (
-            <p className="text-sm text-destructive">{t(`validation.${errors.password.message}`)}</p>
-          )}
-        </div>
-
-        <div className="space-y-2">
-          <label htmlFor="grade" className="text-sm font-medium">
-            {t("register.grade")}
-          </label>
-          <select
-            id="grade"
-            {...register("grade", { valueAsNumber: true })}
-            className="w-full rounded-md border border-input bg-background px-3 py-2 text-sm outline-none focus-visible:ring-2 focus-visible:ring-ring"
-          >
-            <option value={12}>{t("register.gradeOption12")}</option>
-          </select>
-        </div>
-
-        <fieldset className="space-y-2">
-          <legend className="text-sm font-medium">{t("register.explainStyle")}</legend>
-          <div className="space-y-2">
-            <label className="flex items-center gap-2 text-sm">
-              <input type="radio" value="SIMPLE" {...register("explainStyle")} />
-              {t("register.explainStyleSimple")}
-            </label>
-            <label className="flex items-center gap-2 text-sm">
-              <input type="radio" value="EXAMPLES" {...register("explainStyle")} />
-              {t("register.explainStyleExamples")}
-            </label>
-            <label className="flex items-center gap-2 text-sm">
-              <input type="radio" value="STEP_BY_STEP" {...register("explainStyle")} />
-              {t("register.explainStyleStepByStep")}
-            </label>
-          </div>
-        </fieldset>
-
-        {registerMutation.isError && (
+        {showGeneralError && (
           <p role="alert" className="text-sm text-destructive">
             {getProblemMessage(registerMutation.error)}
           </p>
         )}
 
-        <button
-          type="submit"
-          disabled={isSubmitting || registerMutation.isPending}
-          className="w-full rounded-md bg-primary px-4 py-2 text-sm font-medium text-primary-foreground hover:opacity-90 disabled:cursor-not-allowed disabled:opacity-50"
-        >
+        <Button type="submit" size="lg" className="w-full" disabled={registerMutation.isPending}>
           {registerMutation.isPending ? t("register.submitting") : t("register.submit")}
-        </button>
+        </Button>
       </form>
 
       <p className="text-center text-sm text-muted-foreground">
         {t("register.hasAccount")}{" "}
-        <Link to="/login" className="font-medium text-primary underline">
+        <Link to={ROUTES.login} className="font-medium text-primary underline">
           {t("register.loginLink")}
         </Link>
       </p>
