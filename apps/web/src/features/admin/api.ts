@@ -14,6 +14,7 @@ export function useUploadSources() {
     /** Dosyaları bodySerializer ile FormData'ya dönüştürerek sunucuya gönderir. */
     mutationFn: async (files: File[]): Promise<UploadResponse> => {
       const { data, error, response } = await client.POST("/api/admin/sources", {
+        // Sadece tip için
         body: { files: files.map((file) => file.name) },
         /** Dosyaları tarayıcının boundary ekleyeceği FormData nesnesine serileştirir. */
         bodySerializer: () => {

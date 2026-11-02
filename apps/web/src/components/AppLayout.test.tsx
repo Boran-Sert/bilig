@@ -1,4 +1,4 @@
-﻿/**
+/**
  * Ortak sayfa düzeninin başlık ve çıkış davranışını test eder.
  * @vitest-environment jsdom
  */
@@ -61,6 +61,25 @@ describe("AppLayout", () => {
 
     expect(screen.getByRole("link", { name: "Bilig" })).toBeInTheDocument();
     expect(screen.queryByRole("button", { name: "Çıkış yap" })).not.toBeInTheDocument();
+  });
+
+  test("içerik yetkisi varsa yükleme ekranı bağlantısını gösterir", () => {
+    useMeMock.mockReturnValue({ data: { id: 1, canManageContent: true } });
+
+    renderLayout();
+
+    expect(screen.getByRole("link", { name: "İçerik yükle" })).toHaveAttribute(
+      "href",
+      "/admin/sources",
+    );
+  });
+
+  test("içerik yetkisi yoksa yükleme bağlantısını göstermez", () => {
+    useMeMock.mockReturnValue({ data: { id: 1, canManageContent: false } });
+
+    renderLayout();
+
+    expect(screen.queryByRole("link", { name: "İçerik yükle" })).not.toBeInTheDocument();
   });
 
   test("çıkış başarılıysa giriş sayfasına gider", async () => {

@@ -251,6 +251,7 @@ export interface components {
       /** Format: int32 */
       grade: number | null;
       explainStyle: string;
+      canManageContent: boolean;
     };
     LoginRequest: {
       /** Format: email */

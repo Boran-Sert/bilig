@@ -1,5 +1,5 @@
 /**
- * SourcesPage bileşeninin rol yetkilendirme, dosya doğrulama ve yükleme davranışlarını test eder.
+ * SourcesPage bileşeninin yetki, dosya ayıklama ve yükleme davranışlarını test eder.
  * @vitest-environment jsdom
  */
 import "@testing-library/jest-dom/vitest";
@@ -24,22 +24,17 @@ vi.mock("../api", () => ({
   useUploadSources: useUploadSourcesMock,
 }));
 
-const adminUser = {
+const contentManager = {
   id: 1,
   email: "admin@example.com",
   displayName: "Admin",
-  role: "CONTENT_ADMIN",
+  role: "ADMIN",
   grade: null,
-  explainStyle: "DETAILED",
+  explainStyle: "SIMPLE",
+  canManageContent: true,
 };
 
-const studentUser = {
-  ...adminUser,
-  id: 2,
-  role: "STUDENT",
-};
-
-/** Sayfayı bellek içi yönlendiriciyle sarmalayarak render eder. */
+/** Sayfayı bellek içi yönlendiriciyle oluşturur. */
 function renderSourcesPage() {
   return render(
     <MemoryRouter initialEntries={["/admin/sources"]}>
@@ -48,30 +43,50 @@ function renderSourcesPage() {
   );
 }
 
+/** Dosya seçiciye verilen dosyaları bırakır. */
+function dropFiles(files: File[]) {
+  const input = document.querySelector('input[type="file"]') as HTMLInputElement;
+  fireEvent.change(input, { target: { files } });
+}
+
+/** Yükleme hook'unu verilen durumla taklit eder. */
+function mockUploadState(state: { isPending?: boolean; error?: ApiError; data?: unknown }) {
+  useUploadSourcesMock.mockReturnValue({
+    mutate: mutateMock,
+    isPending: state.isPending ?? false,
+    isError: state.error !== undefined,
+    error: state.error ?? null,
+    data: state.data ?? null,
+  });
+}
+
+/** Belirtilen ad ve türle dosya üretir. */
+function createFile(name: string, type: string) {
+  return new File(["içerik"], name, { type });
+}
+
 afterEach(cleanup);
 
 describe("SourcesPage", () => {
   beforeEach(() => {
     mutateMock.mockReset();
-    useMeMock.mockReturnValue({ data: adminUser, isPending: false });
-    useUploadSourcesMock.mockReturnValue({
-      mutate: mutateMock,
-      isPending: false,
-      isError: false,
-      data: null,
-      error: null,
-    });
+    useMeMock.mockReturnValue({ data: contentManager, isPending: false });
+    mockUploadState({});
   });
 
-  test("oturum açmamış kullanıcıyı render etmez veya login'e yönlendirir", () => {
-    useMeMock.mockReturnValue({ data: null, isPending: false });
+  test("yetkisi sunucudan gelen yöneticiye yükleme alanını gösterir", () => {
     renderSourcesPage();
 
-    expect(screen.queryByText("PDF'leri buraya bırak")).not.toBeInTheDocument();
+    expect(document.title).toBe("İçerik yükle · Bilig");
+    expect(screen.getByText("PDF'leri buraya bırak")).toBeInTheDocument();
   });
 
-  test("CONTENT_ADMIN olmayan kullanıcıya erişim engeli gösterir", () => {
-    useMeMock.mockReturnValue({ data: studentUser, isPending: false });
+  test("içerik yetkisi olmayan kullanıcıya erişim engeli gösterir", () => {
+    useMeMock.mockReturnValue({
+      data: { ...contentManager, role: "STUDENT", canManageContent: false },
+      isPending: false,
+    });
+
     renderSourcesPage();
 
     expect(screen.getByRole("alert")).toHaveTextContent(
@@ -80,83 +95,73 @@ describe("SourcesPage", () => {
     expect(screen.queryByText("PDF'leri buraya bırak")).not.toBeInTheDocument();
   });
 
-  test("PDF olmayan dosya seçildiğinde sunucuya istek atmadan uyarır", async () => {
+  test("sadece PDF olmayan dosya bırakılırsa istek atmadan adıyla uyarır", async () => {
     renderSourcesPage();
 
-    const input = document.querySelector('input[type="file"]') as HTMLInputElement;
-    const txtFile = new File(["not a pdf"], "deneme.txt", { type: "text/plain" });
+    dropFiles([createFile("notlar.txt", "text/plain")]);
 
-    fireEvent.change(input, { target: { files: [txtFile] } });
-
-    await waitFor(() => {
-      expect(screen.getByRole("alert")).toHaveTextContent("Yalnızca PDF dosyaları yüklenebilir.");
-    });
+    expect(await screen.findByRole("alert")).toHaveTextContent(
+      "PDF olmadığı için yüklenmeyen dosyalar: notlar.txt",
+    );
     expect(mutateMock).not.toHaveBeenCalled();
   });
 
-  test("geçerli birden çok PDF seçildiğinde tek mutation çağrısı yapar", async () => {
+  test("karışık bırakmada PDF'leri yükler, diğerlerini adıyla bildirir", async () => {
+    const pdf = createFile("kitap.pdf", "application/pdf");
     renderSourcesPage();
 
-    const input = document.querySelector('input[type="file"]') as HTMLInputElement;
-    const pdf1 = new File(["pdf1"], "kitap1.pdf", { type: "application/pdf" });
-    const pdf2 = new File(["pdf2"], "kitap2.pdf", { type: "application/pdf" });
+    dropFiles([pdf, createFile("tablo.docx", "application/msword")]);
 
-    fireEvent.change(input, { target: { files: [pdf1, pdf2] } });
-
-    await waitFor(() => {
-      expect(mutateMock).toHaveBeenCalledTimes(1);
-    });
-    expect(mutateMock).toHaveBeenCalledWith([pdf1, pdf2]);
+    await waitFor(() => expect(mutateMock).toHaveBeenCalledWith([pdf]));
+    expect(screen.getByRole("alert")).toHaveTextContent("tablo.docx");
   });
 
-  test("sunucudan duplicate yanıtı geldiğinde ilgili dosya için uyarı gösterir", () => {
-    useUploadSourcesMock.mockReturnValue({
-      mutate: mutateMock,
-      isPending: false,
-      isError: false,
+  test("birden çok PDF'i tek istekte gönderir", async () => {
+    const firstPdf = createFile("kitap1.pdf", "application/pdf");
+    const secondPdf = createFile("kitap2.pdf", "application/pdf");
+    renderSourcesPage();
+
+    dropFiles([firstPdf, secondPdf]);
+
+    await waitFor(() => expect(mutateMock).toHaveBeenCalledTimes(1));
+    expect(mutateMock).toHaveBeenCalledWith([firstPdf, secondPdf]);
+  });
+
+  test("her dosyanın sonucunu ve daha önce yüklenmiş uyarısını gösterir", () => {
+    mockUploadState({
       data: {
         files: [
           { sourceId: 101, fileName: "yeni.pdf", duplicate: false },
           { sourceId: 102, fileName: "eski.pdf", duplicate: true },
         ],
       },
-      error: null,
     });
 
     renderSourcesPage();
 
-    expect(screen.getByText("yeni.pdf")).toBeInTheDocument();
-    expect(screen.getByText("eski.pdf")).toBeInTheDocument();
-    expect(screen.getByText("Bu dosya daha önce yüklenmiş")).toBeInTheDocument();
+    const rows = screen.getAllByRole("listitem");
+    expect(rows[0]).toHaveTextContent("yeni.pdfYüklendi");
+    expect(rows[1]).toHaveTextContent("eski.pdfBu dosya daha önce yüklenmiş");
   });
 
-  test("sunucu hatası oluştuğunda hata mesajını ekranda gösterir", () => {
-    const error = new ApiError({ code: "FILE_TOO_LARGE" }, 413);
-    useUploadSourcesMock.mockReturnValue({
-      mutate: mutateMock,
-      isPending: false,
-      isError: true,
-      data: null,
-      error,
+  test("sunucu hatasının mesajını gösterir", () => {
+    mockUploadState({
+      error: new ApiError(
+        { code: "FILE_TOO_LARGE", detail: "Dosya en fazla 100 MB olabilir." },
+        413,
+      ),
     });
 
     renderSourcesPage();
 
-    expect(screen.getByRole("alert")).toBeInTheDocument();
+    expect(screen.getByRole("alert")).toHaveTextContent("Dosya en fazla 100 MB olabilir.");
   });
 
-  test("yükleme sürerken butonu devre dışı bırakır ve durum metnini gösterir", () => {
-    useUploadSourcesMock.mockReturnValue({
-      mutate: mutateMock,
-      isPending: true,
-      isError: false,
-      data: null,
-      error: null,
-    });
+  test("yükleme sürerken düğmeyi kapatır ve durumu gösterir", () => {
+    mockUploadState({ isPending: true });
 
     renderSourcesPage();
 
-    const button = screen.getByRole("button", { name: "Yükleniyor..." });
-    expect(button).toBeDisabled();
+    expect(screen.getByRole("button", { name: "Yükleniyor..." })).toBeDisabled();
   });
 });

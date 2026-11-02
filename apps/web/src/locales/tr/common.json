@@ -9,7 +9,8 @@
     "metaDescription": "AYT Türk Dili ve Edebiyatı yanlışlarını kazanım bazında analiz eden çalışma asistanı."
   },
   "navigation": {
-    "home": "Ana sayfa"
+    "home": "Ana sayfa",
+    "adminSources": "İçerik yükle"
   },
   "notFound": {
     "title": "Sayfa bulunamadı",

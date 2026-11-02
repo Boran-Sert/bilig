@@ -1,25 +1,22 @@
 {
   "sources": {
     "title": "İçerik yükle",
-    "programTag": "TDE · eski program",
     "metaDescription": "AYT Edebiyat içerik kaynaklarını PDF olarak sisteme yükleyin.",
     "dropTitle": "PDF'leri buraya bırak",
+    "dropActive": "Dosyaları bırakabilirsin",
     "dropDescription": "Ders kitabı, kazanım testi, soru bankası, cevap anahtarı ya da öğretim programı. Birden çok dosya olabilir.",
     "selectButton": "Dosya seç",
-    "dropActive": "Dosyaları buraya bırakın...",
+    "uploading": "Yükleniyor...",
     "table": {
-      "file": "DOSYA",
-      "status": "DURUM",
-      "result": "SONUÇ"
+      "file": "Dosya",
+      "result": "Sonuç"
     },
-    "status": {
-      "uploading": "Yükleniyor...",
+    "result": {
       "uploaded": "Yüklendi",
-      "duplicate": "Bu dosya daha önce yüklenmiş",
-      "failed": "Yüklenemedi"
+      "duplicate": "Bu dosya daha önce yüklenmiş"
     },
     "errors": {
-      "invalidFileType": "Yalnızca PDF dosyaları yüklenebilir.",
+      "rejectedFiles": "PDF olmadığı için yüklenmeyen dosyalar: {{files}}",
       "accessDenied": "Bu ekranı yalnızca içerik yöneticileri görüntüleyebilir."
     }
   }
