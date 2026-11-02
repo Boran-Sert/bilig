@@ -1,6 +1,6 @@
 /**
  * ESLint ayarları: TypeScript, JSDoc ve i18next kuralları.
- * shadcn/ui bileşenlerinde JSDoc zorunluluğu uygulanmaz.
+ * shadcn/ui bileşenlerinde JSDoc, testlerde sabit metin kuralı uygulanmaz.
  */
 import js from "@eslint/js";
 import { defineConfig } from "eslint/config";
@@ -27,6 +27,12 @@ export default defineConfig(
           },
         },
       ],
+    },
+  },
+  {
+    files: ["src/**/*.test.{ts,tsx}"],
+    rules: {
+      "i18next/no-literal-string": "off",
     },
   },
   {
