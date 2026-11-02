@@ -64,6 +64,6 @@ class AuthServiceTest {
     /** Kayıt servisine geçerli profil değerleri sağlar. */
     private RegisterRequest validRequest() {
         return new RegisterRequest(
-                "student@example.test", "Valid-password-123", "Test student", (short) 12, "SIMPLE", true);
+                "student@example.test", "Valid-password-123", "Test student", (short) 12, "SIMPLE", true, true);
     }
 }

@@ -31,6 +31,11 @@ public record RegisterRequest(
         String explainStyle,
 
         @Schema(requiredMode = Schema.RequiredMode.REQUIRED)
+        @NotNull(message = "{validation.privacyNotice.required}")
+        @AssertTrue(message = "{validation.privacyNotice.required}")
+        Boolean privacyNoticeAccepted,
+
+        @Schema(requiredMode = Schema.RequiredMode.REQUIRED)
         @NotNull(message = "{validation.consent.required}")
         @AssertTrue(message = "{validation.consent.required}")
         Boolean consentAccepted) {

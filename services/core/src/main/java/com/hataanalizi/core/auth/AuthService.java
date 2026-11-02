@@ -52,7 +52,7 @@ public class AuthService {
         this.rememberMeServices = rememberMeServices;
     }
 
-    /** Yeni öğrenciyi açık rızasıyla kaydeder ve aynı istekte oturumunu açar. */
+    /** Yeni öğrenciyi aydınlatma onayı ve açık rızasıyla kaydeder, aynı istekte oturumunu açar. */
     public MeResponse register(
             RegisterRequest request, HttpServletRequest servletRequest, HttpServletResponse servletResponse) {
         AppUser appUser = new AppUser();
@@ -68,8 +68,11 @@ public class AuthService {
         if (request.explainStyle() != null) {
             appUser.setExplainStyle(request.explainStyle());
         }
+        OffsetDateTime acceptedAt = OffsetDateTime.now(ZoneOffset.UTC);
+        appUser.setPrivacyNoticeVersion(AppConstants.PRIVACY_NOTICE_VERSION);
+        appUser.setPrivacyNoticeAcceptedAt(acceptedAt);
         appUser.setConsentVersion(AppConstants.CONSENT_VERSION);
-        appUser.setConsentAcceptedAt(OffsetDateTime.now(ZoneOffset.UTC));
+        appUser.setConsentAcceptedAt(acceptedAt);
 
         AppUserPrincipal principal;
         try {

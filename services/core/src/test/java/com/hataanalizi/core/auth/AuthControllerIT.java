@@ -15,7 +15,7 @@ import java.util.UUID;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
 import org.junit.jupiter.params.ParameterizedTest;
-import org.junit.jupiter.params.provider.ValueSource;
+import org.junit.jupiter.params.provider.CsvSource;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.context.SpringBootTest;
 import org.springframework.boot.test.system.CapturedOutput;
@@ -215,25 +215,38 @@ class AuthControllerIT {
                 .andExpect(jsonPath("$.errors[0].message").value("Geçerli bir anlatım tarzı seç."));
     }
 
-    /** Açık rıza verilmeyen kaydı 400 olarak reddeder ve kullanıcı oluşturmaz. */
+    /** Onaylardan biri eksik ya da hayırsa kaydı yalnız o alanın hatasıyla reddeder. */
     @ParameterizedTest
-    @ValueSource(strings = {"", ",\"consentAccepted\":false"})
-    void missingConsentReturnsBadRequest(String consentProperty) throws Exception {
+    @CsvSource(
+            nullValues = "null",
+            value = {
+                "null,  true,  privacyNoticeAccepted, Devam etmek için aydınlatma metnini okuduğunu onaylamalısın.",
+                "false, true,  privacyNoticeAccepted, Devam etmek için aydınlatma metnini okuduğunu onaylamalısın.",
+                "true,  null,  consentAccepted, Devam etmek için kişisel verilerinin işlenmesine açık rıza vermelisin.",
+                "true,  false, consentAccepted, Devam etmek için kişisel verilerinin işlenmesine açık rıza vermelisin."
+            })
+    void missingApprovalReturnsBadRequest(
+            Boolean privacyNoticeAccepted, Boolean consentAccepted, String field, String message) throws Exception {
         String email = uniqueEmail();
         mockMvc.perform(post("/api/auth/register")
                         .with(csrfHeaders())
                         .contentType(MediaType.APPLICATION_JSON)
                         .content("""
-                                {"email":"%s","password":"%s","displayName":"Test student"%s}
-                                """.formatted(email, PASSWORD, consentProperty)))
+                                {"email":"%s","password":"%s","displayName":"Test student"%s%s}
+                                """.formatted(
+                                        email,
+                                        PASSWORD,
+                                        approvalJson("privacyNoticeAccepted", privacyNoticeAccepted),
+                                        approvalJson("consentAccepted", consentAccepted))))
                 .andExpect(status().isBadRequest())
-                .andExpect(jsonPath("$.errors[0].field").value("consentAccepted"))
-                .andExpect(jsonPath("$.errors[0].message").value("Devam etmek için aydınlatma metnini onaylamalısın."));
+                .andExpect(jsonPath("$.errors.length()").value(1))
+                .andExpect(jsonPath("$.errors[0].field").value(field))
+                .andExpect(jsonPath("$.errors[0].message").value(message));
 
         assertThat(appUserRepository.findByEmail(email)).isEmpty();
     }
 
-    /** Kaydın oturumu açtığını, rızayı sakladığını ve varsayılan sınıfı atadığını doğrular. */
+    /** Kaydın oturumu açtığını, iki onayı ayrı sakladığını ve varsayılan sınıfı atadığını doğrular. */
     @Test
     void registerStartsSessionAndStoresConsent() throws Exception {
         String email = uniqueEmail();
@@ -241,7 +254,8 @@ class AuthControllerIT {
                         .with(csrfHeaders())
                         .contentType(MediaType.APPLICATION_JSON)
                         .content("""
-                                {"email":"%s","password":"%s","displayName":"Test student","consentAccepted":true}
+                                {"email":"%s","password":"%s","displayName":"Test student",\
+                                "privacyNoticeAccepted":true,"consentAccepted":true}
                                 """.formatted(email, PASSWORD)))
                 .andExpect(status().isCreated())
                 .andExpect(jsonPath("$.grade").value((int) AppConstants.DEFAULT_GRADE))
@@ -254,6 +268,8 @@ class AuthControllerIT {
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$.email").value(email));
         AppUser appUser = appUserRepository.findByEmail(email).orElseThrow();
+        assertThat(appUser.getPrivacyNoticeVersion()).isEqualTo(AppConstants.PRIVACY_NOTICE_VERSION);
+        assertThat(appUser.getPrivacyNoticeAcceptedAt()).isNotNull();
         assertThat(appUser.getConsentVersion()).isEqualTo(AppConstants.CONSENT_VERSION);
         assertThat(appUser.getConsentAcceptedAt()).isNotNull();
     }
@@ -289,8 +305,13 @@ class AuthControllerIT {
     private String registerJson(String email, String password, String explainStyle) {
         return """
                 {"email":"%s","password":"%s","displayName":"Test student","grade":12,"explainStyle":"%s",\
-                "consentAccepted":true}
+                "privacyNoticeAccepted":true,"consentAccepted":true}
                 """.formatted(email, password, explainStyle);
+    }
+
+    /** Onay alanını JSON parçası olarak üretir; değer yoksa alanı hiç yazmaz. */
+    private String approvalJson(String field, Boolean accepted) {
+        return accepted == null ? "" : ",\"%s\":%s".formatted(field, accepted);
     }
 
     /** Kalıcı oturum alanı olmayan eski giriş gövdesini üretir. */

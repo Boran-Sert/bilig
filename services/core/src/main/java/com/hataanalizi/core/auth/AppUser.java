@@ -54,6 +54,12 @@ public class AppUser {
     @Column(name = "external_user_id", columnDefinition = "text")
     private String externalUserId;
 
+    @Column(name = "privacy_notice_version", columnDefinition = "text")
+    private String privacyNoticeVersion;
+
+    @Column(name = "privacy_notice_accepted_at")
+    private OffsetDateTime privacyNoticeAcceptedAt;
+
     @Column(name = "consent_version", columnDefinition = "text")
     private String consentVersion;
 

@@ -363,7 +363,9 @@ Sorunun kazanım kolonu yoktur; kazanımlar `question_outcome`'da.
 | grade | smallint | evet | | |
 | explain_style | text | hayır | 'SIMPLE' | CHECK IN ('SIMPLE', 'EXAMPLES', 'STEP_BY_STEP') |
 | external_user_id | text | evet | | Kurumun kendi kullanıcı numarası |
-| consent_version | text | evet | | Kabul edilen aydınlatma ve açık rıza metninin sürümü |
+| privacy_notice_version | text | evet | | Okunduğu onaylanan aydınlatma metninin sürümü |
+| privacy_notice_accepted_at | timestamptz | evet | | Aydınlatma metninin onaylandığı an |
+| consent_version | text | evet | | Verilen açık rıza metninin sürümü |
 | consent_accepted_at | timestamptz | evet | | Açık rızanın verildiği an |
 | created_at | timestamptz | hayır | now() | |
 | updated_at | timestamptz | hayır | now() | |
