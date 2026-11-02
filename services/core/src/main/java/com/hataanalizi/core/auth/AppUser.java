@@ -54,6 +54,12 @@ public class AppUser {
     @Column(name = "external_user_id", columnDefinition = "text")
     private String externalUserId;
 
+    @Column(name = "consent_version", columnDefinition = "text")
+    private String consentVersion;
+
+    @Column(name = "consent_accepted_at")
+    private OffsetDateTime consentAcceptedAt;
+
     @Column(name = "created_at", nullable = false, insertable = false, updatable = false)
     private OffsetDateTime createdAt;
 

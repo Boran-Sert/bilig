@@ -8,6 +8,8 @@ import com.hataanalizi.core.common.AppConstants;
 import com.hataanalizi.core.common.ErrorCode;
 import jakarta.servlet.http.HttpServletRequest;
 import jakarta.servlet.http.HttpServletResponse;
+import java.time.OffsetDateTime;
+import java.time.ZoneOffset;
 import java.util.Locale;
 import org.hibernate.exception.ConstraintViolationException;
 import org.springframework.dao.DataIntegrityViolationException;
@@ -50,8 +52,9 @@ public class AuthService {
         this.rememberMeServices = rememberMeServices;
     }
 
-    /** Yeni öğrenciyi kaydeder ve parola özeti dışında hiçbir parola bilgisi döndürmez. */
-    public MeResponse register(RegisterRequest request) {
+    /** Yeni öğrenciyi açık rızasıyla kaydeder ve aynı istekte oturumunu açar. */
+    public MeResponse register(
+            RegisterRequest request, HttpServletRequest servletRequest, HttpServletResponse servletResponse) {
         AppUser appUser = new AppUser();
         appUser.setTenantId(tenantRepository
                 .findByName(AppConstants.DEFAULT_TENANT_NAME)
@@ -61,19 +64,24 @@ public class AuthService {
         appUser.setPasswordHash(passwordEncoder.encode(request.password()));
         appUser.setDisplayName(request.displayName());
         appUser.setRole(AppConstants.STUDENT_ROLE);
-        appUser.setGrade(request.grade());
+        appUser.setGrade(request.grade() == null ? AppConstants.DEFAULT_GRADE : request.grade());
         if (request.explainStyle() != null) {
             appUser.setExplainStyle(request.explainStyle());
         }
+        appUser.setConsentVersion(AppConstants.CONSENT_VERSION);
+        appUser.setConsentAcceptedAt(OffsetDateTime.now(ZoneOffset.UTC));
 
+        AppUserPrincipal principal;
         try {
-            return MeResponse.from(appUserRepository.saveAndFlush(appUser));
+            principal = AppUserPrincipal.from(appUserRepository.saveAndFlush(appUser));
         } catch (DataIntegrityViolationException exception) {
             if (isEmailAlreadyTaken(exception)) {
                 throw new ApiException(ErrorCode.EMAIL_TAKEN, exception);
             }
             throw exception;
         }
+        startSession(principal, servletRequest, servletResponse);
+        return MeResponse.from(principal);
     }
 
     /** Doğruladığı kullanıcıyı sunucu oturumuna kaydeder. */
@@ -91,18 +99,24 @@ public class AuthService {
         if (!(authentication.getPrincipal() instanceof AppUserPrincipal principal)) {
             throw new IllegalStateException("Authentication returned an unexpected principal");
         }
-        AuthUser authUser = new AuthUser(principal.id(), principal.email(), principal.role());
-        SecurityContext context = SecurityContextHolder.createEmptyContext();
-        context.setAuthentication(
-                UsernamePasswordAuthenticationToken.authenticated(authUser, null, authentication.getAuthorities()));
-        servletRequest.getSession(true);
-        servletRequest.changeSessionId();
-        SecurityContextHolder.setContext(context);
-        securityContextRepository.saveContext(context, servletRequest, servletResponse);
+        startSession(principal, servletRequest, servletResponse);
         if (Boolean.TRUE.equals(request.rememberMe())) {
             rememberMeServices.issueRememberMeCookie(authentication, servletRequest, servletResponse);
         }
         return MeResponse.from(principal);
+    }
+
+    /** Principal'ı yeni oturum kimliğiyle sunucu oturumuna kaydeder. */
+    private void startSession(
+            AppUserPrincipal principal, HttpServletRequest servletRequest, HttpServletResponse servletResponse) {
+        AuthUser authUser = new AuthUser(principal.id(), principal.email(), principal.role());
+        SecurityContext context = SecurityContextHolder.createEmptyContext();
+        context.setAuthentication(
+                UsernamePasswordAuthenticationToken.authenticated(authUser, null, principal.getAuthorities()));
+        servletRequest.getSession(true);
+        servletRequest.changeSessionId();
+        SecurityContextHolder.setContext(context);
+        securityContextRepository.saveContext(context, servletRequest, servletResponse);
     }
 
     /** Giriş yapmış kullanıcının güncel profilini döndürür. */

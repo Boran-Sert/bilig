@@ -12,6 +12,18 @@ public record AppUserPrincipal(
         Long id, String email, String passwordHash, String displayName, String role, Short grade, String explainStyle)
         implements UserDetails {
 
+    /** Kullanıcı kaydından oturumda taşınacak principal'ı üretir. */
+    public static AppUserPrincipal from(AppUser appUser) {
+        return new AppUserPrincipal(
+                appUser.getId(),
+                appUser.getEmail(),
+                appUser.getPasswordHash() == null ? "" : appUser.getPasswordHash(),
+                appUser.getDisplayName(),
+                appUser.getRole(),
+                appUser.getGrade(),
+                appUser.getExplainStyle());
+    }
+
     /** Kullanıcının rol yetkisini döndürür. */
     @Override
     public Collection<? extends GrantedAuthority> getAuthorities() {

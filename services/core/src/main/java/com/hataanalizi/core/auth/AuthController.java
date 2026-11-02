@@ -33,10 +33,14 @@ public class AuthController {
         this.rememberMeServices = rememberMeServices;
     }
 
-    /** Yeni öğrenci hesabı oluşturur. */
+    /** Yeni öğrenci hesabı oluşturur ve oturumunu açar. */
     @PostMapping("/auth/register")
-    public ResponseEntity<MeResponse> register(@Valid @RequestBody RegisterRequest request) {
-        return ResponseEntity.status(HttpStatus.CREATED).body(authService.register(request));
+    public ResponseEntity<MeResponse> register(
+            @Valid @RequestBody RegisterRequest request,
+            HttpServletRequest servletRequest,
+            HttpServletResponse servletResponse) {
+        return ResponseEntity.status(HttpStatus.CREATED)
+                .body(authService.register(request, servletRequest, servletResponse));
     }
 
     /** Öğrencinin kimlik bilgilerini doğrulayıp oturum açar. */

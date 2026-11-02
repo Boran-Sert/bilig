@@ -14,6 +14,8 @@ import java.util.Locale;
 import java.util.UUID;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
+import org.junit.jupiter.params.ParameterizedTest;
+import org.junit.jupiter.params.provider.ValueSource;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.context.SpringBootTest;
 import org.springframework.boot.test.system.CapturedOutput;
@@ -213,6 +215,49 @@ class AuthControllerIT {
                 .andExpect(jsonPath("$.errors[0].message").value("Geçerli bir anlatım tarzı seç."));
     }
 
+    /** Açık rıza verilmeyen kaydı 400 olarak reddeder ve kullanıcı oluşturmaz. */
+    @ParameterizedTest
+    @ValueSource(strings = {"", ",\"consentAccepted\":false"})
+    void missingConsentReturnsBadRequest(String consentProperty) throws Exception {
+        String email = uniqueEmail();
+        mockMvc.perform(post("/api/auth/register")
+                        .with(csrfHeaders())
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("""
+                                {"email":"%s","password":"%s","displayName":"Test student"%s}
+                                """.formatted(email, PASSWORD, consentProperty)))
+                .andExpect(status().isBadRequest())
+                .andExpect(jsonPath("$.errors[0].field").value("consentAccepted"))
+                .andExpect(jsonPath("$.errors[0].message").value("Devam etmek için aydınlatma metnini onaylamalısın."));
+
+        assertThat(appUserRepository.findByEmail(email)).isEmpty();
+    }
+
+    /** Kaydın oturumu açtığını, rızayı sakladığını ve varsayılan sınıfı atadığını doğrular. */
+    @Test
+    void registerStartsSessionAndStoresConsent() throws Exception {
+        String email = uniqueEmail();
+        MvcResult result = mockMvc.perform(post("/api/auth/register")
+                        .with(csrfHeaders())
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("""
+                                {"email":"%s","password":"%s","displayName":"Test student","consentAccepted":true}
+                                """.formatted(email, PASSWORD)))
+                .andExpect(status().isCreated())
+                .andExpect(jsonPath("$.grade").value((int) AppConstants.DEFAULT_GRADE))
+                .andExpect(jsonPath("$.explainStyle").value(AppConstants.DEFAULT_EXPLAIN_STYLE))
+                .andReturn();
+
+        MockHttpSession session = (MockHttpSession) result.getRequest().getSession(false);
+        assertThat(session).isNotNull();
+        mockMvc.perform(get("/api/me").session(session))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.email").value(email));
+        AppUser appUser = appUserRepository.findByEmail(email).orElseThrow();
+        assertThat(appUser.getConsentVersion()).isEqualTo(AppConstants.CONSENT_VERSION);
+        assertThat(appUser.getConsentAcceptedAt()).isNotNull();
+    }
+
     /** BCrypt sınırını aşan UTF-8 parolayı 400 olarak reddeder. */
     @Test
     void oversizedUtf8PasswordReturnsBadRequest() throws Exception {
@@ -243,7 +288,8 @@ class AuthControllerIT {
     /** Kayıt isteğinin JSON gövdesini üretir. */
     private String registerJson(String email, String password, String explainStyle) {
         return """
-                {"email":"%s","password":"%s","displayName":"Test student","grade":12,"explainStyle":"%s"}
+                {"email":"%s","password":"%s","displayName":"Test student","grade":12,"explainStyle":"%s",\
+                "consentAccepted":true}
                 """.formatted(email, password, explainStyle);
     }
 
