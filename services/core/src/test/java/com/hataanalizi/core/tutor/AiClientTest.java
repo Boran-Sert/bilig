@@ -2,6 +2,7 @@ package com.hataanalizi.core.tutor;
 
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
+import static org.springframework.test.web.client.match.MockRestRequestMatchers.content;
 import static org.springframework.test.web.client.match.MockRestRequestMatchers.header;
 import static org.springframework.test.web.client.match.MockRestRequestMatchers.method;
 import static org.springframework.test.web.client.match.MockRestRequestMatchers.requestTo;
@@ -28,6 +29,7 @@ import org.slf4j.LoggerFactory;
 import org.slf4j.MDC;
 import org.springframework.http.HttpMethod;
 import org.springframework.http.HttpStatus;
+import org.springframework.http.MediaType;
 import org.springframework.test.web.client.MockRestServiceServer;
 import org.springframework.web.client.RestClient;
 
@@ -36,6 +38,7 @@ class AiClientTest {
 
     private static final String BASE_URL = "http://ai-test";
     private static final String HEALTH_URL = "http://ai-test/internal/health";
+    private static final String HINT_URL = "http://ai-test/internal/hints";
     private static final String TOKEN = "gizli-test-token-123";
     private static final String UUID_PATTERN = "[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}";
 
@@ -94,6 +97,22 @@ class AiClientTest {
                 .andRespond(withSuccess());
 
         client.health();
+
+        server.verify();
+    }
+
+    /** İpucu isteğini iç başlıklar ve Python sözleşmesindeki JSON ile gönderir. */
+    @Test
+    void requestsHintAndReturnsPythonResponse() {
+        server.expect(requestTo(HINT_URL))
+                .andExpect(method(HttpMethod.POST))
+                .andExpect(header(AiClientConfig.INTERNAL_TOKEN_HEADER, TOKEN))
+                .andExpect(request -> assertThat(request.getHeaders().getFirst(RequestIdFilter.HEADER_NAME))
+                        .matches(UUID_PATTERN))
+                .andExpect(content().json("{\"questionId\":12}"))
+                .andRespond(withSuccess("{\"hint\":\"Compare the choices.\"}", MediaType.APPLICATION_JSON));
+
+        assertThat(client.hint(12L)).isEqualTo("Compare the choices.");
 
         server.verify();
     }
