@@ -2,6 +2,7 @@ package com.hataanalizi.core.auth;
 
 import com.hataanalizi.core.auth.dto.LoginRequest;
 import com.hataanalizi.core.auth.dto.MeResponse;
+import com.hataanalizi.core.auth.dto.RegisterOptionsResponse;
 import com.hataanalizi.core.auth.dto.RegisterRequest;
 import jakarta.servlet.http.HttpServletRequest;
 import jakarta.servlet.http.HttpServletResponse;
@@ -31,6 +32,12 @@ public class AuthController {
     public AuthController(AuthService authService, AppPersistentTokenRememberMeServices rememberMeServices) {
         this.authService = authService;
         this.rememberMeServices = rememberMeServices;
+    }
+
+    /** Kayıt formunda seçilebilecek sınıfları döndürür. */
+    @GetMapping("/auth/register-options")
+    public RegisterOptionsResponse registerOptions() {
+        return authService.registerOptions();
     }
 
     /** Yeni öğrenci hesabı oluşturur ve oturumunu açar. */

@@ -2,6 +2,7 @@ package com.hataanalizi.core.auth;
 
 import com.hataanalizi.core.auth.dto.LoginRequest;
 import com.hataanalizi.core.auth.dto.MeResponse;
+import com.hataanalizi.core.auth.dto.RegisterOptionsResponse;
 import com.hataanalizi.core.auth.dto.RegisterRequest;
 import com.hataanalizi.core.common.ApiException;
 import com.hataanalizi.core.common.AppConstants;
@@ -64,7 +65,7 @@ public class AuthService {
         appUser.setPasswordHash(passwordEncoder.encode(request.password()));
         appUser.setDisplayName(request.displayName());
         appUser.setRole(AppConstants.STUDENT_ROLE);
-        appUser.setGrade(request.grade() == null ? AppConstants.DEFAULT_GRADE : request.grade());
+        appUser.setGrade(request.grade());
         if (request.explainStyle() != null) {
             appUser.setExplainStyle(request.explainStyle());
         }
@@ -107,6 +108,11 @@ public class AuthService {
             rememberMeServices.issueRememberMeCookie(authentication, servletRequest, servletResponse);
         }
         return MeResponse.from(principal);
+    }
+
+    /** Kayıt formunda seçilebilecek değerleri döndürür. */
+    public RegisterOptionsResponse registerOptions() {
+        return RegisterOptionsResponse.current();
     }
 
     /** Principal'ı yeni oturum kimliğiyle sunucu oturumuna kaydeder. */

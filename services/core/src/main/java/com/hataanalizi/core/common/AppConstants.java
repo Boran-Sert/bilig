@@ -15,7 +15,8 @@ public final class AppConstants {
     public static final String ADMIN_ROLE = "ADMIN";
     public static final String DEFAULT_TENANT_NAME = "Bilig";
     public static final String DEFAULT_EXPLAIN_STYLE = "SIMPLE";
-    public static final short DEFAULT_GRADE = 12;
+    public static final int MIN_GRADE = 9;
+    public static final int GRADUATE_GRADE = 13;
     public static final String PRIVACY_NOTICE_VERSION = "2026-11-02";
     public static final String CONSENT_VERSION = "2026-11-02";
     public static final String EXPLAIN_STYLE_PATTERN = "SIMPLE|EXAMPLES|STEP_BY_STEP";
