@@ -10,6 +10,7 @@ import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
 
 import com.hataanalizi.core.auth.AppPersistentTokenRememberMeServices;
+import com.hataanalizi.core.auth.AuthController;
 import com.hataanalizi.core.auth.AuthService;
 import com.hataanalizi.core.auth.WithAuthUser;
 import com.hataanalizi.core.common.AppConstants;
@@ -31,7 +32,7 @@ import org.springframework.test.web.servlet.MockMvc;
 import org.springframework.test.web.servlet.MvcResult;
 
 /** Güvenlik yollarının, rollerin ve CSRF başlık sözleşmesinin HTTP davranışını doğrular. */
-@WebMvcTest
+@WebMvcTest(AuthController.class)
 @Import({
     SecurityConfig.class,
     GlobalExceptionHandler.class,
