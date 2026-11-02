@@ -12,6 +12,7 @@ from contextlib import asynccontextmanager
 
 from fastapi import FastAPI, Request, Response
 
+from app.api.tutor import router as tutor_router
 from app.config import get_settings
 from app.constants import REQUEST_ID_HEADER
 from app.db.pool import close_pool, open_pool
@@ -31,6 +32,7 @@ async def lifespan(_: FastAPI) -> AsyncIterator[None]:
 
 
 app = FastAPI(title="ai", lifespan=lifespan)
+app.include_router(tutor_router)
 
 
 @app.middleware("http")
