@@ -5,6 +5,7 @@ caplog'u kayıt görmez; bu testler çıktıyı capsys ile okur.
 
 Veritabanı testleri core'un migration'larıyla kurulmuş gerçek Postgres'e bağlanır. PDF dış yüzü
 ayar verilmeyince kök listesini WORD_LIST_PATH'ten okur; testlerde bu repodaki listedir.
+İç uç noktaların token'ı (INTERNAL_TOKEN) testlerde sabit bir değerdir.
 Her test kendi transaction'ında çalışır ve test bitince yaptığı her şey geri alınır.
 """
 
@@ -24,6 +25,7 @@ from app.log import clear_request_context
 from tests.word_list import REPOSITORY_WORD_LIST
 
 os.environ.setdefault("WORD_LIST_PATH", str(REPOSITORY_WORD_LIST))
+os.environ.setdefault("INTERNAL_TOKEN", "test-internal-token")
 
 
 @pytest.fixture(autouse=True)

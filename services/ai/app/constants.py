@@ -7,6 +7,7 @@ from pathlib import Path
 
 SERVICE_NAME = "ai"
 REQUEST_ID_HEADER = "X-Request-Id"
+INTERNAL_TOKEN_HEADER = "X-Internal-Token"
 UVICORN_LOGGERS = ("uvicorn", "uvicorn.access", "uvicorn.error")
 
 DB_POOL_MIN_SIZE = 1
@@ -52,6 +53,10 @@ RRF_K = 60
 RRF_RESULT_LIMIT = 20
 OUTCOME_QUESTION_CANDIDATES = 16
 OUTCOME_PARAGRAPH_CANDIDATES = 5
+TUTOR_SOURCE_LIMIT = 4
+TUTOR_SOURCE_BLOCK_TYPES = ("BILGI", "ALINTI")
+TUTOR_SOURCE_LABEL = "{title} · s. {page}"
+SSE_MEDIA_TYPE = "text/event-stream"
 CONTROL_SET_GRADE = 12
 CONTROL_SET_UNIT_TITLES = {
     "Giriş": "Giriş",

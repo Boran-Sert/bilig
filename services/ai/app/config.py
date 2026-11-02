@@ -12,7 +12,7 @@ from functools import lru_cache
 from pathlib import Path
 from typing import Literal
 
-from pydantic import BaseModel, PositiveInt, PostgresDsn, ValidationError
+from pydantic import BaseModel, PositiveInt, PostgresDsn, SecretStr, ValidationError
 from pydantic_settings import BaseSettings, SettingsConfigDict
 
 
@@ -34,6 +34,14 @@ class LogSettings(BaseSettings):
     model_config = SettingsConfigDict(extra="ignore")
 
     log_level: Literal["DEBUG", "INFO", "WARNING", "ERROR"] = "INFO"
+
+
+class ApiSettings(BaseSettings):
+    """Java'dan gelen iç isteklerin token'ı."""
+
+    model_config = SettingsConfigDict(extra="ignore")
+
+    internal_token: SecretStr
 
 
 class IngestSettings(BaseSettings):
@@ -78,12 +86,13 @@ class Settings(BaseModel):
 
     database: DatabaseSettings
     log: LogSettings
+    api: ApiSettings
 
 
 def load_settings() -> Settings:
     """Ayarları ortam değişkenlerinden okur; sorun varsa değişken adlarıyla hata verir."""
     try:
-        return Settings(database=DatabaseSettings(), log=LogSettings())
+        return Settings(database=DatabaseSettings(), log=LogSettings(), api=ApiSettings())
     except ValidationError as error:
         raise SettingsError(_describe_errors(error)) from error
 
