@@ -8,11 +8,12 @@ import jakarta.persistence.Id;
 import jakarta.persistence.Table;
 import lombok.Getter;
 import lombok.NoArgsConstructor;
+import lombok.Setter;
 import org.hibernate.annotations.JdbcTypeCode;
 import org.hibernate.type.SqlTypes;
 import tools.jackson.databind.JsonNode;
 
-/** Soru metnini veritabanından yalnızca okunacak şekilde eşler. */
+/** Soru metnini ve ipucunu veritabanına eşler. */
 @Entity
 @Table(name = "question")
 @Getter
@@ -26,4 +27,8 @@ public class Question {
     @JdbcTypeCode(SqlTypes.JSON)
     @Column(nullable = false, columnDefinition = "jsonb")
     private JsonNode content;
+
+    @Setter
+    @Column(name = "hint")
+    private String hint;
 }
