@@ -10,6 +10,8 @@ import RedirectIfAuthenticated from "./features/auth/components/RedirectIfAuthen
 import RequireAuth from "./features/auth/components/RequireAuth";
 import LoginPage from "./features/auth/pages/LoginPage";
 import RegisterPage from "./features/auth/pages/RegisterPage";
+import SolvePage from "./features/solve/pages/SolvePage";
+import TestListPage from "./features/tests/pages/TestListPage";
 import { ROUTES } from "./lib/constants";
 
 /** Ana sayfayı gösterir. */
@@ -50,6 +52,22 @@ export const router = createBrowserRouter([
         element: (
           <RequireAuth>
             <HomePage />
+          </RequireAuth>
+        ),
+      },
+      {
+        path: ROUTES.tests,
+        element: (
+          <RequireAuth>
+            <TestListPage />
+          </RequireAuth>
+        ),
+      },
+      {
+        path: ROUTES.solve,
+        element: (
+          <RequireAuth>
+            <SolvePage />
           </RequireAuth>
         ),
       },

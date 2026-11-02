@@ -8,6 +8,8 @@ export const ROUTES = {
   login: "/login",
   register: "/register",
   adminSources: "/admin/sources",
+  tests: "/tests",
+  solve: "/tests/:testId/solve",
 } as const;
 
 export const HTTP_STATUS_UNAUTHORIZED = 401;
