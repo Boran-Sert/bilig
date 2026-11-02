@@ -67,7 +67,8 @@ class AiClientTest {
                     return execution.execute(request, body);
                 });
         server = MockRestServiceServer.bindTo(builder).build();
-        client = new AiClient(builder.build());
+        RestClient restClient = builder.build();
+        client = new AiClient(restClient, restClient);
 
         rootLogger = (Logger) LoggerFactory.getLogger(Logger.ROOT_LOGGER_NAME);
         previousLevel = rootLogger.getLevel();
@@ -115,6 +116,28 @@ class AiClientTest {
         assertThat(client.hint(12L)).isEqualTo("Compare the choices.");
 
         server.verify();
+    }
+
+    /** Python sorunun yayında olmadığını 404 ile bildirirse QUESTION_NOT_FOUND olur. */
+    @Test
+    void hintNotFoundBecomesQuestionNotFound() {
+        server.expect(requestTo(HINT_URL)).andRespond(withStatus(HttpStatus.NOT_FOUND));
+
+        assertThatThrownBy(() -> client.hint(12L))
+                .isInstanceOfSatisfying(
+                        ApiException.class,
+                        exception -> assertThat(exception.getErrorCode()).isEqualTo(ErrorCode.QUESTION_NOT_FOUND));
+    }
+
+    /** İpucu üretiminde 5xx cevabı AI_UNAVAILABLE olur. */
+    @Test
+    void hintServerErrorBecomesAiUnavailable() {
+        server.expect(requestTo(HINT_URL)).andRespond(withServerError());
+
+        assertThatThrownBy(() -> client.hint(12L))
+                .isInstanceOfSatisfying(
+                        ApiException.class,
+                        exception -> assertThat(exception.getErrorCode()).isEqualTo(ErrorCode.AI_UNAVAILABLE));
     }
 
     /** MDC boşken de X-Request-Id başlığı gider ve UUID biçimindedir. */

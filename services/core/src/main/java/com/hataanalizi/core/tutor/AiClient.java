@@ -4,6 +4,7 @@ import com.hataanalizi.core.common.ApiException;
 import com.hataanalizi.core.common.ErrorCode;
 import java.util.function.Supplier;
 import org.springframework.beans.factory.annotation.Qualifier;
+import org.springframework.http.HttpStatus;
 import org.springframework.http.HttpStatusCode;
 import org.springframework.http.MediaType;
 import org.springframework.stereotype.Component;
@@ -19,9 +20,14 @@ import org.springframework.web.client.RestClient;
 public class AiClient {
 
     private final RestClient restClient;
+    private final RestClient generationRestClient;
 
-    public AiClient(@Qualifier("aiRestClient") RestClient restClient) {
+    /** Kısa istek ve metin üretimi istemcilerini saklar. */
+    public AiClient(
+            @Qualifier("aiRestClient") RestClient restClient,
+            @Qualifier("aiGenerationRestClient") RestClient generationRestClient) {
         this.restClient = restClient;
+        this.generationRestClient = generationRestClient;
     }
 
     /** AI servisinin ayakta olduğunu GET /internal/health ile kontrol eder. */
@@ -39,14 +45,17 @@ public class AiClient {
                 .toBodilessEntity());
     }
 
-    /** Python'dan soru ipucunu alır. */
+    /** Python'dan soru ipucunu alır; soru Python'da yayında değilse QUESTION_NOT_FOUND olur. */
     public String hint(Long questionId) {
-        HintResponse response = execute(() -> restClient
+        HintResponse response = execute(() -> generationRestClient
                 .post()
                 .uri("/internal/hints")
                 .contentType(MediaType.APPLICATION_JSON)
                 .body(new HintRequest(questionId))
                 .retrieve()
+                .onStatus(status -> status.isSameCodeAs(HttpStatus.NOT_FOUND), (request, result) -> {
+                    throw new ApiException(ErrorCode.QUESTION_NOT_FOUND);
+                })
                 .onStatus(HttpStatusCode::isError, (request, result) -> {
                     throw new ApiException(
                             ErrorCode.AI_UNAVAILABLE,
