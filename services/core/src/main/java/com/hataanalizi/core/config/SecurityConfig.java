@@ -46,7 +46,7 @@ public class SecurityConfig {
                         .requestMatchers("/api/auth/**", "/v3/api-docs/**", "/swagger-ui/**", "/swagger-ui.html")
                         .permitAll()
                         .requestMatchers("/api/admin/**")
-                        .hasAnyRole(AppConstants.CONTENT_ADMIN_ROLE, AppConstants.ADMIN_ROLE)
+                        .hasAnyRole(AppConstants.CONTENT_MANAGER_ROLES.toArray(String[]::new))
                         .requestMatchers("/api/**")
                         .authenticated()
                         .anyRequest()

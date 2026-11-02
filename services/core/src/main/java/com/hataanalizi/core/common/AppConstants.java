@@ -1,5 +1,7 @@
 package com.hataanalizi.core.common;
 
+import java.util.List;
+
 /**
  * Değişmeyen uygulama sabitlerini özellik bölümlerine göre tutar. Ortama göre değişen değerler
  * buraya değil application.yml dosyasına yazılır.
@@ -13,6 +15,7 @@ public final class AppConstants {
     public static final String STUDENT_ROLE = "STUDENT";
     public static final String CONTENT_ADMIN_ROLE = "CONTENT_ADMIN";
     public static final String ADMIN_ROLE = "ADMIN";
+    public static final List<String> CONTENT_MANAGER_ROLES = List.of(CONTENT_ADMIN_ROLE, ADMIN_ROLE);
     public static final String DEFAULT_TENANT_NAME = "Bilig";
     public static final String DEFAULT_EXPLAIN_STYLE = "SIMPLE";
     public static final int MIN_GRADE = 9;
