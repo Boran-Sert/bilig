@@ -1,5 +1,7 @@
 package com.hataanalizi.core.tutor;
 
+import static org.assertj.core.api.Assertions.assertThat;
+import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.times;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
@@ -10,6 +12,7 @@ import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.
 
 import com.hataanalizi.core.TestcontainersConfiguration;
 import com.hataanalizi.core.auth.AuthUser;
+import com.hataanalizi.core.common.AppConstants;
 import java.util.List;
 import java.util.UUID;
 import org.junit.jupiter.api.Test;
@@ -49,7 +52,7 @@ class HintControllerIT {
     @Test
     void generatesAndReturnsCachedHint() throws Exception {
         Long userId = insertUser();
-        Long questionId = insertQuestion(insertCurriculumUnit());
+        Long questionId = insertQuestion(insertCurriculumUnit(), AppConstants.QUESTION_STATUS_PUBLISHED);
         when(aiClient.hint(questionId)).thenReturn("Compare the choices.");
 
         mockMvc.perform(get("/api/questions/{id}/hint", questionId).with(student(userId)))
@@ -60,9 +63,55 @@ class HintControllerIT {
                 .andExpect(jsonPath("$.hint").value("Compare the choices."));
 
         verify(aiClient, times(1)).hint(questionId);
-        org.assertj.core.api.Assertions.assertThat(
-                        jdbcTemplate.queryForObject("SELECT hint FROM question WHERE id = ?", String.class, questionId))
-                .isEqualTo("Compare the choices.");
+        assertThat(storedHint(questionId)).isEqualTo("Compare the choices.");
+    }
+
+    /** Yanıt sadece ipucunu taşır; doğru şık ve kazanımlar dönmez. */
+    @Test
+    void responseContainsOnlyHint() throws Exception {
+        Long questionId = insertQuestion(insertCurriculumUnit(), AppConstants.QUESTION_STATUS_PUBLISHED);
+        when(aiClient.hint(questionId)).thenReturn("Anlatıcının kim olduğuna bak.");
+
+        mockMvc.perform(get("/api/questions/{id}/hint", questionId).with(student(insertUser())))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.length()").value(1))
+                .andExpect(jsonPath("$.hint").value("Anlatıcının kim olduğuna bak."))
+                .andExpect(jsonPath("$.correctOption").doesNotExist())
+                .andExpect(jsonPath("$.outcomes").doesNotExist());
+    }
+
+    /** Yayında olmayan soruya ipucu üretilmez ve 404 döner. */
+    @Test
+    void questionThatIsNotPublishedReturnsNotFound() throws Exception {
+        Long questionId = insertQuestion(insertCurriculumUnit(), "DRAFT");
+
+        mockMvc.perform(get("/api/questions/{id}/hint", questionId).with(student(insertUser())))
+                .andExpect(status().isNotFound())
+                .andExpect(jsonPath("$.code").value("QUESTION_NOT_FOUND"));
+
+        verify(aiClient, never()).hint(questionId);
+        assertThat(storedHint(questionId)).isNull();
+    }
+
+    /** AI beklenirken başka bir istek ipucunu yazarsa ilk yazılan korunur ve döner. */
+    @Test
+    void keepsHintWrittenByConcurrentRequest() throws Exception {
+        Long questionId = insertQuestion(insertCurriculumUnit(), AppConstants.QUESTION_STATUS_PUBLISHED);
+        when(aiClient.hint(questionId)).thenAnswer(invocation -> {
+            jdbcTemplate.update("UPDATE question SET hint = ? WHERE id = ?", "İlk yazılan ipucu.", questionId);
+            return "Geç kalan ipucu.";
+        });
+
+        mockMvc.perform(get("/api/questions/{id}/hint", questionId).with(student(insertUser())))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.hint").value("İlk yazılan ipucu."));
+
+        assertThat(storedHint(questionId)).isEqualTo("İlk yazılan ipucu.");
+    }
+
+    /** Sorunun veritabanındaki ipucunu okur. */
+    private String storedHint(Long questionId) {
+        return jdbcTemplate.queryForObject("SELECT hint FROM question WHERE id = ?", String.class, questionId);
     }
 
     /** Yeni bir öğrenci hesabı oluşturur. */
@@ -94,8 +143,8 @@ class HintControllerIT {
                 """, Long.class, curriculumId, 12, 1, identifier);
     }
 
-    /** Testte kullanılacak yayımlanmış soruyu ekler. */
-    private Long insertQuestion(Long unitId) {
+    /** Testte kullanılacak soruyu verilen durumla ekler. */
+    private Long insertQuestion(Long unitId, String status) {
         String content = """
                 {"stem":[{"type":"paragraph","md":"Question"}],
                  "options":[{"label":"A","blocks":[{"type":"paragraph","md":"Option A"}]},
@@ -106,9 +155,9 @@ class HintControllerIT {
         return jdbcTemplate.queryForObject("""
                 INSERT INTO question (
                     curriculum_unit_id, origin, content, correct_option, content_hash, status
-                ) VALUES (?, 'SOURCE', ?::jsonb, 'B', ?, 'PUBLISHED')
+                ) VALUES (?, 'SOURCE', ?::jsonb, 'B', ?, ?)
                 RETURNING id
-                """, Long.class, unitId, content, contentHash);
+                """, Long.class, unitId, content, contentHash, status);
     }
 
     /** İstek için test öğrencisinin kimliğini hazırlar. */

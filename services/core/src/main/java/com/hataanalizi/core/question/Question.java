@@ -8,12 +8,11 @@ import jakarta.persistence.Id;
 import jakarta.persistence.Table;
 import lombok.Getter;
 import lombok.NoArgsConstructor;
-import lombok.Setter;
 import org.hibernate.annotations.JdbcTypeCode;
 import org.hibernate.type.SqlTypes;
 import tools.jackson.databind.JsonNode;
 
-/** Soru metnini ve ipucunu veritabanına eşler. */
+/** Soru metnini, ipucunu ve yayın durumunu okumak için eşler; ipucu sorguyla yazılır. */
 @Entity
 @Table(name = "question")
 @Getter
@@ -28,7 +27,9 @@ public class Question {
     @Column(nullable = false, columnDefinition = "jsonb")
     private JsonNode content;
 
-    @Setter
-    @Column(name = "hint")
+    @Column(columnDefinition = "text")
     private String hint;
+
+    @Column(nullable = false, columnDefinition = "text")
+    private String status;
 }

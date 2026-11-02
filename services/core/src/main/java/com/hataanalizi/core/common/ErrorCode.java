@@ -24,6 +24,9 @@ public enum ErrorCode {
     // sınav
     EXAM_NOT_FOUND(HttpStatus.NOT_FOUND),
 
+    // soru
+    QUESTION_NOT_FOUND(HttpStatus.NOT_FOUND),
+
     // oturum
     SESSION_NOT_FOUND(HttpStatus.NOT_FOUND),
     SESSION_ALREADY_COMPLETED(HttpStatus.CONFLICT),
