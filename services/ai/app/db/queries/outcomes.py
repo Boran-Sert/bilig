@@ -156,12 +156,9 @@ def question_item(
     content: QuestionContent, correct_option: str, curriculum_unit_id: int | None
 ) -> MatchItem:
     """Sorunun ortak parçası, kökü ve şıklarından eşleştirme metnini kurar."""
-    lines = [block.md for block in [*(content.passage or []), *content.stem]]
-    for option in content.options:
-        lines.append(f"{option.label}) " + "\n".join(block.md for block in option.blocks))
     return MatchItem(
         kind=ItemKind.QUESTION,
-        text="\n".join(lines),
+        text=content.to_text(),
         curriculum_unit_id=curriculum_unit_id,
         correct_option=correct_option,
     )

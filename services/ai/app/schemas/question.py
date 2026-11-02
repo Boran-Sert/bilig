@@ -35,6 +35,13 @@ class QuestionContent(BaseModel):
     stem: list[Block]
     options: list[QuestionOption]
 
+    def to_text(self) -> str:
+        """Ortak parçayı, kökü ve harfleriyle şıkları satır satır düz metne çevirir."""
+        lines = [block.md for block in [*(self.passage or []), *self.stem]]
+        for option in self.options:
+            lines.append(f"{option.label}) " + "\n".join(block.md for block in option.blocks))
+        return "\n".join(lines)
+
 
 class ParsedQuestion(BaseModel):
     """Kaynaktan okunan soru; cevap anahtarı bulunamadıysa correct_option boştur."""

@@ -19,8 +19,9 @@ from pydantic import BaseModel
 
 from app.llm import runner
 from app.llm.pricing import PriceTier
-from app.llm.runner import run_task
+from app.llm.runner import run_task, stream_task
 from app.llm.tasks import LlmTask, TaskConfig
+from app.schemas.tutor import CitationSource, StreamCitation, StreamText
 
 Connection = psycopg.AsyncConnection[TupleRow]
 
@@ -76,6 +77,41 @@ class FakeMessages:
     async def parse(self, **request: object) -> SimpleNamespace:
         """İsteği kaydeder ve hazır yanıtı döner."""
         self.requests.append(request)
+        return self.response
+
+    def stream(self, **request: object) -> "FakeStream":
+        """İsteği kaydeder ve hazır olayları akıtan sahte akışı döner."""
+        self.requests.append(request)
+        return FakeStream(self.response)
+
+
+class FakeStream:
+    """Bir metin, bir alıntı ve bir metin olayı akıtan sahte akış."""
+
+    def __init__(self, response: SimpleNamespace) -> None:
+        """Akış bitince dönecek yanıtı saklar."""
+        self.response = response
+        self.request_id = response._request_id
+
+    async def __aenter__(self) -> "FakeStream":
+        """Akışı açar."""
+        return self
+
+    async def __aexit__(self, *_: object) -> None:
+        """Akışı kapatır."""
+
+    async def __aiter__(self) -> AsyncIterator[SimpleNamespace]:
+        """Olayları sırayla verir."""
+        yield SimpleNamespace(type="text", text="Tarihî roman ")
+        yield SimpleNamespace(
+            type="citation",
+            citation=SimpleNamespace(type="search_result_location", search_result_index=1),
+        )
+        yield SimpleNamespace(type="content_block_stop")
+        yield SimpleNamespace(type="text", text="konusunu tarihten alır.")
+
+    async def get_final_message(self) -> SimpleNamespace:
+        """Token sayıları belli yanıtı döner."""
         return self.response
 
 
@@ -232,3 +268,42 @@ async def test_student_is_logged_by_id_only(messages: FakeMessages, db: Connecti
     assert "Ayşe" not in str(request) and "ayse.yilmaz" not in str(request)
     row = await read_call(db, "req_1")
     assert row is not None and row[8] == student_id
+
+
+@pytest.mark.asyncio
+async def test_stream_sends_sources_as_search_results(messages: FakeMessages) -> None:
+    """Kaynaklar alıntısı açık search_result bloğu olarak, prompt'tan önce gider."""
+    sources = [
+        CitationSource(source="TDE 12 · s. 174", title="Roman › Türler", text="Tarihî roman."),
+        CitationSource(source="TDE 12 · s. 175", title="Roman › Türler", text="Psikolojik roman."),
+    ]
+
+    parts = [part async for part in stream_task(LlmTask.HINT, VARIABLES, sources)]
+
+    assert parts == [
+        StreamText(text="Tarihî roman "),
+        StreamCitation(source_index=1),
+        StreamText(text="konusunu tarihten alır."),
+    ]
+    content = messages.requests[0]["messages"][0]["content"]
+    assert content[0] == {
+        "type": "search_result",
+        "source": "TDE 12 · s. 174",
+        "title": "Roman › Türler",
+        "content": [{"type": "text", "text": "Tarihî roman."}],
+        "citations": {"enabled": True},
+    }
+    assert content[2] == {"type": "text", "text": "Soru: Roman nedir?"}
+
+
+@pytest.mark.asyncio
+async def test_stream_is_logged_when_finished(messages: FakeMessages, db: Connection) -> None:
+    """Akış bitince çağrı token ve request_id ile llm_call_log'a yazılır."""
+    messages.response = make_response(request_id="req_stream")
+
+    async for _ in stream_task(LlmTask.HINT, VARIABLES, [], user_id=None):
+        pass
+
+    call = await read_call(db, "req_stream")
+    assert call is not None
+    assert call[:5] == ("HINT", "claude-haiku-5-5", 2, 1200, 300)
