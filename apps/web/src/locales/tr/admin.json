@@ -7,13 +7,38 @@
     "dropDescription": "Ders kitabı, kazanım testi, soru bankası, cevap anahtarı ya da öğretim programı. Birden çok dosya olabilir.",
     "selectButton": "Dosya seç",
     "uploading": "Yükleniyor...",
+    "emptyList": "Henüz yüklenmiş bir kaynak bulunmuyor.",
     "table": {
       "file": "Dosya",
+      "status": "Durum",
       "result": "Sonuç"
     },
     "result": {
       "uploaded": "Yüklendi",
       "duplicate": "Bu dosya daha önce yüklenmiş"
+    },
+    "kinds": {
+      "PROGRAM": "Öğretim programı",
+      "TEXTBOOK": "Ders kitabı",
+      "TEST": "Test",
+      "QUESTION_BANK": "Soru bankası",
+      "ANSWER_KEY": "Cevap anahtarı",
+      "UNKNOWN": "Belge"
+    },
+    "steps": {
+      "REGISTERED": "Kaydedildi",
+      "EXTRACT": "Metin çıkarma",
+      "VALIDATE": "Doğrulama",
+      "ENTITIES": "Varlık eşleştirme",
+      "OUTCOMES": "Kazanım eşleştirme",
+      "INDEX": "İndeksleme"
+    },
+    "status": {
+      "UPLOADED": "Yüklendi",
+      "PROCESSING": "İşleniyor",
+      "REVIEW": "İnceleme listesinde",
+      "PUBLISHED": "Yayında",
+      "FAILED": "Başarısız"
     },
     "errors": {
       "rejectedFiles": "PDF olmadığı için yüklenmeyen dosyalar: {{files}}",

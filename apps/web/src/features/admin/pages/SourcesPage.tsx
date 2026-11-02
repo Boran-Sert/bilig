@@ -7,8 +7,9 @@ import { useTranslation } from "react-i18next";
 import PageMeta from "../../../components/PageMeta";
 import { getProblemMessage } from "../../../lib/api/problem";
 import { useMe } from "../../auth/api";
-import { useUploadSources } from "../api";
+import { useSources, useUploadSources } from "../api";
 import SourceDropzone from "../components/SourceDropzone";
+import SourceList from "../components/SourceList";
 import UploadResultList from "../components/UploadResultList";
 
 /**
@@ -17,6 +18,7 @@ import UploadResultList from "../components/UploadResultList";
 export default function SourcesPage() {
   const { t } = useTranslation("admin");
   const { data: user, isPending: isUserPending } = useMe();
+  const { data: sourcesData } = useSources();
   const uploadMutation = useUploadSources();
   const [rejectedNames, setRejectedNames] = useState<string[]>([]);
 
@@ -62,6 +64,9 @@ export default function SourcesPage() {
       {uploadMutation.data?.files && uploadMutation.data.files.length > 0 && (
         <UploadResultList files={uploadMutation.data.files} />
       )}
+
+      {/* Sunucudaki kaynakların 8 adım durum listesi (#131) */}
+      <SourceList items={sourcesData?.items ?? []} />
     </section>
   );
 }

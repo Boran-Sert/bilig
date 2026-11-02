@@ -10,9 +10,10 @@ import "../../../lib/i18n";
 import { ApiError } from "../../../lib/api/problem";
 import SourcesPage from "./SourcesPage";
 
-const { useMeMock, useUploadSourcesMock, mutateMock } = vi.hoisted(() => ({
+const { useMeMock, useUploadSourcesMock, useSourcesMock, mutateMock } = vi.hoisted(() => ({
   useMeMock: vi.fn(),
   useUploadSourcesMock: vi.fn(),
+  useSourcesMock: vi.fn(),
   mutateMock: vi.fn(),
 }));
 
@@ -22,6 +23,7 @@ vi.mock("../../auth/api", () => ({
 
 vi.mock("../api", () => ({
   useUploadSources: useUploadSourcesMock,
+  useSources: useSourcesMock,
 }));
 
 const contentManager = {
@@ -71,6 +73,10 @@ describe("SourcesPage", () => {
   beforeEach(() => {
     mutateMock.mockReset();
     useMeMock.mockReturnValue({ data: contentManager, isPending: false });
+    useSourcesMock.mockReturnValue({
+      data: { items: [], page: 0, size: 20, total: 0 },
+      isPending: false,
+    });
     mockUploadState({});
   });
 
