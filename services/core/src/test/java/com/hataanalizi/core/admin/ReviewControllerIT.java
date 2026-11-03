@@ -161,6 +161,18 @@ class ReviewControllerIT {
         assertDecision(fixture.blockReviewId(), "REJECTED");
     }
 
+    /** Soru için REJECT soruyu ve inceleme kaydını reddeder. */
+    @Test
+    @WithAuthUser(role = "CONTENT_ADMIN", id = 1001)
+    void rejectsQuestion() throws Exception {
+        postDecision(fixture.questionReviewId(), "{\"decision\":\"REJECT\"}").andExpect(status().isNoContent());
+
+        assertThat(jdbcTemplate.queryForObject(
+                        "SELECT status FROM question WHERE id = ?", String.class, fixture.questionId()))
+                .isEqualTo("REJECTED");
+        assertDecision(fixture.questionReviewId(), "REJECTED");
+    }
+
     /** Daha önce karara bağlanan kaydın ikinci kararını 409 ile reddeder. */
     @Test
     @WithAuthUser(role = "CONTENT_ADMIN", id = 1001)
