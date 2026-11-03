@@ -7,8 +7,9 @@ import { useTranslation } from "react-i18next";
 import PageMeta from "../../../components/PageMeta";
 import { getProblemMessage } from "../../../lib/api/problem";
 import { useMe } from "../../auth/api";
-import { useUploadSources } from "../api";
+import { useSources, useUploadSources } from "../api";
 import SourceDropzone from "../components/SourceDropzone";
+import SourceList from "../components/SourceList";
 import UploadResultList from "../components/UploadResultList";
 
 /**
@@ -17,6 +18,7 @@ import UploadResultList from "../components/UploadResultList";
 export default function SourcesPage() {
   const { t } = useTranslation("admin");
   const { data: user, isPending: isUserPending } = useMe();
+  const sourcesQuery = useSources(user?.canManageContent === true);
   const uploadMutation = useUploadSources();
   const [rejectedNames, setRejectedNames] = useState<string[]>([]);
 
@@ -62,6 +64,16 @@ export default function SourcesPage() {
       {uploadMutation.data?.files && uploadMutation.data.files.length > 0 && (
         <UploadResultList files={uploadMutation.data.files} />
       )}
+
+      {sourcesQuery.isPending && (
+        <p className="py-8 text-center text-sm text-muted-foreground">{t("sources.loadingList")}</p>
+      )}
+      {sourcesQuery.isError && (
+        <p role="alert" className="rounded-md bg-destructive/10 p-3 text-sm text-destructive">
+          {getProblemMessage(sourcesQuery.error)}
+        </p>
+      )}
+      {sourcesQuery.isSuccess && <SourceList items={sourcesQuery.data.items} />}
     </section>
   );
 }

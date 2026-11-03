@@ -5,3 +5,5 @@ import type { components } from "../../lib/api/schema";
 
 export type UploadedFile = components["schemas"]["UploadedFile"];
 export type UploadResponse = components["schemas"]["UploadResponse"];
+export type SourceListItem = components["schemas"]["SourceListItem"];
+export type SourceListResponse = components["schemas"]["PageResponseSourceListItem"];

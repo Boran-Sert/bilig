@@ -10,9 +10,10 @@ import "../../../lib/i18n";
 import { ApiError } from "../../../lib/api/problem";
 import SourcesPage from "./SourcesPage";
 
-const { useMeMock, useUploadSourcesMock, mutateMock } = vi.hoisted(() => ({
+const { useMeMock, useUploadSourcesMock, useSourcesMock, mutateMock } = vi.hoisted(() => ({
   useMeMock: vi.fn(),
   useUploadSourcesMock: vi.fn(),
+  useSourcesMock: vi.fn(),
   mutateMock: vi.fn(),
 }));
 
@@ -22,6 +23,7 @@ vi.mock("../../auth/api", () => ({
 
 vi.mock("../api", () => ({
   useUploadSources: useUploadSourcesMock,
+  useSources: useSourcesMock,
 }));
 
 const contentManager = {
@@ -71,6 +73,12 @@ describe("SourcesPage", () => {
   beforeEach(() => {
     mutateMock.mockReset();
     useMeMock.mockReturnValue({ data: contentManager, isPending: false });
+    useSourcesMock.mockReturnValue({
+      data: { items: [], page: 0, size: 20, total: 0 },
+      isPending: false,
+      isSuccess: true,
+      isError: false,
+    });
     mockUploadState({});
   });
 
@@ -93,6 +101,21 @@ describe("SourcesPage", () => {
       "Bu ekranı yalnızca içerik yöneticileri görüntüleyebilir.",
     );
     expect(screen.queryByText("PDF'leri buraya bırak")).not.toBeInTheDocument();
+    expect(useSourcesMock).toHaveBeenCalledWith(false);
+  });
+
+  test("kaynak listesi alınamazsa boş liste yerine hata mesajını gösterir", () => {
+    useSourcesMock.mockReturnValue({
+      isPending: false,
+      isSuccess: false,
+      isError: true,
+      error: new ApiError({ code: "INTERNAL_ERROR", detail: "Kaynaklar okunamadı." }, 500),
+    });
+
+    renderSourcesPage();
+
+    expect(screen.getByRole("alert")).toHaveTextContent("Kaynaklar okunamadı.");
+    expect(screen.queryByText("Henüz yüklenmiş bir kaynak bulunmuyor.")).not.toBeInTheDocument();
   });
 
   test("sadece PDF olmayan dosya bırakılırsa istek atmadan adıyla uyarır", async () => {

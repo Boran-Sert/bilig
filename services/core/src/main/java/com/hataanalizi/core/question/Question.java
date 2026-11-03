@@ -12,7 +12,7 @@ import org.hibernate.annotations.JdbcTypeCode;
 import org.hibernate.type.SqlTypes;
 import tools.jackson.databind.JsonNode;
 
-/** Soru metnini veritabanından yalnızca okunacak şekilde eşler. */
+/** Soru metnini, ipucunu ve yayın durumunu okumak için eşler; ipucu sorguyla yazılır. */
 @Entity
 @Table(name = "question")
 @Getter
@@ -26,4 +26,10 @@ public class Question {
     @JdbcTypeCode(SqlTypes.JSON)
     @Column(nullable = false, columnDefinition = "jsonb")
     private JsonNode content;
+
+    @Column(columnDefinition = "text")
+    private String hint;
+
+    @Column(nullable = false, columnDefinition = "text")
+    private String status;
 }

@@ -1,0 +1,25 @@
+{
+  "testList": {
+    "title": "Testler",
+    "metaDescription": "AYT Türk Dili ve Edebiyatı kazanım testleri ve denemeleri.",
+    "empty": "Henüz yayınlanmış bir test bulunmuyor.",
+    "start": "Başla",
+    "resume": "Devam et",
+    "questionCount": "{{count}} soru",
+    "answeredCount": "{{count}} / {{total}} tamamlandı",
+    "completed": "Tamamlandı"
+  },
+  "solve": {
+    "backToTests": "Testler",
+    "metaDescription": "AYT Türk Dili ve Edebiyatı test sorusunu çöz, cevabının doğru olup olmadığını hemen gör.",
+    "questionNumber": "Soru {{current}} / {{total}}",
+    "progressText": "%{{percent}} tamamlandı · kaldığın yerden devam ediyorsun",
+    "yourAnswer": "Senin cevabın",
+    "correctAnswer": "Doğru cevap",
+    "outcomesLabel": "Bu sorunun kazanımları:",
+    "prev": "Önceki",
+    "next": "Sonraki",
+    "loading": "Soru yükleniyor...",
+    "submitting": "Cevap kaydediliyor..."
+  }
+}
