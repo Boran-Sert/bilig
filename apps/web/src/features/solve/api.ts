@@ -4,7 +4,13 @@
 import { useMutation, useQuery } from "@tanstack/react-query";
 import { client } from "../../lib/api/client";
 import { ApiError } from "../../lib/api/problem";
-import type { AnswerRequest, AnswerResponse, ExamSummary, SessionResponse } from "./types";
+import type {
+  AnswerRequest,
+  AnswerResponse,
+  ExamSummary,
+  SessionCompletionResponse,
+  SessionResponse,
+} from "./types";
 
 export const solveKeys = {
   tests: ["solve", "tests"] as const,
@@ -77,6 +83,27 @@ export function useSubmitAnswer() {
           body: request,
         },
       );
+      const status = response.status;
+
+      if (error || !data) {
+        throw new ApiError(error, status);
+      }
+
+      return data;
+    },
+  });
+}
+
+/**
+ * Test oturumunu tamamlar ve net ile kazanım bazlı özet sonucunu döner.
+ */
+export function useCompleteSession() {
+  return useMutation<SessionCompletionResponse, ApiError, number>({
+    /** Oturumu POST /api/sessions/{id}/complete ucundan tamamlar. */
+    mutationFn: async (sessionId: number): Promise<SessionCompletionResponse> => {
+      const { data, error, response } = await client.POST("/api/sessions/{id}/complete", {
+        params: { path: { id: sessionId } },
+      });
       const status = response.status;
 
       if (error || !data) {

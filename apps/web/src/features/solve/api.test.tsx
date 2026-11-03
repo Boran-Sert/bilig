@@ -7,7 +7,7 @@ import { cleanup, renderHook, waitFor } from "@testing-library/react";
 import type { ReactNode } from "react";
 import { afterEach, beforeEach, describe, expect, test, vi } from "vitest";
 import { ApiError } from "../../lib/api/problem";
-import { useStartSession, useSubmitAnswer, useTests } from "./api";
+import { useCompleteSession, useStartSession, useSubmitAnswer, useTests } from "./api";
 
 const { getMock, postMock, putMock } = vi.hoisted(() => ({
   getMock: vi.fn(),
@@ -99,6 +99,33 @@ describe("solve api", () => {
     expect(result.current.data?.isCorrect).toBe(false);
     expect(result.current.data?.correctOption).toBe("B");
     expect(result.current.data?.outcomes[0].code).toBe("A.2.15");
+  });
+
+  test("useCompleteSession oturumu tamamlar ve net ile kazanımları döner", async () => {
+    const mockCompletion = {
+      correct: 18,
+      wrong: 4,
+      blank: 2,
+      net: 17,
+      outcomes: [
+        { code: "A.2.15", title: "Türün yazar ve eserleri", wrong: 3, failed: true },
+        { code: "A.2.3", title: "Tema ve konu", wrong: 1, failed: false },
+      ],
+    };
+    postMock.mockResolvedValue({ data: mockCompletion, response: { status: 200 } });
+
+    const { result } = renderHook(() => useCompleteSession(), {
+      wrapper: createWrapper(queryClient),
+    });
+
+    result.current.mutate(99);
+
+    await waitFor(() => expect(result.current.isSuccess).toBe(true));
+    expect(postMock).toHaveBeenCalledWith("/api/sessions/{id}/complete", {
+      params: { path: { id: 99 } },
+    });
+    expect(result.current.data?.net).toBe(17);
+    expect(result.current.data?.outcomes[0].failed).toBe(true);
   });
 
   test("sunucu hatasında ApiError fırlatır", async () => {

@@ -13,6 +13,7 @@ import RegisterPage from "./features/auth/pages/RegisterPage";
 import SolvePage from "./features/solve/pages/SolvePage";
 import TestListPage from "./features/tests/pages/TestListPage";
 import { ROUTES } from "./lib/constants";
+import ResultPage from "./features/solve/pages/ResultPage";
 
 /** Ana sayfayı gösterir. */
 function HomePage() {
@@ -68,6 +69,14 @@ export const router = createBrowserRouter([
         element: (
           <RequireAuth>
             <SolvePage />
+          </RequireAuth>
+        ),
+      },
+      {
+        path: ROUTES.testResult,
+        element: (
+          <RequireAuth>
+            <ResultPage />
           </RequireAuth>
         ),
       },

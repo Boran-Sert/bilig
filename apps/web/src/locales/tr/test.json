@@ -17,9 +17,30 @@
     "yourAnswer": "Senin cevabın",
     "correctAnswer": "Doğru cevap",
     "outcomesLabel": "Bu sorunun kazanımları:",
+    "hint": "İpucu",
+    "whyWrong": "Neden yanlış?",
+    "similar": "Benzer soru çöz",
+    "report": "Hatalı içerik bildir",
     "prev": "Önceki",
     "next": "Sonraki",
+    "finishTest": "Testi Bitir",
+    "finishing": "Tamamlanıyor...",
     "loading": "Soru yükleniyor...",
-    "submitting": "Cevap kaydediliyor..."
+    "submitting": "Cevap kaydediliyor...",
+    "alreadyAnswered": "Bu soru zaten cevaplandı."
+  },
+  "result": {
+    "title": "Test Sonucu",
+    "metaDescription": "Tamamlanan testin net puanı ve kazanım bazlı analiz özeti.",
+    "netScore": "Net",
+    "correct": "Doğru",
+    "wrong": "Yanlış",
+    "blank": "Boş",
+    "outcomesTitle": "Kazanım Analizi",
+    "failedBadge": "Başarısız",
+    "successBadge": "Başarılı",
+    "wrongCount": "{{count}} yanlış",
+    "backToTests": "Testlere Dön",
+    "noResultFound": "Görüntülenecek test sonucu bulunamadı."
   }
 }
