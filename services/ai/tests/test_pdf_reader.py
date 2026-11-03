@@ -192,3 +192,8 @@ def test_missing_tesseract_raises_ocr_error() -> None:
     options = pdf.ReaderOptions(KNOWN_WORDS, tesseract_cmd="tesseract-yok")
     with pytest.raises(pdf.OcrError):
         pdf.read_lines(source, options)
+
+
+def test_page_count_returns_number_of_pages() -> None:
+    """Sayfa sayısı PDF'in gerçek sayfa sayısıdır."""
+    assert pdf.page_count(lines_pdf([["Bir"], ["İki"], ["Üç"]])) == 3

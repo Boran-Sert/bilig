@@ -102,6 +102,16 @@ def read_lines(source: PdfSource, options: ReaderOptions | None = None) -> list[
         return to_lines(book_reader.reading_order(pages))
 
 
+def page_count(source: PdfSource) -> int:
+    """PDF'in sayfa sayısını verir."""
+    with _reading():
+        document = pdfium.PdfDocument(source)
+        try:
+            return len(document)
+        finally:
+            document.close()
+
+
 def render_page(source: PdfSource, page_no: int, dpi: int = PAGE_IMAGE_DPI) -> bytes:
     """Sayfayı (1'den sayılır) verilen çözünürlükte PNG olarak çizer."""
     with _reading():

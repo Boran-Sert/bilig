@@ -4,8 +4,8 @@ Her özelliğin ayarları kendi bloğundadır; yeni ayar kendi bloğuna eklenir 
 .env.example'a yazılır. Ayar sadece ortam değişkeninden okunur, .env dosyası okunmaz.
 Eksik ya da hatalı ayarda servis açılırken hangi değişkenin sorunlu olduğunu söyleyen
 SettingsError ile durur. Sadece bir sürecin kullandığı bloklar (IngestSettings, PdfSettings,
-WorkerSettings) ve veritabanı olmadan çalışan model indirme betiğinin okuduğu blok
-(EmbeddingSettings) Settings'e konmaz, kendi load_ fonksiyonuyla okunur.
+StorageSettings, WorkerSettings) ve veritabanı olmadan çalışan model indirme betiğinin okuduğu
+blok (EmbeddingSettings) Settings'e konmaz, kendi load_ fonksiyonuyla okunur.
 """
 
 from functools import lru_cache
@@ -69,6 +69,14 @@ class PdfSettings(BaseSettings):
     ocr_cache_dir: Path | None = None
 
 
+class StorageSettings(BaseSettings):
+    """Dosya saklama ayarları: PDF ve sayfa görüntülerinin yazıldığı kök klasör."""
+
+    model_config = SettingsConfigDict(extra="ignore")
+
+    storage_dir: Path
+
+
 class EmbeddingSettings(BaseSettings):
     """Embedding ve reranker model adları ve sabit commit'leri; Settings'ten ayrı okunur."""
 
@@ -117,6 +125,14 @@ def load_pdf_settings() -> PdfSettings:
     """PDF okuma ayarlarını okur; sorun varsa değişken adlarıyla hata verir."""
     try:
         return PdfSettings()
+    except ValidationError as error:
+        raise SettingsError(_describe_errors(error)) from error
+
+
+def load_storage_settings() -> StorageSettings:
+    """Dosya saklama ayarlarını okur; sorun varsa değişken adlarıyla hata verir."""
+    try:
+        return StorageSettings()
     except ValidationError as error:
         raise SettingsError(_describe_errors(error)) from error
 
