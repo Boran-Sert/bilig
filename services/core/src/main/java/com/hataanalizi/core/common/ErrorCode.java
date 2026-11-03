@@ -41,8 +41,8 @@ public enum ErrorCode {
     // inceleme
     REVIEW_ALREADY_DECIDED(HttpStatus.CONFLICT),
 
-// sohbet
-;
+    // sohbet
+    TUTOR_CONFLICT(HttpStatus.CONFLICT);
 
     private final HttpStatus status;
 

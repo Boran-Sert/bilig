@@ -26,6 +26,7 @@ app:
     connect-timeout: 2s
     read-timeout: 5s
     generation-read-timeout: 30s
+    stream-timeout: 90s
 
 server:
   port: 8081

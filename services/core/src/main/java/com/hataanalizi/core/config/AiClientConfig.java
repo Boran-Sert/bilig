@@ -1,6 +1,7 @@
 package com.hataanalizi.core.config;
 
 import com.hataanalizi.core.common.RequestIdFilter;
+import io.netty.channel.ChannelOption;
 import java.net.http.HttpClient;
 import java.time.Duration;
 import java.util.UUID;
@@ -9,13 +10,16 @@ import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
 import org.springframework.http.client.ClientHttpRequestInterceptor;
 import org.springframework.http.client.JdkClientHttpRequestFactory;
+import org.springframework.http.client.reactive.ReactorClientHttpConnector;
 import org.springframework.web.client.RestClient;
+import org.springframework.web.reactive.function.client.ClientRequest;
+import org.springframework.web.reactive.function.client.ExchangeFilterFunction;
+import org.springframework.web.reactive.function.client.WebClient;
 
 /**
- * Python AI servisini çağıran RestClient'leri kurar: kısa istekler için aiRestClient, Claude'un
- * metin ürettiği istekler için daha uzun okuma süreli aiGenerationRestClient. Adres AI_BASE_URL,
- * token INTERNAL_TOKEN ortam değişkeninden, zaman aşımları application.yml'deki app.ai.* ayarından
- * gelir. Her isteğe X-Internal-Token ve X-Request-Id başlıkları burada eklenir.
+ * Python AI servisini çağıran RestClient ve WebClient'leri kurar. Adres AI_BASE_URL, token
+ * INTERNAL_TOKEN ortam değişkeninden, zaman aşımları application.yml'deki app.ai.* ayarından gelir.
+ * Her isteğe X-Internal-Token ve X-Request-Id başlıkları burada eklenir.
  */
 @Configuration
 public class AiClientConfig {
@@ -44,6 +48,24 @@ public class AiClientConfig {
         return buildClient(restClientBuilder, baseUrl, internalToken, connectTimeout, readTimeout);
     }
 
+    /** Akışlı iç istekler için zaman aşımlı WebClient bean'ini üretir. */
+    @Bean
+    public WebClient aiWebClient(
+            WebClient.Builder webClientBuilder,
+            @Value("${AI_BASE_URL}") String baseUrl,
+            @Value("${INTERNAL_TOKEN}") String internalToken,
+            @Value("${app.ai.connect-timeout}") Duration connectTimeout,
+            @Value("${app.ai.stream-timeout}") Duration streamTimeout) {
+        reactor.netty.http.client.HttpClient httpClient = reactor.netty.http.client.HttpClient.create()
+                .option(ChannelOption.CONNECT_TIMEOUT_MILLIS, Math.toIntExact(connectTimeout.toMillis()))
+                .responseTimeout(streamTimeout);
+        return webClientBuilder
+                .baseUrl(baseUrl)
+                .clientConnector(new ReactorClientHttpConnector(httpClient))
+                .filter(webClientInternalHeaders(internalToken))
+                .build();
+    }
+
     /** Verilen zaman aşımlarıyla adresi ve iç başlıkları hazır RestClient kurar. */
     private RestClient buildClient(
             RestClient.Builder restClientBuilder,
@@ -70,6 +92,19 @@ public class AiClientConfig {
             request.getHeaders().set(INTERNAL_TOKEN_HEADER, internalToken);
             request.getHeaders().set(RequestIdFilter.HEADER_NAME, currentOrNewRequestId());
             return execution.execute(request, body);
+        };
+    }
+
+    /** Akışlı isteğe token'ı ve o anki istek numarasını ekleyen filtreyi döndürür. */
+    private ExchangeFilterFunction webClientInternalHeaders(String internalToken) {
+        return (request, next) -> {
+            ClientRequest updatedRequest = ClientRequest.from(request)
+                    .headers(headers -> {
+                        headers.set(INTERNAL_TOKEN_HEADER, internalToken);
+                        headers.set(RequestIdFilter.HEADER_NAME, currentOrNewRequestId());
+                    })
+                    .build();
+            return next.exchange(updatedRequest);
         };
     }
 
