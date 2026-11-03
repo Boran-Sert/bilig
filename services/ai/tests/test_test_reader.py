@@ -8,7 +8,8 @@ import psycopg
 import pytest
 from psycopg.rows import TupleRow
 
-from app.ingest.readers.test import ReadingProblems, content_hash, find_problems, report_problems
+from app.db.queries.question import content_hash
+from app.ingest.readers.test import ReadingProblems, find_problems, report_problems
 from app.ingest.validators import ValidationProblem
 from tests.test_pipeline import make_source
 from tests.test_validators import build_question
