@@ -3,9 +3,10 @@
 claim, sırası gelmiş QUEUED işleri ve JOB_STALE_AFTER_SECONDS boyunca heartbeat atmamış RUNNING
 işleri FOR UPDATE SKIP LOCKED ile seçer: başka çalışanın kilitlediği satır beklenmeden atlanır.
 Seçim MATERIALIZED CTE'dedir, böylece kilitleme tek kez çalışır. Son denemesinde takılan iş tekrar
-alınmaz, FAILED olur. fail, hakkı olan işi QUEUED'a döndürür ve run_after'ı deneme sayısıyla
-orantılı ileri atar. Bağlantı verilen connect fonksiyonundan alınır (üretimde havuzun connection
-metodu); her çağrı tek transaction'dır. Tablo core'un Flyway migration'larıyla kurulur.
+alınmaz, FAILED olur; INGEST_SOURCE işiyse kaynağı da FAILED olur. fail, hakkı olan işi QUEUED'a
+döndürür ve run_after'ı deneme sayısıyla orantılı ileri atar. Bağlantı verilen connect
+fonksiyonundan alınır (üretimde havuzun connection metodu); her çağrı tek transaction'dır.
+Tablo core'un Flyway migration'larıyla kurulur.
 """
 
 from collections.abc import Callable
@@ -29,11 +30,19 @@ RETURNING id
 """
 
 FAIL_ABANDONED_JOBS = """
-UPDATE background_job
-SET status = 'FAILED', last_error = %(error)s, updated_at = now()
-WHERE status = 'RUNNING'
-    AND updated_at < now() - make_interval(secs => %(stale_after)s)
-    AND attempts >= %(max_attempts)s
+WITH abandoned AS (
+    UPDATE background_job
+    SET status = 'FAILED', last_error = %(error)s, updated_at = now()
+    WHERE status = 'RUNNING'
+        AND updated_at < now() - make_interval(secs => %(stale_after)s)
+        AND attempts >= %(max_attempts)s
+    RETURNING job_type, payload
+)
+UPDATE source_document
+SET status = 'FAILED', updated_at = now()
+FROM abandoned
+WHERE abandoned.job_type = 'INGEST_SOURCE'
+    AND source_document.id = (abandoned.payload ->> 'sourceId')::bigint
 """
 
 CLAIM_JOBS = """

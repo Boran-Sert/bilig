@@ -17,7 +17,7 @@ from app.jobs.queue import Job
 from app.storage import LocalFileStorage, page_image_key, source_key
 from tests.pdf_factory import lines_pdf
 from tests.test_job_step import read_step
-from tests.test_postgres_queue import PAST, Connection, add_job, make_queue
+from tests.test_postgres_queue import PAST, STALE_AGE, Connection, add_job, make_queue
 
 INSERT_SOURCE = """
 WITH user_row AS (
@@ -164,6 +164,24 @@ async def test_register_source_writes_page_images_and_rows(db: Connection, tmp_p
     assert all(context.storage.read(key).startswith(b"\x89PNG") for key in keys)
     cursor = await db.execute(READ_PAGES, (source_id,))
     assert await cursor.fetchall() == [(1, keys[0]), (2, keys[1])]
+
+
+@pytest.mark.asyncio
+async def test_source_is_failed_when_last_attempt_is_abandoned(db: Connection) -> None:
+    """Son denemesinde çalışanı ölen işin kaynağı da FAILED olur."""
+    source_id = await make_source(db)
+    job_id = await add_job(db, status="RUNNING", attempts=JOB_MAX_ATTEMPTS, age=STALE_AGE)
+    await db.execute(
+        "UPDATE background_job SET payload = jsonb_build_object('sourceId', %s::bigint)"
+        " WHERE id = %s",
+        (source_id, job_id),
+    )
+    await db.execute("UPDATE source_document SET status = 'PROCESSING' WHERE id = %s", (source_id,))
+
+    await make_queue(db).claim(1)
+
+    cursor = await db.execute(READ_SOURCE_STATUS, (source_id,))
+    assert await cursor.fetchone() == ("FAILED",)
 
 
 def test_registered_step_is_the_only_registered_step() -> None:
