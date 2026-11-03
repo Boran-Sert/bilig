@@ -11,15 +11,35 @@
   },
   "solve": {
     "backToTests": "Testler",
-    "metaDescription": "AYT Türk Dili ve Edebiyatı test sorusunu çöz, cevabının doğru olup olmadığını hemen gör.",
     "questionNumber": "Soru {{current}} / {{total}}",
     "progressText": "%{{percent}} tamamlandı · kaldığın yerden devam ediyorsun",
     "yourAnswer": "Senin cevabın",
     "correctAnswer": "Doğru cevap",
     "outcomesLabel": "Bu sorunun kazanımları:",
+    "hint": "İpucu",
+    "whyWrong": "Neden yanlış?",
+    "similar": "Benzer soru çöz",
+    "report": "Hatalı içerik bildir",
     "prev": "Önceki",
     "next": "Sonraki",
+    "finishTest": "Testi Bitir",
+    "finishing": "Tamamlanıyor...",
     "loading": "Soru yükleniyor...",
-    "submitting": "Cevap kaydediliyor..."
+    "submitting": "Cevap kaydediliyor...",
+    "alreadyAnswered": "Bu soru zaten cevaplandı."
+  },
+  "result": {
+    "title": "Test Sonucu",
+    "metaDescription": "Tamamlanan testin net puanı ve kazanım bazlı analiz özeti.",
+    "netScore": "Net",
+    "correct": "Doğru",
+    "wrong": "Yanlış",
+    "blank": "Boş",
+    "outcomesTitle": "Kazanım Analizi",
+    "failedBadge": "Başarısız",
+    "successBadge": "Başarılı",
+    "wrongCount": "{{count}} yanlış",
+    "backToTests": "Testlere Dön",
+    "noResultFound": "Görüntülenecek test sonucu bulunamadı."
   }
 }

@@ -12,3 +12,5 @@ export type AnswerRequest = components["schemas"]["AnswerRequest"];
 export type AnswerResponse = components["schemas"]["AnswerResponse"];
 export type Outcome = components["schemas"]["Outcome"];
 export type ExamSummary = components["schemas"]["ExamSummaryResponse"];
+export type SessionCompletionResponse = components["schemas"]["SessionCompletionResponse"];
+export type SessionCompletionOutcome = components["schemas"]["SessionCompletionOutcome"];

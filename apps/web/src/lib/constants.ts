@@ -10,6 +10,7 @@ export const ROUTES = {
   adminSources: "/admin/sources",
   tests: "/tests",
   solve: "/tests/:testId/solve",
+  testResult: "/tests/:testId/result",
 } as const;
 
 export const HTTP_STATUS_UNAUTHORIZED = 401;

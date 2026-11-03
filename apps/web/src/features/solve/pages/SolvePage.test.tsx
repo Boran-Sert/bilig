@@ -10,18 +10,26 @@ import "../../../lib/i18n";
 import { ApiError } from "../../../lib/api/problem";
 import SolvePage from "./SolvePage";
 
-const { useStartSessionMock, useSubmitAnswerMock, startMutateMock, submitMutateMock } = vi.hoisted(
-  () => ({
-    useStartSessionMock: vi.fn(),
-    useSubmitAnswerMock: vi.fn(),
-    startMutateMock: vi.fn(),
-    submitMutateMock: vi.fn(),
-  }),
-);
+const {
+  useStartSessionMock,
+  useSubmitAnswerMock,
+  useCompleteSessionMock,
+  startMutateMock,
+  submitMutateMock,
+  completeMutateMock,
+} = vi.hoisted(() => ({
+  useStartSessionMock: vi.fn(),
+  useSubmitAnswerMock: vi.fn(),
+  useCompleteSessionMock: vi.fn(),
+  startMutateMock: vi.fn(),
+  submitMutateMock: vi.fn(),
+  completeMutateMock: vi.fn(),
+}));
 
 vi.mock("../api", () => ({
   useStartSession: useStartSessionMock,
   useSubmitAnswer: useSubmitAnswerMock,
+  useCompleteSession: useCompleteSessionMock,
 }));
 
 const mockQuestions = [
@@ -78,6 +86,7 @@ describe("SolvePage", () => {
   beforeEach(() => {
     startMutateMock.mockReset();
     submitMutateMock.mockReset();
+    completeMutateMock.mockReset();
 
     useStartSessionMock.mockReturnValue({
       mutate: startMutateMock,
@@ -98,10 +107,16 @@ describe("SolvePage", () => {
       isError: false,
       error: null,
     });
+
+    useCompleteSessionMock.mockReturnValue({
+      mutate: completeMutateMock,
+      isPending: false,
+      isError: false,
+      error: null,
+    });
   });
 
   test("sayfa yenilendiğinde oturumun kaldığı sorudan açılır (Kabul Kriteri 2)", () => {
-    // 2. sorudan başlamasını simüle eder
     useStartSessionMock.mockReturnValue({
       mutate: startMutateMock,
       isPending: false,
@@ -135,7 +150,6 @@ describe("SolvePage", () => {
 
     renderSolvePage(1);
 
-    // Öğrenci yanlış olan A şıkkına tıklar
     const optionA = screen.getByText("A şıkkı").closest("button")!;
     fireEvent.click(optionA);
 
@@ -144,7 +158,6 @@ describe("SolvePage", () => {
     });
     expect(screen.getByText("Doğru cevap")).toBeInTheDocument();
 
-    // Kazanımların listelendiğini doğrular
     expect(screen.getByText("Bu sorunun kazanımları:")).toBeInTheDocument();
     expect(screen.getByText(/A\.2\.15 Türün yazar ve eserleri/)).toBeInTheDocument();
     expect(screen.getByText(/A\.2\.3 Tema ve konu/)).toBeInTheDocument();
@@ -155,11 +168,9 @@ describe("SolvePage", () => {
 
     expect(screen.getByText("Birinci soru kökü")).toBeInTheDocument();
 
-    // Sonraki düğmesine tıklar
     fireEvent.click(screen.getByRole("button", { name: "Sonraki" }));
     expect(screen.getByText("İkinci soru kökü")).toBeInTheDocument();
 
-    // Önceki düğmesine tıklar
     fireEvent.click(screen.getByRole("button", { name: "Önceki" }));
     expect(screen.getByText("Birinci soru kökü")).toBeInTheDocument();
   });
@@ -200,5 +211,27 @@ describe("SolvePage", () => {
     renderSolvePage(1);
 
     expect(screen.getByRole("alert")).toHaveTextContent("Bu soru zaten cevaplandı.");
+  });
+
+  test("son soruda testi bitir butonu oturumu tamamlar", () => {
+    useStartSessionMock.mockReturnValue({
+      mutate: startMutateMock,
+      isPending: false,
+      isError: false,
+      data: {
+        sessionId: 99,
+        currentPosition: 2,
+        questions: mockQuestions,
+      },
+      error: null,
+    });
+
+    renderSolvePage(2);
+
+    const finishButton = screen.getByRole("button", { name: "Testi Bitir" });
+    expect(finishButton).toBeInTheDocument();
+
+    fireEvent.click(finishButton);
+    expect(completeMutateMock).toHaveBeenCalledWith(99, expect.any(Object));
   });
 });

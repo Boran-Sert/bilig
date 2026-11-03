@@ -3,12 +3,12 @@
  */
 import { useEffect, useState } from "react";
 import { useTranslation } from "react-i18next";
-import { Link, useParams } from "react-router";
+import { Link, useNavigate, useParams } from "react-router";
 import PageMeta from "../../../components/PageMeta";
 import { Button } from "../../../components/ui/button";
 import { getProblemMessage } from "../../../lib/api/problem";
 import { ROUTES } from "../../../lib/constants";
-import { useStartSession, useSubmitAnswer } from "../api";
+import { useCompleteSession, useStartSession, useSubmitAnswer } from "../api";
 import QuestionCard, { type QuestionAnswerState } from "../components/QuestionCard";
 
 /**
@@ -17,8 +17,10 @@ import QuestionCard, { type QuestionAnswerState } from "../components/QuestionCa
 export default function SolvePage() {
   const { t } = useTranslation("test");
   const { testId } = useParams();
+  const navigate = useNavigate();
   const startSession = useStartSession();
   const submitAnswer = useSubmitAnswer();
+  const completeSession = useCompleteSession();
   const [currentIndex, setCurrentIndex] = useState(0);
   const [answers, setAnswers] = useState<Record<number, QuestionAnswerState>>({});
 
@@ -58,6 +60,20 @@ export default function SolvePage() {
         },
       },
     );
+  }
+
+  /** Oturumu tamamlar ve sonuç sayfasına yönlendirir. */
+  function handleCompleteTest() {
+    if (!sessionId || !testId) {
+      return;
+    }
+
+    completeSession.mutate(sessionId, {
+      /** Başarılı tamamlamada sonuç sayfasına geçer. */
+      onSuccess: (result) => {
+        navigate(`/tests/${testId}/result`, { state: { result } });
+      },
+    });
   }
 
   /** Verilen soruya geçer ve önceki cevap hatasını temizler. */
@@ -140,14 +156,15 @@ export default function SolvePage() {
         >
           {t("solve.prev")}
         </Button>
-        <Button
-          variant="outline"
-          size="sm"
-          onClick={() => goToQuestion(currentIndex + 1)}
-          disabled={currentIndex === questions.length - 1}
-        >
-          {t("solve.next")}
-        </Button>
+        {currentIndex === questions.length - 1 ? (
+          <Button size="sm" onClick={handleCompleteTest} disabled={completeSession.isPending}>
+            {completeSession.isPending ? t("solve.finishing") : t("solve.finishTest")}
+          </Button>
+        ) : (
+          <Button variant="outline" size="sm" onClick={() => goToQuestion(currentIndex + 1)}>
+            {t("solve.next")}
+          </Button>
+        )}
       </div>
     </section>
   );
