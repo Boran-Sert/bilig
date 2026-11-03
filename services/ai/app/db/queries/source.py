@@ -13,6 +13,8 @@ VALUES (%(source_id)s, %(page_no)s, %(image_path)s)
 ON CONFLICT (source_document_id, page_no) DO UPDATE SET image_path = EXCLUDED.image_path
 """
 
+SELECT_SOURCE_TITLE = "SELECT title FROM source_document WHERE id = %(source_id)s"
+
 SET_SOURCE_STATUS = """
 UPDATE source_document
 SET status = %(status)s, updated_at = now()
@@ -32,6 +34,15 @@ async def save_source_pages(
                 for page_no, image_path in enumerate(image_paths, start=1)
             ],
         )
+
+
+async def fetch_source_title(connection: AsyncConnection, source_id: int) -> str:
+    """Kaynağın başlığını verir; kaynak yoksa LookupError fırlatır."""
+    cursor = await connection.execute(SELECT_SOURCE_TITLE, {"source_id": source_id})
+    row = await cursor.fetchone()
+    if row is None:
+        raise LookupError(f"Source {source_id} not found")
+    return str(row[0])
 
 
 async def mark_processing(connection: AsyncConnection, source_id: int) -> None:
