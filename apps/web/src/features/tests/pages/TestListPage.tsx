@@ -2,10 +2,11 @@
  * Öğrencinin çözebileceği testleri listeler ve oturum başlatma bağlantısı sunar.
  */
 import { useTranslation } from "react-i18next";
-import { useNavigate } from "react-router";
+import { generatePath, useNavigate } from "react-router";
 import PageMeta from "../../../components/PageMeta";
 import { Button } from "../../../components/ui/button";
 import { getProblemMessage } from "../../../lib/api/problem";
+import { ROUTES } from "../../../lib/constants";
 import { useTests } from "../../solve/api";
 
 /**
@@ -18,7 +19,7 @@ export default function TestListPage() {
 
   /** Testi çözme sayfasına yönlendirir. */
   function handleStart(testId: number) {
-    navigate(`/tests/${testId}/solve`);
+    navigate(generatePath(ROUTES.solve, { testId: String(testId) }));
   }
 
   if (isPending) {
@@ -49,7 +50,7 @@ export default function TestListPage() {
       {tests && tests.length > 0 && (
         <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
           {tests.map((test) => {
-            const hasProgress = (test.answeredCount ?? 0) > 0 || test.sessionId !== null;
+            const hasProgress = test.answeredCount > 0 || test.sessionId !== null;
             const isCompleted = test.status === "COMPLETED";
 
             return (
