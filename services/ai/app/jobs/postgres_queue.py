@@ -60,6 +60,12 @@ SET updated_at = now()
 WHERE id = %(id)s AND status = 'RUNNING' AND attempts = %(attempts)s
 """
 
+RECORD_STEP = """
+UPDATE background_job
+SET last_completed_step = %(step)s, updated_at = now()
+WHERE id = %(id)s AND status = 'RUNNING' AND attempts = %(attempts)s
+"""
+
 COMPLETE_JOB = """
 UPDATE background_job
 SET status = 'DONE', updated_at = now()
@@ -118,6 +124,10 @@ class PostgresJobQueue:
     async def heartbeat(self, job: Job) -> bool:
         """İşin son güncelleme zamanını yeniler; iş başkasına geçtiyse False döner."""
         return await self._update_owned(TOUCH_JOB, job)
+
+    async def record_step(self, job: Job, step: str) -> bool:
+        """Tamamlanan son adımı yazar; iş başkasına geçtiyse False döner."""
+        return await self._update_owned(RECORD_STEP, job, step=step)
 
     async def complete(self, job: Job) -> bool:
         """İşi DONE yapar; iş başkasına geçtiyse False döner."""
