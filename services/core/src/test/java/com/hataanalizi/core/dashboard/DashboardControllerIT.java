@@ -89,6 +89,24 @@ class DashboardControllerIT {
                 .andExpect(jsonPath("$.activeSessions[0].currentPosition").value(2));
     }
 
+    /** En son başarısız testi seçer ve yalnızca toplam eşiğinde test alanlarını boş döndürür. */
+    @Test
+    void returnsLatestFailedTestAndTotalOnlyOutcome() throws Exception {
+        Long userId = testData.createFailedOutcomeOrderingFixture();
+
+        mockMvc.perform(get("/api/me/dashboard").with(student(userId)))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.failedOutcomes.length()").value(2))
+                .andExpect(jsonPath("$.failedOutcomes[0].code").value("A.2.7"))
+                .andExpect(jsonPath("$.failedOutcomes[0].totalWrongCount").value(8))
+                .andExpect(jsonPath("$.failedOutcomes[0].testTitle").value("Roman · Kazanım Testi 3"))
+                .andExpect(jsonPath("$.failedOutcomes[0].testWrongCount").value(3))
+                .andExpect(jsonPath("$.failedOutcomes[1].code").value("A.2.8"))
+                .andExpect(jsonPath("$.failedOutcomes[1].totalWrongCount").value(6))
+                .andExpect(jsonPath("$.failedOutcomes[1].testTitle").value(nullValue()))
+                .andExpect(jsonPath("$.failedOutcomes[1].testWrongCount").value(nullValue()));
+    }
+
     /** Hiç cevaplamamış öğrencinin boş panelini sıfırlarla döndürür. */
     @Test
     void returnsEmptyDashboardForNewStudent() throws Exception {

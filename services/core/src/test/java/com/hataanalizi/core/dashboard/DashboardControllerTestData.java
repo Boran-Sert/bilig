@@ -61,6 +61,29 @@ class DashboardControllerTestData {
         return userId;
     }
 
+    /** Yayındaki sorularla en son başarısız testi ve yalnızca toplam eşiğini aşan kazanımı hazırlar. */
+    Long createFailedOutcomeOrderingFixture() {
+        Long userId = insertUser();
+        Long unitId = insertCurriculumUnit("Roman");
+        Long latestExamId = insertExam("Roman · Kazanım Testi 3");
+        Long earlierExamId = insertExam("Roman · Kazanım Testi 2");
+        List<Long> questionIds = insertQuestions(unitId, latestExamId, 3);
+        Map<String, Long> outcomeIds = insertOutcomes(unitId);
+        questionIds.forEach(questionId -> insertOutcomeMapping(questionId, outcomeIds.get("A.2.7")));
+        insertOutcomeMapping(questionIds.get(0), outcomeIds.get("A.2.8"));
+        insertOutcomeMapping(questionIds.get(1), outcomeIds.get("A.2.8"));
+
+        Long latestSessionId =
+                insertSession(userId, latestExamId, "COMPLETED", BigDecimal.ZERO, BASE_TIMESTAMP.plusDays(2));
+        insertAnswers(latestSessionId, questionIds);
+        Long laterIdEarlierSessionId =
+                insertSession(userId, earlierExamId, "COMPLETED", BigDecimal.ZERO, BASE_TIMESTAMP.plusDays(1));
+        insertAnswers(laterIdEarlierSessionId, questionIds);
+        Long oldestSessionId = insertSession(userId, earlierExamId, "COMPLETED", BigDecimal.ZERO, BASE_TIMESTAMP);
+        insertAnswers(oldestSessionId, questionIds.subList(0, 2));
+        return userId;
+    }
+
     /** Başka öğrencinin cevabını ekleyerek panel sahipliği sınamasını hazırlar. */
     void insertOtherStudentAnswer(DashboardFixture fixture) {
         Long otherUserId = insertUser();
