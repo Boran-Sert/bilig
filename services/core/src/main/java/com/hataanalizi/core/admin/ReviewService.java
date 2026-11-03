@@ -66,7 +66,7 @@ public class ReviewService {
                     ON learning_outcome.id = content_block_outcome.learning_outcome_id
                 WHERE content_block_outcome.content_block_id = review_item.content_block_id
             ) block_outcomes ON true
-            WHERE review_item.status = 'OPEN' AND review_item.reason = 'LOW_CONFIDENCE'
+            WHERE review_item.status = :openStatus AND review_item.reason = :lowConfidenceReason
             ORDER BY review_item.created_at, review_item.id
             LIMIT :size OFFSET :offset
             """;
@@ -80,7 +80,7 @@ public class ReviewService {
     private static final String REVIEW_COUNT_QUERY = """
             SELECT count(*)
             FROM review_item
-            WHERE status = 'OPEN' AND reason = 'LOW_CONFIDENCE'
+            WHERE status = :openStatus AND reason = :lowConfidenceReason
             """;
 
     private static final String SELECT_OUTCOME_COUNT_QUERY = """
@@ -90,22 +90,22 @@ public class ReviewService {
             """;
 
     private static final String PUBLISH_QUESTION_QUERY = """
-            UPDATE question SET status = 'PUBLISHED', updated_at = now()
+            UPDATE question SET status = :publishedStatus, updated_at = now()
             WHERE id = :targetId AND status = :draftStatus
             """;
 
     private static final String PUBLISH_BLOCK_QUERY = """
-            UPDATE content_block SET status = 'PUBLISHED', updated_at = now()
+            UPDATE content_block SET status = :publishedStatus, updated_at = now()
             WHERE id = :targetId AND status = :draftStatus
             """;
 
     private static final String REJECT_QUESTION_QUERY = """
-            UPDATE question SET status = 'REJECTED', updated_at = now()
+            UPDATE question SET status = :rejectedStatus, updated_at = now()
             WHERE id = :targetId
             """;
 
     private static final String REJECT_BLOCK_QUERY = """
-            UPDATE content_block SET status = 'REJECTED', updated_at = now()
+            UPDATE content_block SET status = :rejectedStatus, updated_at = now()
             WHERE id = :targetId
             """;
 
@@ -119,12 +119,12 @@ public class ReviewService {
 
     private static final String INSERT_QUESTION_OUTCOME_QUERY = """
             INSERT INTO question_outcome (question_id, learning_outcome_id, mapped_by)
-            VALUES (:targetId, :outcomeId, 'HUMAN')
+            VALUES (:targetId, :outcomeId, :mappedBy)
             """;
 
     private static final String INSERT_BLOCK_OUTCOME_QUERY = """
             INSERT INTO content_block_outcome (content_block_id, learning_outcome_id, mapped_by)
-            VALUES (:targetId, :outcomeId, 'HUMAN')
+            VALUES (:targetId, :outcomeId, :mappedBy)
             """;
 
     private static final String UPDATE_REVIEW_DECISION_QUERY = """
@@ -151,11 +151,14 @@ public class ReviewService {
     @Transactional(readOnly = true)
     public PageResponse<ReviewItemResponse> listReviews(int page, int size) {
         validatePage(page, size);
-        MapSqlParameterSource parameters =
-                new MapSqlParameterSource().addValue("size", size).addValue("offset", (long) page * size);
+        MapSqlParameterSource parameters = new MapSqlParameterSource()
+                .addValue("openStatus", AppConstants.REVIEW_STATUS_OPEN)
+                .addValue("lowConfidenceReason", AppConstants.REVIEW_REASON_LOW_CONFIDENCE)
+                .addValue("size", size)
+                .addValue("offset", (long) page * size);
         List<ReviewItemResponse> items =
                 jdbcTemplate.query(REVIEW_LIST_QUERY, parameters, (result, rowNumber) -> mapReviewItem(result));
-        Long total = jdbcTemplate.getJdbcTemplate().queryForObject(REVIEW_COUNT_QUERY, Long.class);
+        Long total = jdbcTemplate.queryForObject(REVIEW_COUNT_QUERY, parameters, Long.class);
         return new PageResponse<>(items, page, size, total == null ? 0 : total);
     }
 
@@ -179,18 +182,18 @@ public class ReviewService {
         ReviewItem reviewItem = reviewItemRepository
                 .findByIdForUpdate(reviewId, AppConstants.REVIEW_REASON_LOW_CONFIDENCE)
                 .orElseThrow(() -> new ApiException(ErrorCode.NOT_FOUND));
-        if (!"OPEN".equals(reviewItem.getStatus())) {
+        if (!AppConstants.REVIEW_STATUS_OPEN.equals(reviewItem.getStatus())) {
             throw new ApiException(ErrorCode.REVIEW_ALREADY_DECIDED);
         }
         TargetType targetType = targetType(reviewItem);
         long targetId = targetId(reviewItem);
         applyDecision(request, targetType, targetId);
+        String reviewStatus = request.decision() == Decision.REJECT
+                ? AppConstants.REVIEW_STATUS_REJECTED
+                : AppConstants.REVIEW_STATUS_APPROVED;
         jdbcTemplate.update(
                 UPDATE_REVIEW_DECISION_QUERY,
-                Map.of(
-                        "status", request.decision() == Decision.REJECT ? "REJECTED" : "APPROVED",
-                        "reviewerId", reviewerId,
-                        "reviewId", reviewId));
+                Map.of("status", reviewStatus, "reviewerId", reviewerId, "reviewId", reviewId));
     }
 
     /** Seçilen kararı kazanım ve hedef tablolarına uygular. */
@@ -224,7 +227,10 @@ public class ReviewService {
         for (Long outcomeId : uniqueOutcomeIds) {
             jdbcTemplate.update(
                     insertQuery,
-                    new MapSqlParameterSource().addValue("targetId", targetId).addValue("outcomeId", outcomeId));
+                    new MapSqlParameterSource()
+                            .addValue("targetId", targetId)
+                            .addValue("outcomeId", outcomeId)
+                            .addValue("mappedBy", AppConstants.OUTCOME_MAPPED_BY_HUMAN));
         }
     }
 
@@ -233,18 +239,31 @@ public class ReviewService {
         if (targetType == TargetType.QUESTION) {
             jdbcTemplate.update(
                     PUBLISH_QUESTION_QUERY,
-                    Map.of("targetId", targetId, "draftStatus", AppConstants.QUESTION_STATUS_DRAFT));
+                    Map.of(
+                            "targetId", targetId,
+                            "draftStatus", AppConstants.QUESTION_STATUS_DRAFT,
+                            "publishedStatus", AppConstants.QUESTION_STATUS_PUBLISHED));
         } else {
             jdbcTemplate.update(
                     PUBLISH_BLOCK_QUERY,
-                    Map.of("targetId", targetId, "draftStatus", AppConstants.CONTENT_BLOCK_STATUS_DRAFT));
+                    Map.of(
+                            "targetId", targetId,
+                            "draftStatus", AppConstants.CONTENT_BLOCK_STATUS_DRAFT,
+                            "publishedStatus", AppConstants.CONTENT_BLOCK_STATUS_PUBLISHED));
         }
     }
 
     /** Hedef içeriği reddeder. */
     private void rejectTarget(TargetType targetType, long targetId) {
-        String query = targetType == TargetType.QUESTION ? REJECT_QUESTION_QUERY : REJECT_BLOCK_QUERY;
-        jdbcTemplate.update(query, Map.of("targetId", targetId));
+        if (targetType == TargetType.QUESTION) {
+            jdbcTemplate.update(
+                    REJECT_QUESTION_QUERY,
+                    Map.of("targetId", targetId, "rejectedStatus", AppConstants.QUESTION_STATUS_REJECTED));
+        } else {
+            jdbcTemplate.update(
+                    REJECT_BLOCK_QUERY,
+                    Map.of("targetId", targetId, "rejectedStatus", AppConstants.CONTENT_BLOCK_STATUS_REJECTED));
+        }
     }
 
     /** İnceleme kaydının soru veya paragraf hedefini belirler. */
