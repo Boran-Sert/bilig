@@ -4,6 +4,7 @@ Ortama göre değişen değerler burada değil, app/config.py'deki ayarlardadır
 """
 
 from pathlib import Path
+from typing import Final
 
 SERVICE_NAME = "ai"
 REQUEST_ID_HEADER = "X-Request-Id"
@@ -22,6 +23,7 @@ PROGRAM_CURRICULUM_YEAR = 2018
 SEARCH_PATH_SEPARATOR = " › "
 PAGE_IMAGE_DPI = 150
 TEST_SOURCE_KINDS = ("TEST", "QUESTION_BANK")
+IMAGE_MEDIA_TYPE: Final = "image/png"
 UNIT_GROUP_KEYWORDS = {  # şapkasız küçük harf
     "hikaye": "A.2",
     "roman": "A.2",
