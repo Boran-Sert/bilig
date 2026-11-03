@@ -170,6 +170,22 @@ class ReviewControllerIT {
                 .andExpect(jsonPath("$.code").value("REVIEW_ALREADY_DECIDED"));
     }
 
+    /** Düşük güven dışındaki açık kaydı 404 ile reddeder ve hedefe dokunmaz. */
+    @Test
+    @WithAuthUser(role = "CONTENT_ADMIN", id = 1001)
+    void rejectsDecisionForOtherReason() throws Exception {
+        long reviewId =
+                testData.createReview(fixture.questionId(), null, "VALIDATION_FAILED", "OPEN", "2026-11-02T12:00:00Z");
+
+        postDecision(reviewId, "{\"decision\":\"APPROVE\"}").andExpect(status().isNotFound());
+
+        assertThat(jdbcTemplate.queryForObject(
+                        "SELECT status FROM question WHERE id = ?", String.class, fixture.questionId()))
+                .isEqualTo("DRAFT");
+        assertThat(jdbcTemplate.queryForObject("SELECT status FROM review_item WHERE id = ?", String.class, reviewId))
+                .isEqualTo("OPEN");
+    }
+
     /** Boş veya bulunmayan kazanımlı FIX isteğini 400 ile reddeder. */
     @Test
     @WithAuthUser(role = "CONTENT_ADMIN", id = 1001)

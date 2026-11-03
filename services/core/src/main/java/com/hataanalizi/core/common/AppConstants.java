@@ -49,6 +49,7 @@ public final class AppConstants {
     // iş
 
     // inceleme
+    public static final String REVIEW_REASON_LOW_CONFIDENCE = "LOW_CONFIDENCE";
 
     // sohbet
 

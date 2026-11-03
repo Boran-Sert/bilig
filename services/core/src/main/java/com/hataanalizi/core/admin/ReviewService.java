@@ -177,7 +177,7 @@ public class ReviewService {
             throw new ApiException(ErrorCode.VALIDATION_FAILED);
         }
         ReviewItem reviewItem = reviewItemRepository
-                .findByIdForUpdate(reviewId)
+                .findByIdForUpdate(reviewId, AppConstants.REVIEW_REASON_LOW_CONFIDENCE)
                 .orElseThrow(() -> new ApiException(ErrorCode.NOT_FOUND));
         if (!"OPEN".equals(reviewItem.getStatus())) {
             throw new ApiException(ErrorCode.REVIEW_ALREADY_DECIDED);
