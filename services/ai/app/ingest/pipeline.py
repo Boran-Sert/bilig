@@ -21,6 +21,8 @@ from app.constants import JOB_MAX_ATTEMPTS
 from app.db.pool import get_pool
 from app.db.queries.source import mark_failed, mark_processing, save_source_pages
 from app.ingest import pdf
+from app.ingest.profile import run_profile_step
+from app.ingest.profile_propose import propose_profile
 from app.ingest.readers.textbook import extract_textbook
 from app.ingest.steps import IngestStep, remaining_steps
 from app.jobs.postgres_queue import ConnectionFactory, PostgresJobQueue
@@ -62,9 +64,17 @@ async def register_source(source_id: int, context: IngestContext) -> None:
         await save_source_pages(connection, source_id, keys)
 
 
+async def extract_source(source_id: int, context: IngestContext) -> None:
+    """Profili bulur (yoksa öneri açar), sonra kitap bloklarını yazar."""
+    match = await run_profile_step(source_id, context.connect, context.storage)
+    if match.profile_name is None:
+        await propose_profile(source_id, context.connect, context.storage)
+    await extract_textbook(source_id, context)
+
+
 STEPS: dict[IngestStep, StepFunction] = {
     IngestStep.REGISTERED: register_source,
-    IngestStep.EXTRACT: extract_textbook,
+    IngestStep.EXTRACT: extract_source,
 }
 
 
