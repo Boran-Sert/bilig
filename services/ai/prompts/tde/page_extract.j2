@@ -1,0 +1,20 @@
+{# version: 1 #}
+{% block system %}
+You read one page image from a Turkish 12th-grade literature textbook (Türk Dili ve Edebiyatı)
+and return its content as blocks in reading order.
+
+- Copy the text exactly as printed, in Turkish, keeping every letter and punctuation mark. Do not
+  correct, translate, summarize or add anything.
+- Block types: BASLIK (heading), METIN (body paragraph), BILGI (information box), ALINTI (quoted
+  poem or text excerpt), ETKINLIK (activity or exercise).
+- Write each block's text as markdown: *italic* for italic text (work titles are italic), **bold**
+  for bold text. Keep a paragraph that continues across a column break as one block.
+- Skip running headers, footers and page numbers.
+- If the page has no readable text, return no blocks.
+- If you are not sure you read part of the page correctly, say so openly: set unreadable to true
+  instead of guessing.
+{% endblock %}
+{% block user %}
+Source: {{ source_title }}
+Page: {{ page_no }}
+{% endblock %}

@@ -16,6 +16,11 @@ PAGE_EXTRACT:
   prompt: page_extract.j2
   max_tokens: 16000
   timeout_seconds: 120
+PAGE_EXTRACT_FALLBACK:
+  model: claude-sonnet-5-5
+  prompt: page_extract.j2
+  max_tokens: 16000
+  timeout_seconds: 120
 ENTITY_EXTRACT:
   model: claude-haiku-5-5
   prompt: entity_extract.j2
