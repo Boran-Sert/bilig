@@ -21,6 +21,7 @@ from app.constants import JOB_MAX_ATTEMPTS
 from app.db.pool import get_pool
 from app.db.queries.source import mark_failed, mark_processing, save_source_pages
 from app.ingest import pdf
+from app.ingest.readers.textbook import extract_textbook
 from app.ingest.steps import IngestStep, remaining_steps
 from app.jobs.postgres_queue import ConnectionFactory, PostgresJobQueue
 from app.jobs.queue import Job, JobQueue
@@ -61,7 +62,10 @@ async def register_source(source_id: int, context: IngestContext) -> None:
         await save_source_pages(connection, source_id, keys)
 
 
-STEPS: dict[IngestStep, StepFunction] = {IngestStep.REGISTERED: register_source}
+STEPS: dict[IngestStep, StepFunction] = {
+    IngestStep.REGISTERED: register_source,
+    IngestStep.EXTRACT: extract_textbook,
+}
 
 
 async def run_ingest(job: Job) -> None:

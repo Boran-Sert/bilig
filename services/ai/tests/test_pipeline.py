@@ -184,6 +184,6 @@ async def test_source_is_failed_when_last_attempt_is_abandoned(db: Connection) -
     assert await cursor.fetchone() == ("FAILED",)
 
 
-def test_registered_step_is_the_only_registered_step() -> None:
-    """Bu PR'da sadece REGISTERED kayıtlıdır; diğer adımlar atlanır."""
-    assert set(STEPS) == {IngestStep.REGISTERED}
+def test_registered_and_extract_steps_are_registered() -> None:
+    """Bu aşamada sadece REGISTERED ve EXTRACT kayıtlıdır; diğer adımlar atlanır."""
+    assert set(STEPS) == {IngestStep.REGISTERED, IngestStep.EXTRACT}
