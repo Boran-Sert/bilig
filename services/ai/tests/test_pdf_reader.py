@@ -194,6 +194,14 @@ def test_missing_tesseract_raises_ocr_error() -> None:
         pdf.read_lines(source, options)
 
 
-def test_page_count_returns_number_of_pages() -> None:
-    """Sayfa sayısı PDF'in gerçek sayfa sayısıdır."""
-    assert pdf.page_count(lines_pdf([["Bir"], ["İki"], ["Üç"]])) == 3
+def test_render_pages_saves_every_page_in_order() -> None:
+    """Her sayfa sırayla PNG olarak verilir ve sayfa sayısı döner."""
+    saved: list[tuple[int, bytes]] = []
+
+    total = pdf.render_pages(
+        lines_pdf([["Bir"], ["İki"], ["Üç"]]), lambda no, image: saved.append((no, image))
+    )
+
+    assert total == 3
+    assert [no for no, _ in saved] == [1, 2, 3]
+    assert all(image.startswith(b"\x89PNG") for _, image in saved)

@@ -19,7 +19,7 @@ from pydantic import BaseModel, ConfigDict, Field
 from app.config import load_storage_settings
 from app.constants import JOB_MAX_ATTEMPTS
 from app.db.pool import get_pool
-from app.db.queries.source import mark_failed, mark_processing, save_source_page
+from app.db.queries.source import mark_failed, mark_processing, save_source_pages
 from app.ingest import pdf
 from app.ingest.steps import IngestStep, remaining_steps
 from app.jobs.postgres_queue import ConnectionFactory, PostgresJobQueue
@@ -50,13 +50,15 @@ StepFunction = Callable[[int, IngestContext], Coroutine[Any, Any, None]]
 async def register_source(source_id: int, context: IngestContext) -> None:
     """Kaynağın her sayfasını 150 dpi görüntü olarak yazar ve source_page satırını kaydeder."""
     content = await asyncio.to_thread(context.storage.read, source_key(source_id))
-    page_total = await asyncio.to_thread(pdf.page_count, content)
-    for page_no in range(1, page_total + 1):
-        image = await asyncio.to_thread(pdf.render_page, content, page_no)
-        key = page_image_key(source_id, page_no)
-        await asyncio.to_thread(context.storage.write, key, image)
-        async with context.connect() as connection:
-            await save_source_page(connection, source_id, page_no, key)
+
+    def save(page_no: int, image: bytes) -> None:
+        """Sayfa görüntüsünü saklamaya yazar."""
+        context.storage.write(page_image_key(source_id, page_no), image)
+
+    page_total = await asyncio.to_thread(pdf.render_pages, content, save)
+    keys = [page_image_key(source_id, page_no) for page_no in range(1, page_total + 1)]
+    async with context.connect() as connection:
+        await save_source_pages(connection, source_id, keys)
 
 
 STEPS: dict[IngestStep, StepFunction] = {IngestStep.REGISTERED: register_source}

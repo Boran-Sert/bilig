@@ -20,14 +20,18 @@ WHERE id = %(source_id)s
 """
 
 
-async def save_source_page(
-    connection: AsyncConnection, source_id: int, page_no: int, image_path: str
+async def save_source_pages(
+    connection: AsyncConnection, source_id: int, image_paths: list[str]
 ) -> None:
-    """Sayfanın kaydını ekler; varsa görüntü yolunu günceller."""
-    await connection.execute(
-        UPSERT_SOURCE_PAGE,
-        {"source_id": source_id, "page_no": page_no, "image_path": image_path},
-    )
+    """Sayfaların kayıtlarını tek seferde ekler; varsa görüntü yollarını günceller."""
+    async with connection.cursor() as cursor:
+        await cursor.executemany(
+            UPSERT_SOURCE_PAGE,
+            [
+                {"source_id": source_id, "page_no": page_no, "image_path": image_path}
+                for page_no, image_path in enumerate(image_paths, start=1)
+            ],
+        )
 
 
 async def mark_processing(connection: AsyncConnection, source_id: int) -> None:
