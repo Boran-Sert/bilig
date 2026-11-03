@@ -7,6 +7,7 @@ import { cleanup, fireEvent, render, screen, waitFor } from "@testing-library/re
 import { MemoryRouter, Route, Routes } from "react-router";
 import { afterEach, beforeEach, describe, expect, test, vi } from "vitest";
 import "../../../lib/i18n";
+import { ApiError } from "../../../lib/api/problem";
 import SolvePage from "./SolvePage";
 
 const { useStartSessionMock, useSubmitAnswerMock, startMutateMock, submitMutateMock } = vi.hoisted(
@@ -92,7 +93,10 @@ describe("SolvePage", () => {
 
     useSubmitAnswerMock.mockReturnValue({
       mutate: submitMutateMock,
+      reset: vi.fn(),
       isPending: false,
+      isError: false,
+      error: null,
     });
   });
 
@@ -158,5 +162,43 @@ describe("SolvePage", () => {
     // Önceki düğmesine tıklar
     fireEvent.click(screen.getByRole("button", { name: "Önceki" }));
     expect(screen.getByText("Birinci soru kökü")).toBeInTheDocument();
+  });
+
+  test("yenilemeden önce cevaplanan soruda seçilen şıkkı işaretler ve kilitler", () => {
+    const answeredQuestions = [{ ...mockQuestions[0], selectedOption: "B" }, mockQuestions[1]];
+    useStartSessionMock.mockReturnValue({
+      mutate: startMutateMock,
+      isPending: false,
+      isError: false,
+      data: { sessionId: 99, currentPosition: 1, questions: answeredQuestions },
+      error: null,
+    });
+
+    renderSolvePage(1);
+
+    const optionB = screen.getByText("B şıkkı").closest("button")!;
+    expect(optionB).toHaveTextContent("Senin cevabın");
+    expect(optionB).toBeDisabled();
+    expect(screen.getByText("A şıkkı").closest("button")).toBeDisabled();
+    expect(
+      screen.getByText("%50 tamamlandı · kaldığın yerden devam ediyorsun"),
+    ).toBeInTheDocument();
+  });
+
+  test("cevap kaydedilemezse sunucunun mesajını gösterir", () => {
+    useSubmitAnswerMock.mockReturnValue({
+      mutate: submitMutateMock,
+      reset: vi.fn(),
+      isPending: false,
+      isError: true,
+      error: new ApiError(
+        { code: "ANSWER_ALREADY_SUBMITTED", detail: "Bu soru zaten cevaplandı." },
+        409,
+      ),
+    });
+
+    renderSolvePage(1);
+
+    expect(screen.getByRole("alert")).toHaveTextContent("Bu soru zaten cevaplandı.");
   });
 });

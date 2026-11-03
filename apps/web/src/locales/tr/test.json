@@ -11,19 +11,15 @@
   },
   "solve": {
     "backToTests": "Testler",
+    "metaDescription": "AYT Türk Dili ve Edebiyatı test sorusunu çöz, cevabının doğru olup olmadığını hemen gör.",
     "questionNumber": "Soru {{current}} / {{total}}",
     "progressText": "%{{percent}} tamamlandı · kaldığın yerden devam ediyorsun",
     "yourAnswer": "Senin cevabın",
     "correctAnswer": "Doğru cevap",
     "outcomesLabel": "Bu sorunun kazanımları:",
-    "hint": "İpucu",
-    "whyWrong": "Neden yanlış?",
-    "similar": "Benzer soru çöz",
-    "report": "Hatalı içerik bildir",
     "prev": "Önceki",
     "next": "Sonraki",
     "loading": "Soru yükleniyor...",
-    "submitting": "Cevap kaydediliyor...",
-    "alreadyAnswered": "Bu soru zaten cevaplandı."
+    "submitting": "Cevap kaydediliyor..."
   }
 }
