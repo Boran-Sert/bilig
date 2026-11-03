@@ -31,7 +31,7 @@ import org.springframework.transaction.annotation.Transactional;
 @AutoConfigureMockMvc
 @Import(TestcontainersConfiguration.class)
 @Transactional
-class ReviewControllerIT extends ReviewControllerTestSupport{
+class ReviewControllerIT extends ReviewControllerTestSupport {
 
     private final MockMvc mockMvc;
     private final JdbcTemplate jdbcTemplate;

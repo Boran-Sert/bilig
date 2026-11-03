@@ -1,5 +1,6 @@
 package com.hataanalizi.core.admin.dto;
 
+import io.swagger.v3.oas.annotations.media.Schema;
 import java.time.Instant;
 import java.util.List;
 import tools.jackson.databind.JsonNode;

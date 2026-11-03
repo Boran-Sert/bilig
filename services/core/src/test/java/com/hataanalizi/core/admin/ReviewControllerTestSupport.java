@@ -1,16 +1,10 @@
 package com.hataanalizi.core.admin;
 
-import static org.springframework.security.test.web.servlet.request.SecurityMockMvcRequestPostProcessors.testSecurityContext;
-import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.post;
-
-import jakarta.servlet.http.Cookie;
 import java.util.UUID;
 import org.junit.jupiter.api.BeforeEach;
 import org.springframework.beans.factory.annotation.Autowired;
-import org.springframework.http.MediaType;
 import org.springframework.jdbc.core.JdbcTemplate;
 import org.springframework.test.web.servlet.MockMvc;
-import org.springframework.test.web.servlet.ResultActions;
 
 /** İnceleme uçlarının entegrasyon testleri için ortak veritabanı fikstürü sağlar. */
 abstract class ReviewControllerTestSupport {
@@ -148,29 +142,5 @@ abstract class ReviewControllerTestSupport {
                 VALUES ('LOW_CONFIDENCE', ?, ?, ?, ?::timestamptz)
                 RETURNING id
                 """, Long.class, questionId, contentBlockId, status, createdAt);
-    }
-
-    /** CSRF doğrulamasıyla yönetici karar isteği gönderir. */
-    protected ResultActions postDecision(long reviewId, String body) throws Exception {
-        String csrfToken = UUID.randomUUID().toString();
-        return mockMvc.perform(post("/api/admin/review/" + reviewId)
-                .with(testSecurityContext())
-                .cookie(new Cookie("XSRF-TOKEN", csrfToken))
-                .header("X-XSRF-TOKEN", csrfToken)
-                .contentType(MediaType.APPLICATION_JSON)
-                .content(body));
-    }
-
-    /** Karar durumu, karar veren ve zamanı veritabanında kaydedildiğini doğrular. */
-    protected void assertDecision(long reviewId, String expectedStatus) {
-        org.assertj.core.api.Assertions.assertThat(jdbcTemplate.queryForObject(
-                        "SELECT status FROM review_item WHERE id = ?", String.class, reviewId))
-                .isEqualTo(expectedStatus);
-        org.assertj.core.api.Assertions.assertThat(jdbcTemplate.queryForObject(
-                        "SELECT decided_by FROM review_item WHERE id = ?", Long.class, reviewId))
-                .isEqualTo(1001L);
-        org.assertj.core.api.Assertions.assertThat(jdbcTemplate.queryForObject(
-                        "SELECT decided_at FROM review_item WHERE id = ?", Object.class, reviewId))
-                .isNotNull();
     }
 }
