@@ -26,6 +26,7 @@ import org.springframework.stereotype.Service;
 import org.springframework.web.servlet.mvc.method.annotation.SseEmitter;
 import reactor.core.Disposable;
 import reactor.core.publisher.Flux;
+import reactor.core.scheduler.Schedulers;
 import tools.jackson.core.JacksonException;
 import tools.jackson.databind.JsonNode;
 import tools.jackson.databind.ObjectMapper;
@@ -112,8 +113,8 @@ public class TutorService {
             dispose(subscription);
             fail(state, ErrorCode.AI_UNAVAILABLE);
         });
-        Disposable disposable = stream.subscribe(
-                event -> acceptEvent(state, event), exception -> fail(state, errorCode(exception)), () -> {
+        Disposable disposable = stream.publishOn(Schedulers.boundedElastic())
+                .subscribe(event -> acceptEvent(state, event), exception -> fail(state, errorCode(exception)), () -> {
                     if (!state.done.get()) {
                         fail(state, ErrorCode.AI_UNAVAILABLE);
                     }
