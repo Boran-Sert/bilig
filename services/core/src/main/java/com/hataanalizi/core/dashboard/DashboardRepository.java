@@ -36,12 +36,17 @@ public interface DashboardRepository extends Repository<StudySession, Long> {
                            CASE WHEN latest_completed.id IS NULL THEN NULL ELSE
                                (SELECT COUNT(*)
                                 FROM exam_question
+                                JOIN question ON question.id = exam_question.question_id
+                                    AND question.status = :publishedQuestionStatus
                                 WHERE exam_question.exam_id = latest_completed.exam_id)
                            END AS "latestQuestionCount"
                     FROM answer_summary
                     LEFT JOIN latest_completed ON true
                     """, nativeQuery = true)
-    SummaryRow findSummaryByUserId(@Param("userId") Long userId, @Param("completedStatus") String completedStatus);
+    SummaryRow findSummaryByUserId(
+            @Param("userId") Long userId,
+            @Param("completedStatus") String completedStatus,
+            @Param("publishedQuestionStatus") String publishedQuestionStatus);
 
     /** Öğrencinin yayındaki testlerdeki devam eden oturumlarını döndürür. */
     @Query(value = """
@@ -50,7 +55,9 @@ public interface DashboardRepository extends Repository<StudySession, Long> {
                            exam.title AS "examTitle",
                            COUNT(question.id) AS "questionCount",
                            COUNT(student_answer.id) AS "answeredCount",
-                           study_session.current_position AS "currentPosition"
+                           CAST(COUNT(question.id) FILTER (
+                               WHERE exam_question.position < study_session.current_position) + 1
+                               AS smallint) AS "currentPosition"
                     FROM study_session
                     JOIN exam ON exam.id = study_session.exam_id
                         AND exam.status = :publishedExamStatus
@@ -83,7 +90,9 @@ public interface DashboardRepository extends Repository<StudySession, Long> {
                         JOIN student_answer
                             ON student_answer.study_session_id = study_session.id
                            AND student_answer.is_correct = false
-                        JOIN question_outcome ON question_outcome.question_id = student_answer.question_id
+                        JOIN question ON question.id = student_answer.question_id
+                            AND question.status = :publishedQuestionStatus
+                        JOIN question_outcome ON question_outcome.question_id = question.id
                         JOIN exam ON exam.id = study_session.exam_id
                         WHERE study_session.user_id = :userId
                           AND study_session.exam_id IS NOT NULL
@@ -108,7 +117,9 @@ public interface DashboardRepository extends Repository<StudySession, Long> {
                         JOIN student_answer
                             ON student_answer.study_session_id = study_session.id
                            AND student_answer.is_correct = false
-                        JOIN question_outcome ON question_outcome.question_id = student_answer.question_id
+                        JOIN question ON question.id = student_answer.question_id
+                            AND question.status = :publishedQuestionStatus
+                        JOIN question_outcome ON question_outcome.question_id = question.id
                         WHERE study_session.user_id = :userId
                         GROUP BY question_outcome.learning_outcome_id
                     )
@@ -129,7 +140,8 @@ public interface DashboardRepository extends Repository<StudySession, Long> {
     List<FailedOutcomeRow> findFailedOutcomesByUserId(
             @Param("userId") Long userId,
             @Param("maximumWrongPerTest") int maximumWrongPerTest,
-            @Param("maximumWrongTotal") int maximumWrongTotal);
+            @Param("maximumWrongTotal") int maximumWrongTotal,
+            @Param("publishedQuestionStatus") String publishedQuestionStatus);
 
     /** Öğrencinin cevap doğruluğunu ünite başlığına göre toplar. */
     @Query(value = """
@@ -180,7 +192,7 @@ public interface DashboardRepository extends Repository<StudySession, Long> {
         /** Son tamamlanan test netini veya null değerini döndürür. */
         BigDecimal getLatestNet();
 
-        /** Son tamamlanan testteki soru sayısını veya null değerini döndürür. */
+        /** Son tamamlanan testteki yayımlanmış soru sayısını veya null değerini döndürür. */
         Long getLatestQuestionCount();
     }
 
@@ -202,7 +214,7 @@ public interface DashboardRepository extends Repository<StudySession, Long> {
         /** Cevaplanmış soru sayısını döndürür. */
         Long getAnsweredCount();
 
-        /** Öğrencinin mevcut soru konumunu döndürür. */
+        /** Öğrencinin yayımlanmış sorular arasındaki sırasını döndürür. */
         Short getCurrentPosition();
     }
 

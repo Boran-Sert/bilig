@@ -31,8 +31,8 @@ public class DashboardService {
     @Transactional(readOnly = true)
     public DashboardResponse getDashboard(AuthUser authUser) {
         long userId = authUser.id();
-        DashboardRepository.SummaryRow summaryRow =
-                dashboardRepository.findSummaryByUserId(userId, AppConstants.SESSION_STATUS_COMPLETED);
+        DashboardRepository.SummaryRow summaryRow = dashboardRepository.findSummaryByUserId(
+                userId, AppConstants.SESSION_STATUS_COMPLETED, AppConstants.QUESTION_STATUS_PUBLISHED);
         DashboardSummary summary = new DashboardSummary(
                 summaryRow.getAnsweredCount(),
                 accuracyPercent(summaryRow.getCorrectCount(), summaryRow.getAnsweredCount()),
@@ -48,7 +48,11 @@ public class DashboardService {
                 .map(DashboardService::toActiveSession)
                 .toList();
         List<DashboardFailedOutcome> failedOutcomes = dashboardRepository
-                .findFailedOutcomesByUserId(userId, AppConstants.MAX_WRONG_PER_TEST, AppConstants.MAX_WRONG_TOTAL)
+                .findFailedOutcomesByUserId(
+                        userId,
+                        AppConstants.MAX_WRONG_PER_TEST,
+                        AppConstants.MAX_WRONG_TOTAL,
+                        AppConstants.QUESTION_STATUS_PUBLISHED)
                 .stream()
                 .map(DashboardService::toFailedOutcome)
                 .toList();
