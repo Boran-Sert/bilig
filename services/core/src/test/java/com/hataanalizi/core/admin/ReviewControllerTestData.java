@@ -1,49 +1,44 @@
 package com.hataanalizi.core.admin;
 
-import static org.springframework.security.test.web.servlet.request.SecurityMockMvcRequestPostProcessors.testSecurityContext;
-import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.post;
-
-import jakarta.servlet.http.Cookie;
 import java.util.UUID;
-import org.junit.jupiter.api.BeforeEach;
-import org.springframework.beans.factory.annotation.Autowired;
-import org.springframework.http.MediaType;
 import org.springframework.jdbc.core.JdbcTemplate;
-import org.springframework.test.web.servlet.MockMvc;
-import org.springframework.test.web.servlet.ResultActions;
 
-/** İnceleme uçlarının entegrasyon testleri için ortak veritabanı fikstürü sağlar. */
-abstract class ReviewControllerTestSupport {
+/** İnceleme uçlarının entegrasyon testleri için PostgreSQL verisi oluşturur. */
+class ReviewControllerTestData {
 
-    @Autowired
-    protected MockMvc mockMvc;
+    private final JdbcTemplate jdbcTemplate;
 
-    @Autowired
-    protected JdbcTemplate jdbcTemplate;
-
-    protected long questionId;
-    protected long blockId;
-    protected long firstOutcomeId;
-    protected long secondOutcomeId;
-    protected long questionReviewId;
-    protected long blockReviewId;
-    protected long decidedReviewId;
-    private long curriculumUnitId;
+    /** Test veritabanı bağlantısını saklar. */
+    ReviewControllerTestData(JdbcTemplate jdbcTemplate) {
+        this.jdbcTemplate = jdbcTemplate;
+    }
 
     /** Soru, paragraf, kazanım ve açık/karara bağlanmış incelemeleri oluşturur. */
-    @BeforeEach
-    void createReviewData() {
+    ReviewFixture createReviewFixture() {
         createAdmin();
         long sourcePageId = createSourcePage();
-        long outcomeGroupId = createOutcomeGroup();
-        firstOutcomeId = createOutcome(outcomeGroupId, "A.2.6", "Şahıs kadrosu");
-        secondOutcomeId = createOutcome(outcomeGroupId, "A.2.7", "Zaman ve mekân");
-        questionId = createQuestion(sourcePageId);
-        blockId = createBlock(sourcePageId);
-        createLinks();
-        questionReviewId = createReview(questionId, null, "OPEN", "2026-11-02T10:00:00Z");
-        blockReviewId = createReview(null, blockId, "OPEN", "2026-11-02T11:00:00Z");
-        decidedReviewId = createReview(questionId, null, "APPROVED", "2026-11-02T09:00:00Z");
+        long curriculumId = createCurriculum();
+        long curriculumUnitId = createCurriculumUnit(curriculumId);
+        long outcomeGroupId = createOutcomeGroup(curriculumId);
+        long firstOutcomeId = createOutcome(outcomeGroupId, "A.2.6", "Şahıs kadrosu");
+        long secondOutcomeId = createOutcome(outcomeGroupId, "A.2.7", "Zaman ve mekân");
+        long questionId = createQuestion(sourcePageId, curriculumUnitId);
+        long blockId = createBlock(sourcePageId);
+        createLinks(questionId, firstOutcomeId, blockId, secondOutcomeId);
+        long questionReviewId = createReview(questionId, null, "LOW_CONFIDENCE", "OPEN", "2026-11-02T10:00:00Z");
+        long blockReviewId = createReview(null, blockId, "LOW_CONFIDENCE", "OPEN", "2026-11-02T11:00:00Z");
+        long decidedReviewId = createReview(questionId, null, "LOW_CONFIDENCE", "APPROVED", "2026-11-02T09:00:00Z");
+        return new ReviewFixture(
+                questionId, blockId, firstOutcomeId, secondOutcomeId, questionReviewId, blockReviewId, decidedReviewId);
+    }
+
+    /** İnceleme kaydını hedefi, sebebi ve oluşturulma zamanıyla ekler. */
+    long createReview(Long questionId, Long contentBlockId, String reason, String status, String createdAt) {
+        return jdbcTemplate.queryForObject("""
+                INSERT INTO review_item (reason, question_id, content_block_id, status, created_at)
+                VALUES (?, ?, ?, ?, ?::timestamptz)
+                RETURNING id
+                """, Long.class, reason, questionId, contentBlockId, status, createdAt);
     }
 
     /** İçerik yöneticisi kullanıcısını test tenant'ına ekler. */
@@ -72,21 +67,31 @@ abstract class ReviewControllerTestSupport {
                 """, Long.class, sourceId);
     }
 
-    /** Test kazanımları için program ve kazanım grubunu oluşturur. */
-    private long createOutcomeGroup() {
+    /** Test kazanımları için ders ve programı oluşturur. */
+    private long createCurriculum() {
         String uniqueValue = UUID.randomUUID().toString();
         Long subjectId = jdbcTemplate.queryForObject(
                 "INSERT INTO subject (code, name) VALUES (?, ?) RETURNING id", Long.class, uniqueValue, uniqueValue);
-        Long curriculumId = jdbcTemplate.queryForObject(
+        return jdbcTemplate.queryForObject(
                 "INSERT INTO curriculum (subject_id, name, model, year) VALUES (?, ?, 'LEGACY', 2018) RETURNING id",
                 Long.class,
                 subjectId,
                 uniqueValue);
-        curriculumUnitId = jdbcTemplate.queryForObject("""
+    }
+
+    /** Test sorusu için program ünitesini oluşturur. */
+    private long createCurriculumUnit(long curriculumId) {
+        return jdbcTemplate.queryForObject(
+                """
                 INSERT INTO curriculum_unit (curriculum_id, grade, unit_no, title)
                 VALUES (?, 12, 1, ?)
                 RETURNING id
-                """, Long.class, curriculumId, uniqueValue);
+                """, Long.class, curriculumId, UUID.randomUUID().toString());
+    }
+
+    /** Test kazanımları için kazanım grubunu oluşturur. */
+    private long createOutcomeGroup(long curriculumId) {
+        String uniqueValue = UUID.randomUUID().toString();
         return jdbcTemplate.queryForObject("""
                 INSERT INTO learning_outcome_group (curriculum_id, code, name)
                 VALUES (?, ?, ?)
@@ -104,7 +109,7 @@ abstract class ReviewControllerTestSupport {
     }
 
     /** Test sorusunu sayfaya bağlar. */
-    private long createQuestion(long sourcePageId) {
+    private long createQuestion(long sourcePageId, long curriculumUnitId) {
         String uniqueHash = UUID.randomUUID().toString().replace("-", "")
                 + UUID.randomUUID().toString().replace("-", "");
         return jdbcTemplate.queryForObject("""
@@ -130,47 +135,24 @@ abstract class ReviewControllerTestSupport {
     }
 
     /** Soruya ve paragrafa MODEL eşleştirmelerini ekler. */
-    private void createLinks() {
+    private void createLinks(long questionId, long questionOutcomeId, long blockId, long blockOutcomeId) {
         jdbcTemplate.update("""
                 INSERT INTO question_outcome (question_id, learning_outcome_id, mapped_by)
                 VALUES (?, ?, 'MODEL')
-                """, questionId, firstOutcomeId);
+                """, questionId, questionOutcomeId);
         jdbcTemplate.update("""
                 INSERT INTO content_block_outcome (content_block_id, learning_outcome_id, mapped_by)
                 VALUES (?, ?, 'MODEL')
-                """, blockId, secondOutcomeId);
+                """, blockId, blockOutcomeId);
     }
 
-    /** İnceleme kaydını hedefi ve oluşturulma zamanıyla ekler. */
-    private long createReview(Long questionId, Long contentBlockId, String status, String createdAt) {
-        return jdbcTemplate.queryForObject("""
-                INSERT INTO review_item (reason, question_id, content_block_id, status, created_at)
-                VALUES ('LOW_CONFIDENCE', ?, ?, ?, ?::timestamptz)
-                RETURNING id
-                """, Long.class, questionId, contentBlockId, status, createdAt);
-    }
-
-    /** CSRF doğrulamasıyla yönetici karar isteği gönderir. */
-    protected ResultActions postDecision(long reviewId, String body) throws Exception {
-        String csrfToken = UUID.randomUUID().toString();
-        return mockMvc.perform(post("/api/admin/review/" + reviewId)
-                .with(testSecurityContext())
-                .cookie(new Cookie("XSRF-TOKEN", csrfToken))
-                .header("X-XSRF-TOKEN", csrfToken)
-                .contentType(MediaType.APPLICATION_JSON)
-                .content(body));
-    }
-
-    /** Karar durumu, karar veren ve zamanı veritabanında kaydedildiğini doğrular. */
-    protected void assertDecision(long reviewId, String expectedStatus) {
-        org.assertj.core.api.Assertions.assertThat(jdbcTemplate.queryForObject(
-                        "SELECT status FROM review_item WHERE id = ?", String.class, reviewId))
-                .isEqualTo(expectedStatus);
-        org.assertj.core.api.Assertions.assertThat(jdbcTemplate.queryForObject(
-                        "SELECT decided_by FROM review_item WHERE id = ?", Long.class, reviewId))
-                .isEqualTo(1001L);
-        org.assertj.core.api.Assertions.assertThat(jdbcTemplate.queryForObject(
-                        "SELECT decided_at FROM review_item WHERE id = ?", Object.class, reviewId))
-                .isNotNull();
-    }
+    /** İnceleme testlerinin kullandığı kayıt kimliklerini taşır. */
+    record ReviewFixture(
+            long questionId,
+            long blockId,
+            long firstOutcomeId,
+            long secondOutcomeId,
+            long questionReviewId,
+            long blockReviewId,
+            long decidedReviewId) {}
 }
