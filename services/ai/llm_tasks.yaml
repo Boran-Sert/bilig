@@ -21,6 +21,11 @@ ENTITY_EXTRACT:
   prompt: entity_extract.j2
   max_tokens: 16000
   timeout_seconds: 120
+PROFILE_PROPOSE:
+  model: claude-sonnet-5-5
+  prompt: profile_propose.j2
+  max_tokens: 16000
+  timeout_seconds: 120
 OUTCOME_MATCH:
   model: claude-haiku-5-5
   prompt: outcome_match.j2
