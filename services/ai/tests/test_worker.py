@@ -46,6 +46,10 @@ class FakeQueue:
         self.heartbeats += 1
         return self.owned
 
+    async def record_step(self, job: Job, step: str) -> bool:
+        """Worker adım yazmaz; sadece sözleşmeyi sağlar."""
+        raise NotImplementedError
+
     async def complete(self, job: Job) -> bool:
         """Biten işi kaydeder."""
         self.completed.append(job.id)

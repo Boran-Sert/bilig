@@ -192,3 +192,16 @@ def test_missing_tesseract_raises_ocr_error() -> None:
     options = pdf.ReaderOptions(KNOWN_WORDS, tesseract_cmd="tesseract-yok")
     with pytest.raises(pdf.OcrError):
         pdf.read_lines(source, options)
+
+
+def test_render_pages_saves_every_page_in_order() -> None:
+    """Her sayfa sırayla PNG olarak verilir ve sayfa sayısı döner."""
+    saved: list[tuple[int, bytes]] = []
+
+    total = pdf.render_pages(
+        lines_pdf([["Bir"], ["İki"], ["Üç"]]), lambda no, image: saved.append((no, image))
+    )
+
+    assert total == 3
+    assert [no for no, _ in saved] == [1, 2, 3]
+    assert all(image.startswith(b"\x89PNG") for _, image in saved)

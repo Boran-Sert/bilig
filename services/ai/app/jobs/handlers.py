@@ -8,8 +8,9 @@ alır; yarıda kalmış işte last_completed_step'ten sonraki adımdan devam ede
 from collections.abc import Callable, Coroutine
 from typing import Any
 
+from app.ingest.pipeline import run_ingest
 from app.jobs.queue import Job, JobType
 
 JobHandler = Callable[[Job], Coroutine[Any, Any, None]]
 
-HANDLERS: dict[JobType, JobHandler] = {}
+HANDLERS: dict[JobType, JobHandler] = {JobType.INGEST_SOURCE: run_ingest}

@@ -4,7 +4,13 @@ from pathlib import Path
 
 import pytest
 
-from app.config import SettingsError, get_settings, load_ingest_settings, load_settings
+from app.config import (
+    SettingsError,
+    get_settings,
+    load_ingest_settings,
+    load_settings,
+    load_storage_settings,
+)
 
 DATABASE_URL = "postgresql://app:secret@localhost:5432/hata_analizi"
 WORD_LIST_PATH = "/app/data/turkce_kelimeler.txt"
@@ -97,3 +103,18 @@ def test_load_ingest_settings_names_missing_word_list_path(monkeypatch: pytest.M
 
     with pytest.raises(SettingsError, match="WORD_LIST_PATH is missing"):
         load_ingest_settings()
+
+
+def test_load_storage_settings_reads_directory(monkeypatch: pytest.MonkeyPatch) -> None:
+    """STORAGE_DIR klasör olarak okunur."""
+    monkeypatch.setenv("STORAGE_DIR", "/data")
+
+    assert load_storage_settings().storage_dir == Path("/data")
+
+
+def test_load_storage_settings_names_missing_variable(monkeypatch: pytest.MonkeyPatch) -> None:
+    """STORAGE_DIR yoksa hata değişkenin adını söyler."""
+    monkeypatch.delenv("STORAGE_DIR", raising=False)
+
+    with pytest.raises(SettingsError, match="STORAGE_DIR"):
+        load_storage_settings()

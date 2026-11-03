@@ -27,6 +27,7 @@ from functools import partial
 from pathlib import Path
 
 import pypdfium2 as pdfium
+from PIL import Image
 
 from app.config import load_ingest_settings, load_pdf_settings
 from app.constants import FONT_FIX_MIN_WORDS, PAGE_IMAGE_DPI
@@ -107,14 +108,28 @@ def render_page(source: PdfSource, page_no: int, dpi: int = PAGE_IMAGE_DPI) -> b
     with _reading():
         document = pdfium.PdfDocument(source)
         try:
-            page = document[page_no - 1]
-            image = page.render(scale=dpi / 72).to_pil()
-            page.close()
+            image = _render(document, page_no, dpi)
         finally:
             document.close()
-    output = io.BytesIO()
-    image.save(output, format="PNG")
-    return output.getvalue()
+    return _to_png(image)
+
+
+def render_pages(
+    source: PdfSource, save: Callable[[int, bytes], None], dpi: int = PAGE_IMAGE_DPI
+) -> int:
+    """PDF'i bir kez açıp her sayfayı PNG olarak save'e verir ve sayfa sayısını döner."""
+    with _reading():
+        document = pdfium.PdfDocument(source)
+        total = len(document)
+    try:
+        for page_no in range(1, total + 1):
+            with _reading():
+                image = _render(document, page_no, dpi)
+            save(page_no, _to_png(image))
+    finally:
+        with _reading():
+            document.close()
+    return total
 
 
 def review_text(text: str, known_words: frozenset[str]) -> Review | None:
@@ -141,6 +156,23 @@ def _read_book_pages(source: PdfSource, options: ReaderOptions | None) -> list[b
         return book_reader.TextReview(*review) if review else None
 
     return book_reader.read_document(source, ocr, check)
+
+
+def _render(document: pdfium.PdfDocument, page_no: int, dpi: int) -> Image.Image:
+    """Açık belgenin sayfasını (1'den sayılır) görüntü olarak çizer."""
+    page = document[page_no - 1]
+    try:
+        image: Image.Image = page.render(scale=dpi / 72).to_pil()
+        return image
+    finally:
+        page.close()
+
+
+def _to_png(image: Image.Image) -> bytes:
+    """Görüntüyü PNG baytlarına çevirir."""
+    output = io.BytesIO()
+    image.save(output, format="PNG")
+    return output.getvalue()
 
 
 @contextmanager

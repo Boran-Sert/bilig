@@ -2,9 +2,9 @@
 
 Çalışan sadece JobQueue'yu bilir; şimdiki uygulama PostgresJobQueue'dur. İşin durumu her zaman
 background_job tablosunda kalır. attempts her alımda bir artar ve o alımın sahiplik numarasıdır:
-heartbeat, complete ve fail sadece iş hâlâ aynı numarayla çalışıyorsa yazar, değilse False döner.
-Böylece iş başka çalışana geçtiyse eski çalışan durumu ezemez. İş türleri Java'daki JobType ile
-aynıdır.
+heartbeat, record_step, complete ve fail sadece iş hâlâ aynı numarayla çalışıyorsa yazar, değilse
+False döner. Böylece iş başka çalışana geçtiyse eski çalışan durumu ezemez. İş türleri Java'daki
+JobType ile aynıdır.
 """
 
 from enum import StrEnum
@@ -46,6 +46,9 @@ class JobQueue(Protocol):
 
     async def heartbeat(self, job: Job) -> bool:
         """İşin hâlâ çalıştığını bildirir; iş başkasına geçtiyse False döner."""
+
+    async def record_step(self, job: Job, step: str) -> bool:
+        """Tamamlanan son adımı yazar; iş başkasına geçtiyse False döner."""
 
     async def complete(self, job: Job) -> bool:
         """İşi bitmiş olarak işaretler; iş başkasına geçtiyse False döner."""
