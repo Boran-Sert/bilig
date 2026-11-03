@@ -6,17 +6,32 @@ import tools.jackson.databind.JsonNode;
 
 /** İnceleme kaydını hedef içerik ve mevcut kazanımlarıyla taşır. */
 public record ReviewItemResponse(
-        Long id,
-        String reason,
-        TargetType targetType,
-        Long targetId,
+        @Schema(requiredMode = Schema.RequiredMode.REQUIRED) Long id,
+        @Schema(requiredMode = Schema.RequiredMode.REQUIRED) String reason,
+        @Schema(requiredMode = Schema.RequiredMode.REQUIRED) TargetType targetType,
+        @Schema(requiredMode = Schema.RequiredMode.REQUIRED) Long targetId,
+
+        @Schema(
+                requiredMode = Schema.RequiredMode.REQUIRED,
+                implementation = Object.class,
+                types = {"object", "null"},
+                additionalProperties = Schema.AdditionalPropertiesValue.TRUE)
         JsonNode questionContent,
+
+        @Schema(requiredMode = Schema.RequiredMode.REQUIRED, nullable = true)
         String blockMarkdown,
+
+        @Schema(requiredMode = Schema.RequiredMode.REQUIRED, nullable = true)
         String sourceTitle,
+
+        @Schema(requiredMode = Schema.RequiredMode.REQUIRED, nullable = true)
         Long pageId,
+
+        @Schema(requiredMode = Schema.RequiredMode.REQUIRED, nullable = true)
         Integer pageNo,
-        List<OutcomeLink> outcomes,
-        Instant createdAt) {
+
+        @Schema(requiredMode = Schema.RequiredMode.REQUIRED) List<OutcomeLink> outcomes,
+        @Schema(requiredMode = Schema.RequiredMode.REQUIRED) Instant createdAt) {
 
     /** İncelemenin soru veya paragraf hedefini tanımlar. */
     public enum TargetType {
@@ -25,5 +40,16 @@ public record ReviewItemResponse(
     }
 
     /** Hedefe bağlı kazanımı ve eşleştirme kaynağını taşır. */
-    public record OutcomeLink(Long id, String code, String title, String mappedBy) {}
+    public record OutcomeLink(
+            @Schema(requiredMode = Schema.RequiredMode.REQUIRED)
+            Long id,
+
+            @Schema(requiredMode = Schema.RequiredMode.REQUIRED)
+            String code,
+
+            @Schema(requiredMode = Schema.RequiredMode.REQUIRED)
+            String title,
+
+            @Schema(requiredMode = Schema.RequiredMode.REQUIRED)
+            String mappedBy) {}
 }

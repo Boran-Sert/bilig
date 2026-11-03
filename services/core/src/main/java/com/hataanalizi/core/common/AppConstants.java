@@ -34,6 +34,8 @@ public final class AppConstants {
 
     // soru
     public static final String QUESTION_STATUS_PUBLISHED = "PUBLISHED";
+    public static final String QUESTION_STATUS_DRAFT = "DRAFT";
+    public static final String QUESTION_STATUS_REJECTED = "REJECTED";
 
     // oturum
     public static final String SESSION_STATUS_IN_PROGRESS = "IN_PROGRESS";
@@ -49,6 +51,16 @@ public final class AppConstants {
     // iş
 
     // inceleme
+    public static final String DEFAULT_REVIEW_PAGE_SIZE = "20";
+    public static final int MAX_REVIEW_PAGE_SIZE = 100;
+    public static final String REVIEW_REASON_LOW_CONFIDENCE = "LOW_CONFIDENCE";
+    public static final String REVIEW_STATUS_OPEN = "OPEN";
+    public static final String REVIEW_STATUS_APPROVED = "APPROVED";
+    public static final String REVIEW_STATUS_REJECTED = "REJECTED";
+    public static final String CONTENT_BLOCK_STATUS_DRAFT = "DRAFT";
+    public static final String CONTENT_BLOCK_STATUS_PUBLISHED = "PUBLISHED";
+    public static final String CONTENT_BLOCK_STATUS_REJECTED = "REJECTED";
+    public static final String OUTCOME_MAPPED_BY_HUMAN = "HUMAN";
 
     // sohbet
 

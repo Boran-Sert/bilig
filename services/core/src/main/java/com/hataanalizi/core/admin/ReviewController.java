@@ -33,7 +33,7 @@ public class ReviewController {
     @GetMapping("/review")
     public PageResponse<ReviewItemResponse> listReviews(
             @RequestParam(defaultValue = "0") int page,
-            @RequestParam(defaultValue = AppConstants.DEFAULT_SOURCE_PAGE_SIZE) int size) {
+            @RequestParam(defaultValue = AppConstants.DEFAULT_REVIEW_PAGE_SIZE) int size) {
         return reviewService.listReviews(page, size);
     }
 
