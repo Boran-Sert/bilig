@@ -116,6 +116,22 @@ export interface paths {
     patch?: never;
     trace?: never;
   };
+  "/api/admin/review/{id}": {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    get?: never;
+    put?: never;
+    post: operations["decideReview"];
+    delete?: never;
+    options?: never;
+    head?: never;
+    patch?: never;
+    trace?: never;
+  };
   "/api/tests": {
     parameters: {
       query?: never;
@@ -188,6 +204,38 @@ export interface paths {
       cookie?: never;
     };
     get: operations["registerOptions"];
+    put?: never;
+    post?: never;
+    delete?: never;
+    options?: never;
+    head?: never;
+    patch?: never;
+    trace?: never;
+  };
+  "/api/admin/review": {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    get: operations["listReviews"];
+    put?: never;
+    post?: never;
+    delete?: never;
+    options?: never;
+    head?: never;
+    patch?: never;
+    trace?: never;
+  };
+  "/api/admin/outcomes": {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    get: operations["listOutcomes"];
     put?: never;
     post?: never;
     delete?: never;
@@ -300,6 +348,11 @@ export interface components {
       fileName?: string;
       duplicate?: boolean;
     };
+    ReviewDecisionRequest: {
+      /** @enum {string} */
+      decision: "APPROVE" | "FIX" | "REJECT";
+      outcomeIds?: number[];
+    };
     ExamSummaryResponse: {
       /** Format: int64 */
       id: number;
@@ -395,6 +448,49 @@ export interface components {
       error: string | null;
       /** Format: date-time */
       createdAt: string;
+    };
+    OutcomeLink: {
+      /** Format: int64 */
+      id: number;
+      code: string;
+      title: string;
+      mappedBy: string;
+    };
+    PageResponseReviewItemResponse: {
+      items: components["schemas"]["ReviewItemResponse"][];
+      /** Format: int32 */
+      page: number;
+      /** Format: int32 */
+      size: number;
+      /** Format: int64 */
+      total: number;
+    };
+    ReviewItemResponse: {
+      /** Format: int64 */
+      id: number;
+      reason: string;
+      /** @enum {string} */
+      targetType: "QUESTION" | "BLOCK";
+      /** Format: int64 */
+      targetId: number;
+      questionContent: {
+        [key: string]: unknown;
+      } | null;
+      blockMarkdown: string | null;
+      sourceTitle: string | null;
+      /** Format: int64 */
+      pageId: number | null;
+      /** Format: int32 */
+      pageNo: number | null;
+      outcomes: components["schemas"]["OutcomeLink"][];
+      /** Format: date-time */
+      createdAt: string;
+    };
+    ReviewOutcomeResponse: {
+      /** Format: int64 */
+      id: number;
+      code: string;
+      title: string;
     };
   };
   responses: never;
@@ -591,6 +687,30 @@ export interface operations {
       };
     };
   };
+  decideReview: {
+    parameters: {
+      query?: never;
+      header?: never;
+      path: {
+        id: number;
+      };
+      cookie?: never;
+    };
+    requestBody: {
+      content: {
+        "application/json": components["schemas"]["ReviewDecisionRequest"];
+      };
+    };
+    responses: {
+      /** @description OK */
+      200: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content?: never;
+      };
+    };
+  };
   listTests: {
     parameters: {
       query?: never;
@@ -689,6 +809,49 @@ export interface operations {
         };
         content: {
           "*/*": components["schemas"]["RegisterOptionsResponse"];
+        };
+      };
+    };
+  };
+  listReviews: {
+    parameters: {
+      query?: {
+        page?: number;
+        size?: number;
+      };
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    requestBody?: never;
+    responses: {
+      /** @description OK */
+      200: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          "*/*": components["schemas"]["PageResponseReviewItemResponse"];
+        };
+      };
+    };
+  };
+  listOutcomes: {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    requestBody?: never;
+    responses: {
+      /** @description OK */
+      200: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          "*/*": components["schemas"]["ReviewOutcomeResponse"][];
         };
       };
     };

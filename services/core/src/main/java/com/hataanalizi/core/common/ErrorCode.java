@@ -36,9 +36,10 @@ public enum ErrorCode {
     FILE_NOT_PDF(HttpStatus.BAD_REQUEST),
     FILE_TOO_LARGE(HttpStatus.CONTENT_TOO_LARGE),
 
-// iş
+    // iş
 
-// inceleme
+    // inceleme
+    REVIEW_ALREADY_DECIDED(HttpStatus.CONFLICT),
 
 // sohbet
 ;
