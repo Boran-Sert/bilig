@@ -148,6 +148,22 @@ export interface paths {
     patch?: never;
     trace?: never;
   };
+  "/api/questions/{id}/hint": {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    get: operations["getHint"];
+    put?: never;
+    post?: never;
+    delete?: never;
+    options?: never;
+    head?: never;
+    patch?: never;
+    trace?: never;
+  };
   "/api/me": {
     parameters: {
       query?: never;
@@ -332,6 +348,9 @@ export interface components {
       /** Format: int64 */
       sessionId: number | null;
       status: string | null;
+    };
+    HintResponse: {
+      hint: string;
     };
     RegisterOptionsResponse: {
       grades: number[];
@@ -642,6 +661,28 @@ export interface operations {
         };
         content: {
           "*/*": components["schemas"]["ExamSummaryResponse"][];
+        };
+      };
+    };
+  };
+  getHint: {
+    parameters: {
+      query?: never;
+      header?: never;
+      path: {
+        id: number;
+      };
+      cookie?: never;
+    };
+    requestBody?: never;
+    responses: {
+      /** @description OK */
+      200: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          "*/*": components["schemas"]["HintResponse"];
         };
       };
     };
