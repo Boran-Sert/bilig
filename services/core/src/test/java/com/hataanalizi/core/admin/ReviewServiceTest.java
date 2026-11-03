@@ -1,5 +1,6 @@
 package com.hataanalizi.core.admin;
 
+import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.verifyNoInteractions;
@@ -48,8 +49,7 @@ class ReviewServiceTest {
         assertThatThrownBy(() -> reviewService.decideReview(7L, 10L, new ReviewDecisionRequest(Decision.APPROVE, null)))
                 .isInstanceOfSatisfying(
                         ApiException.class,
-                        exception -> org.assertj.core.api.Assertions.assertThat(exception.getErrorCode())
-                                .isEqualTo(ErrorCode.REVIEW_ALREADY_DECIDED));
+                        exception -> assertThat(exception.getErrorCode()).isEqualTo(ErrorCode.REVIEW_ALREADY_DECIDED));
 
         verify(reviewItemRepository).findByIdForUpdate(7L, AppConstants.REVIEW_REASON_LOW_CONFIDENCE);
         verifyNoInteractions(jdbcTemplate);
@@ -66,8 +66,7 @@ class ReviewServiceTest {
                         () -> reviewService.decideReview(7L, 10L, new ReviewDecisionRequest(Decision.FIX, List.of())))
                 .isInstanceOfSatisfying(
                         ApiException.class,
-                        exception -> org.assertj.core.api.Assertions.assertThat(exception.getErrorCode())
-                                .isEqualTo(ErrorCode.VALIDATION_FAILED));
+                        exception -> assertThat(exception.getErrorCode()).isEqualTo(ErrorCode.VALIDATION_FAILED));
 
         verifyNoInteractions(jdbcTemplate);
     }
@@ -78,8 +77,7 @@ class ReviewServiceTest {
         assertThatThrownBy(() -> reviewService.listReviews(-1, 20))
                 .isInstanceOfSatisfying(
                         ApiException.class,
-                        exception -> org.assertj.core.api.Assertions.assertThat(exception.getErrorCode())
-                                .isEqualTo(ErrorCode.VALIDATION_FAILED));
+                        exception -> assertThat(exception.getErrorCode()).isEqualTo(ErrorCode.VALIDATION_FAILED));
 
         verifyNoInteractions(jdbcTemplate, reviewItemRepository);
     }

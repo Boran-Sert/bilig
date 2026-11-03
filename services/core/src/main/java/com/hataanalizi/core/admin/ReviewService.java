@@ -10,6 +10,8 @@ import com.hataanalizi.core.common.ApiException;
 import com.hataanalizi.core.common.AppConstants;
 import com.hataanalizi.core.common.ErrorCode;
 import com.hataanalizi.core.common.PageResponse;
+import java.sql.ResultSet;
+import java.sql.SQLException;
 import java.time.OffsetDateTime;
 import java.util.List;
 import java.util.Map;
@@ -288,7 +290,7 @@ public class ReviewService {
     }
 
     /** Sorgu satırını inceleme cevabına dönüştürür. */
-    private ReviewItemResponse mapReviewItem(java.sql.ResultSet result) throws java.sql.SQLException {
+    private ReviewItemResponse mapReviewItem(ResultSet result) throws SQLException {
         String content = result.getString(5);
         JsonNode questionContent = content == null ? null : objectMapper.readTree(content);
         JsonNode outcomeItems = objectMapper.readTree(result.getString(10));
