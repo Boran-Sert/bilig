@@ -32,6 +32,7 @@ import org.springframework.http.HttpStatus;
 import org.springframework.http.MediaType;
 import org.springframework.test.web.client.MockRestServiceServer;
 import org.springframework.web.client.RestClient;
+import org.springframework.web.reactive.function.client.WebClient;
 
 /** AiClient'ın iç başlıklarını, hata çevirisini ve token'ın log'a yazılmadığını sınar. */
 class AiClientTest {
@@ -68,7 +69,7 @@ class AiClientTest {
                 });
         server = MockRestServiceServer.bindTo(builder).build();
         RestClient restClient = builder.build();
-        client = new AiClient(restClient, restClient);
+        client = new AiClient(restClient, restClient, WebClient.builder().build());
 
         rootLogger = (Logger) LoggerFactory.getLogger(Logger.ROOT_LOGGER_NAME);
         previousLevel = rootLogger.getLevel();
