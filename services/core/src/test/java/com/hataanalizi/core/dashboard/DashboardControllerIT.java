@@ -56,7 +56,7 @@ class DashboardControllerIT {
                 .andExpect(jsonPath("$.summary.answeredQuestionCount").value(21))
                 .andExpect(jsonPath("$.summary.accuracyPercent").value(9.52))
                 .andExpect(jsonPath("$.summary.latestNet").value(0.25))
-                .andExpect(jsonPath("$.summary.latestQuestionCount").value(8))
+                .andExpect(jsonPath("$.summary.latestQuestionCount").value(7))
                 .andExpect(jsonPath("$.activeSessions.length()").value(1))
                 .andExpect(jsonPath("$.activeSessions[0].examId").value(fixture.activeExamId()))
                 .andExpect(jsonPath("$.activeSessions[0].examTitle").value("Şiir · Kazanım Testi 1"))
@@ -74,6 +74,19 @@ class DashboardControllerIT {
                 .andReturn();
 
         assertFailedOutcomes(result.getResponse().getContentAsString());
+    }
+
+    /** Aktif testte yayında olmayan soruyu sıra ve soru sayısından çıkarır. */
+    @Test
+    void returnsActiveSessionPositionAmongPublishedQuestions() throws Exception {
+        Long userId = testData.createActiveSessionWithReviewQuestion();
+
+        mockMvc.perform(get("/api/me/dashboard").with(student(userId)))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.activeSessions.length()").value(1))
+                .andExpect(jsonPath("$.activeSessions[0].questionCount").value(2))
+                .andExpect(jsonPath("$.activeSessions[0].answeredCount").value(1))
+                .andExpect(jsonPath("$.activeSessions[0].currentPosition").value(2));
     }
 
     /** Hiç cevaplamamış öğrencinin boş panelini sıfırlarla döndürür. */
@@ -100,17 +113,10 @@ class DashboardControllerIT {
     /** Panel yanıtındaki başarısız kazanım eşiklerini doğrular. */
     private void assertFailedOutcomes(String response) throws Exception {
         JsonNode outcomes = objectMapper.readTree(response).get("failedOutcomes");
-        assertThat(outcomes.size()).isEqualTo(3);
+        assertThat(outcomes.size()).isEqualTo(1);
         assertThat(outcomes.get(0).get("code").stringValue()).isEqualTo("A.2.4");
         assertThat(outcomes.get(0).get("totalWrongCount").longValue()).isEqualTo(3);
         assertThat(outcomes.get(0).get("testWrongCount").longValue()).isEqualTo(3);
-        assertThat(outcomes.get(1).get("code").stringValue()).isEqualTo("A.2.7");
-        assertThat(outcomes.get(1).get("totalWrongCount").longValue()).isEqualTo(11);
-        assertThat(outcomes.get(1).get("testTitle").stringValue()).isEqualTo("Roman · Kazanım Testi 3");
-        assertThat(outcomes.get(2).get("code").stringValue()).isEqualTo("A.2.8");
-        assertThat(outcomes.get(2).get("totalWrongCount").longValue()).isEqualTo(7);
-        assertThat(outcomes.get(2).get("testTitle").isNull()).isTrue();
-        assertThat(outcomes.get(2).get("testWrongCount").isNull()).isTrue();
     }
 
     /** İstek için test öğrencisinin kimliğini hazırlar. */

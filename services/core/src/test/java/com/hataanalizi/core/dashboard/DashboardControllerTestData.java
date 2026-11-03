@@ -48,6 +48,19 @@ class DashboardControllerTestData {
         return new DashboardFixture(userId, latestExamId, activeExamId, questionIds.getFirst());
     }
 
+    /** İlk sorusu incelemede olan aktif testi ikinci soruda bekleyen oturumla hazırlar. */
+    Long createActiveSessionWithReviewQuestion() {
+        Long userId = insertUser();
+        Long unitId = insertCurriculumUnit("Şiir");
+        Long examId = insertExam("Şiir · Kazanım Testi 2");
+        List<Long> questionIds = insertQuestions(unitId, examId, 3);
+        markQuestionForReview(questionIds.getFirst());
+        Long sessionId = insertSession(userId, examId, "IN_PROGRESS", null, BASE_TIMESTAMP);
+        insertAnswer(sessionId, questionIds.get(1), true, null);
+        jdbcTemplate.update("UPDATE study_session SET current_position = 3 WHERE id = ?", sessionId);
+        return userId;
+    }
+
     /** Başka öğrencinin cevabını ekleyerek panel sahipliği sınamasını hazırlar. */
     void insertOtherStudentAnswer(DashboardFixture fixture) {
         Long otherUserId = insertUser();
