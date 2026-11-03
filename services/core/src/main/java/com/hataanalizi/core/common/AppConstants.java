@@ -34,6 +34,7 @@ public final class AppConstants {
 
     // soru
     public static final String QUESTION_STATUS_PUBLISHED = "PUBLISHED";
+    public static final String QUESTION_STATUS_DRAFT = "DRAFT";
 
     // oturum
     public static final String SESSION_STATUS_IN_PROGRESS = "IN_PROGRESS";
@@ -50,6 +51,7 @@ public final class AppConstants {
 
     // inceleme
     public static final String REVIEW_REASON_LOW_CONFIDENCE = "LOW_CONFIDENCE";
+    public static final String CONTENT_BLOCK_STATUS_DRAFT = "DRAFT";
 
     // sohbet
 

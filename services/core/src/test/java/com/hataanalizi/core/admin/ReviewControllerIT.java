@@ -186,6 +186,24 @@ class ReviewControllerIT {
                 .isEqualTo("OPEN");
     }
 
+    /** APPROVE taslak olmayan soru ve paragrafın durumunu değiştirmez. */
+    @Test
+    @WithAuthUser(role = "CONTENT_ADMIN", id = 1001)
+    void approveKeepsNonDraftTargets() throws Exception {
+        jdbcTemplate.update("UPDATE question SET status = 'REJECTED' WHERE id = ?", fixture.questionId());
+        jdbcTemplate.update("UPDATE content_block SET status = 'REJECTED' WHERE id = ?", fixture.blockId());
+
+        postDecision(fixture.questionReviewId(), "{\"decision\":\"APPROVE\"}").andExpect(status().isNoContent());
+        postDecision(fixture.blockReviewId(), "{\"decision\":\"APPROVE\"}").andExpect(status().isNoContent());
+
+        assertThat(jdbcTemplate.queryForObject(
+                        "SELECT status FROM question WHERE id = ?", String.class, fixture.questionId()))
+                .isEqualTo("REJECTED");
+        assertThat(jdbcTemplate.queryForObject(
+                        "SELECT status FROM content_block WHERE id = ?", String.class, fixture.blockId()))
+                .isEqualTo("REJECTED");
+    }
+
     /** Boş veya bulunmayan kazanımlı FIX isteğini 400 ile reddeder. */
     @Test
     @WithAuthUser(role = "CONTENT_ADMIN", id = 1001)

@@ -91,12 +91,12 @@ public class ReviewService {
 
     private static final String PUBLISH_QUESTION_QUERY = """
             UPDATE question SET status = 'PUBLISHED', updated_at = now()
-            WHERE id = :targetId
+            WHERE id = :targetId AND status = :draftStatus
             """;
 
     private static final String PUBLISH_BLOCK_QUERY = """
             UPDATE content_block SET status = 'PUBLISHED', updated_at = now()
-            WHERE id = :targetId
+            WHERE id = :targetId AND status = :draftStatus
             """;
 
     private static final String REJECT_QUESTION_QUERY = """
@@ -228,10 +228,17 @@ public class ReviewService {
         }
     }
 
-    /** Hedef içeriği yayına alır. */
+    /** Taslak hedef içeriği yayına alır. */
     private void publishTarget(TargetType targetType, long targetId) {
-        String query = targetType == TargetType.QUESTION ? PUBLISH_QUESTION_QUERY : PUBLISH_BLOCK_QUERY;
-        jdbcTemplate.update(query, Map.of("targetId", targetId));
+        if (targetType == TargetType.QUESTION) {
+            jdbcTemplate.update(
+                    PUBLISH_QUESTION_QUERY,
+                    Map.of("targetId", targetId, "draftStatus", AppConstants.QUESTION_STATUS_DRAFT));
+        } else {
+            jdbcTemplate.update(
+                    PUBLISH_BLOCK_QUERY,
+                    Map.of("targetId", targetId, "draftStatus", AppConstants.CONTENT_BLOCK_STATUS_DRAFT));
+        }
     }
 
     /** Hedef içeriği reddeder. */
