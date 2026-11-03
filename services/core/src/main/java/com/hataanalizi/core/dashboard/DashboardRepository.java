@@ -3,7 +3,6 @@ package com.hataanalizi.core.dashboard;
 import com.hataanalizi.core.session.StudySession;
 import java.math.BigDecimal;
 import java.util.List;
-import java.util.Optional;
 import org.springframework.data.jpa.repository.Query;
 import org.springframework.data.repository.Repository;
 import org.springframework.data.repository.query.Param;
@@ -35,23 +34,20 @@ public interface DashboardRepository extends Repository<StudySession, Long> {
                            answer_summary."correctCount",
                            latest_completed.net AS "latestNet",
                            CASE WHEN latest_completed.id IS NULL THEN NULL ELSE
-                               (SELECT COUNT(question.id)
+                               (SELECT COUNT(*)
                                 FROM exam_question
-                                JOIN question ON question.id = exam_question.question_id
-                                    AND question.status = :publishedQuestionStatus
                                 WHERE exam_question.exam_id = latest_completed.exam_id)
                            END AS "latestQuestionCount"
                     FROM answer_summary
                     LEFT JOIN latest_completed ON true
                     """, nativeQuery = true)
-    Optional<SummaryRow> findSummaryByUserId(
-            @Param("userId") Long userId,
-            @Param("completedStatus") String completedStatus,
-            @Param("publishedQuestionStatus") String publishedQuestionStatus);
+    SummaryRow findSummaryByUserId(
+            @Param("userId") Long userId, @Param("completedStatus") String completedStatus);
 
     /** Öğrencinin yayındaki testlerdeki devam eden oturumlarını döndürür. */
     @Query(value = """
                     SELECT study_session.id AS "sessionId",
+                           exam.id AS "examId",
                            exam.title AS "examTitle",
                            COUNT(question.id) AS "questionCount",
                            COUNT(student_answer.id) AS "answeredCount",
@@ -67,7 +63,7 @@ public interface DashboardRepository extends Repository<StudySession, Long> {
                        AND student_answer.question_id = question.id
                     WHERE study_session.user_id = :userId
                       AND study_session.status = :inProgressStatus
-                    GROUP BY study_session.id, exam.title
+                    GROUP BY study_session.id, exam.id, exam.title
                     ORDER BY study_session.started_at DESC, study_session.id DESC
                     """, nativeQuery = true)
     List<ActiveSessionRow> findActiveSessionsByUserId(
@@ -89,7 +85,7 @@ public interface DashboardRepository extends Repository<StudySession, Long> {
                             ON student_answer.study_session_id = study_session.id
                            AND student_answer.is_correct = false
                         JOIN question_outcome ON question_outcome.question_id = student_answer.question_id
-                        LEFT JOIN exam ON exam.id = study_session.exam_id
+                        JOIN exam ON exam.id = study_session.exam_id
                         WHERE study_session.user_id = :userId
                           AND study_session.exam_id IS NOT NULL
                         GROUP BY question_outcome.learning_outcome_id,
@@ -129,6 +125,7 @@ public interface DashboardRepository extends Repository<StudySession, Long> {
                         ON latest_test_failure.learning_outcome_id = learning_outcome.id
                     WHERE outcome_total_wrong.wrong_count > :maximumWrongTotal
                        OR latest_test_failure.learning_outcome_id IS NOT NULL
+                    ORDER BY learning_outcome.code, learning_outcome.id
                     """, nativeQuery = true)
     List<FailedOutcomeRow> findFailedOutcomesByUserId(
             @Param("userId") Long userId,
@@ -147,7 +144,14 @@ public interface DashboardRepository extends Repository<StudySession, Long> {
                     JOIN question ON question.id = student_answer.question_id
                     JOIN curriculum_unit ON curriculum_unit.id = question.curriculum_unit_id
                     WHERE study_session.user_id = :userId
-                    GROUP BY curriculum_unit.id, curriculum_unit.title
+                    GROUP BY curriculum_unit.id,
+                             curriculum_unit.grade,
+                             curriculum_unit.unit_no,
+                             curriculum_unit.title
+                    ORDER BY curriculum_unit.grade,
+                             curriculum_unit.unit_no,
+                             curriculum_unit.title,
+                             curriculum_unit.id
                     """, nativeQuery = true)
     List<UnitAccuracyRow> findUnitAccuracyByUserId(@Param("userId") Long userId);
 
@@ -161,6 +165,7 @@ public interface DashboardRepository extends Repository<StudySession, Long> {
                     WHERE study_session.user_id = :userId
                       AND student_answer.error_type IS NOT NULL
                     GROUP BY student_answer.error_type
+                    ORDER BY student_answer.error_type
                     """, nativeQuery = true)
     List<ErrorTypeCountRow> findErrorTypeCountsByUserId(@Param("userId") Long userId);
 
@@ -185,6 +190,9 @@ public interface DashboardRepository extends Repository<StudySession, Long> {
 
         /** Oturum kimliğini döndürür. */
         Long getSessionId();
+
+        /** Test kimliğini döndürür. */
+        Long getExamId();
 
         /** Test başlığını döndürür. */
         String getExamTitle();

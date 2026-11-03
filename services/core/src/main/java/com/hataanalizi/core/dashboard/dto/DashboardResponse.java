@@ -6,14 +6,15 @@ import java.util.List;
 
 /** Öğrencinin test, kazanım ve hata türü panelini taşır. */
 public record DashboardResponse(
-        @Schema(requiredMode = Schema.RequiredMode.REQUIRED) Summary summary,
-        @Schema(requiredMode = Schema.RequiredMode.REQUIRED) List<ActiveSession> activeSessions,
-        @Schema(requiredMode = Schema.RequiredMode.REQUIRED) List<FailedOutcome> failedOutcomes,
-        @Schema(requiredMode = Schema.RequiredMode.REQUIRED) List<UnitAccuracy> unitAccuracy,
-        @Schema(requiredMode = Schema.RequiredMode.REQUIRED) List<ErrorTypeCount> errorTypeDistribution) {
+        @Schema(requiredMode = Schema.RequiredMode.REQUIRED) DashboardSummary summary,
+        @Schema(requiredMode = Schema.RequiredMode.REQUIRED) List<DashboardActiveSession> activeSessions,
+        @Schema(requiredMode = Schema.RequiredMode.REQUIRED) List<DashboardFailedOutcome> failedOutcomes,
+        @Schema(requiredMode = Schema.RequiredMode.REQUIRED) List<DashboardUnitAccuracy> unitAccuracy,
+        @Schema(requiredMode = Schema.RequiredMode.REQUIRED)
+                List<DashboardErrorTypeCount> errorTypeDistribution) {
 
     /** Genel cevap başarısını ve son tamamlanan test netini taşır. */
-    public record Summary(
+    public record DashboardSummary(
             @Schema(requiredMode = Schema.RequiredMode.REQUIRED)
             long answeredQuestionCount,
 
@@ -27,9 +28,13 @@ public record DashboardResponse(
             Long latestQuestionCount) {}
 
     /** Devam eden testin öğrenci ilerlemesini taşır. */
-    public record ActiveSession(
+    public record DashboardActiveSession(
+
             @Schema(requiredMode = Schema.RequiredMode.REQUIRED)
             Long sessionId,
+
+            @Schema(requiredMode = Schema.RequiredMode.REQUIRED)
+            Long examId,
 
             @Schema(requiredMode = Schema.RequiredMode.REQUIRED)
             String examTitle,
@@ -44,7 +49,7 @@ public record DashboardResponse(
             short currentPosition) {}
 
     /** Başarısız kazanımın toplam ve son test yanlışlarını taşır. */
-    public record FailedOutcome(
+    public record DashboardFailedOutcome(
             @Schema(requiredMode = Schema.RequiredMode.REQUIRED)
             String code,
 
@@ -61,7 +66,7 @@ public record DashboardResponse(
             Long testWrongCount) {}
 
     /** Ünite bazlı doğru cevap oranını taşır. */
-    public record UnitAccuracy(
+    public record DashboardUnitAccuracy(
             @Schema(requiredMode = Schema.RequiredMode.REQUIRED)
             String unitTitle,
 
@@ -75,7 +80,7 @@ public record DashboardResponse(
             BigDecimal accuracyPercent) {}
 
     /** Sınıflandırılmış hata türü ve cevap sayısını taşır. */
-    public record ErrorTypeCount(
+    public record DashboardErrorTypeCount(
             @Schema(requiredMode = Schema.RequiredMode.REQUIRED)
             String errorType,
 
