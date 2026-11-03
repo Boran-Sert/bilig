@@ -18,7 +18,7 @@ import UploadResultList from "../components/UploadResultList";
 export default function SourcesPage() {
   const { t } = useTranslation("admin");
   const { data: user, isPending: isUserPending } = useMe();
-  const { data: sourcesData } = useSources();
+  const sourcesQuery = useSources(user?.canManageContent === true);
   const uploadMutation = useUploadSources();
   const [rejectedNames, setRejectedNames] = useState<string[]>([]);
 
@@ -65,8 +65,15 @@ export default function SourcesPage() {
         <UploadResultList files={uploadMutation.data.files} />
       )}
 
-      {/* Sunucudaki kaynakların 8 adım durum listesi (#131) */}
-      <SourceList items={sourcesData?.items ?? []} />
+      {sourcesQuery.isPending && (
+        <p className="py-8 text-center text-sm text-muted-foreground">{t("sources.loadingList")}</p>
+      )}
+      {sourcesQuery.isError && (
+        <p role="alert" className="rounded-md bg-destructive/10 p-3 text-sm text-destructive">
+          {getProblemMessage(sourcesQuery.error)}
+        </p>
+      )}
+      {sourcesQuery.isSuccess && <SourceList items={sourcesQuery.data.items} />}
     </section>
   );
 }

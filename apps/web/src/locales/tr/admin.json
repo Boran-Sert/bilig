@@ -8,6 +8,7 @@
     "selectButton": "Dosya seç",
     "uploading": "Yükleniyor...",
     "emptyList": "Henüz yüklenmiş bir kaynak bulunmuyor.",
+    "loadingList": "Kaynaklar yükleniyor...",
     "table": {
       "file": "Dosya",
       "status": "Durum",
