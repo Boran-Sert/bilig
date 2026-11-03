@@ -132,6 +132,22 @@ export interface paths {
     patch?: never;
     trace?: never;
   };
+  "/api/questions/{id}/hint": {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    get: operations["getHint"];
+    put?: never;
+    post?: never;
+    delete?: never;
+    options?: never;
+    head?: never;
+    patch?: never;
+    trace?: never;
+  };
   "/api/me": {
     parameters: {
       query?: never;
@@ -296,9 +312,14 @@ export interface components {
       sessionId: number | null;
       status: string | null;
     };
-    ActiveSession: {
+    HintResponse: {
+      hint: string;
+    };
+    DashboardActiveSession: {
       /** Format: int64 */
       sessionId: number;
+      /** Format: int64 */
+      examId: number;
       examTitle: string;
       /** Format: int64 */
       questionCount: number;
@@ -307,19 +328,12 @@ export interface components {
       /** Format: int32 */
       currentPosition: number;
     };
-    DashboardResponse: {
-      summary: components["schemas"]["Summary"];
-      activeSessions: components["schemas"]["ActiveSession"][];
-      failedOutcomes: components["schemas"]["FailedOutcome"][];
-      unitAccuracy: components["schemas"]["UnitAccuracy"][];
-      errorTypeDistribution: components["schemas"]["ErrorTypeCount"][];
-    };
-    ErrorTypeCount: {
+    DashboardErrorTypeCount: {
       errorType: string;
       /** Format: int64 */
       answerCount: number;
     };
-    FailedOutcome: {
+    DashboardFailedOutcome: {
       code: string;
       title: string;
       /** Format: int64 */
@@ -328,7 +342,14 @@ export interface components {
       /** Format: int64 */
       testWrongCount: number | null;
     };
-    Summary: {
+    DashboardResponse: {
+      summary: components["schemas"]["DashboardSummary"];
+      activeSessions: components["schemas"]["DashboardActiveSession"][];
+      failedOutcomes: components["schemas"]["DashboardFailedOutcome"][];
+      unitAccuracy: components["schemas"]["DashboardUnitAccuracy"][];
+      errorTypeDistribution: components["schemas"]["DashboardErrorTypeCount"][];
+    };
+    DashboardSummary: {
       /** Format: int64 */
       answeredQuestionCount: number;
       accuracyPercent: number;
@@ -336,7 +357,7 @@ export interface components {
       /** Format: int64 */
       latestQuestionCount: number | null;
     };
-    UnitAccuracy: {
+    DashboardUnitAccuracy: {
       unitTitle: string;
       /** Format: int64 */
       answeredCount: number;
@@ -586,6 +607,28 @@ export interface operations {
         };
         content: {
           "*/*": components["schemas"]["ExamSummaryResponse"][];
+        };
+      };
+    };
+  };
+  getHint: {
+    parameters: {
+      query?: never;
+      header?: never;
+      path: {
+        id: number;
+      };
+      cookie?: never;
+    };
+    requestBody?: never;
+    responses: {
+      /** @description OK */
+      200: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          "*/*": components["schemas"]["HintResponse"];
         };
       };
     };
