@@ -1,55 +1,12 @@
 /**
- * Kaynak dosyalarının durumunu ve 8 adım ilerlemesini tablo olarak gösterir.
+ * Kaynak dosyalarının durumunu ve hazırlık adımlarındaki ilerlemesini tablo olarak gösterir.
  */
 import { useTranslation } from "react-i18next";
 import type { SourceListItem } from "../types";
+import StepProgress from "./StepProgress";
 
 interface SourceListProps {
   items: SourceListItem[];
-}
-
-const TOTAL_SEGMENTS = 8;
-
-/**
- * Dosyanın adımına göre segmentli ilerleme çubuğunu oluşturur.
- * @param stepIndex Tamamlanan adım indeksi.
- * @param totalSteps Toplam adım sayısı.
- * @param isFailed İşlemin başarısız olup olmadığı.
- */
-function StepProgress({
-  stepIndex,
-  totalSteps,
-  isFailed,
-}: {
-  stepIndex: number;
-  totalSteps: number;
-  isFailed: boolean;
-}) {
-  const activeCount = Math.min(
-    TOTAL_SEGMENTS,
-    Math.round((stepIndex / Math.max(totalSteps, 1)) * TOTAL_SEGMENTS),
-  );
-
-  return (
-    <div className="flex gap-1">
-      {Array.from({ length: TOTAL_SEGMENTS }).map((_, index) => {
-        const isCompleted = index < activeCount;
-        let barColor = "bg-muted";
-
-        if (isCompleted) {
-          barColor = isFailed ? "bg-destructive" : "bg-emerald-600 dark:bg-emerald-500";
-        }
-
-        return (
-          <div
-            key={index}
-            className={`h-1.5 w-4 rounded-full transition-colors ${barColor}`}
-            data-testid="step-segment"
-          />
-        );
-      })}
-    </div>
-  );
 }
 
 /**
@@ -98,11 +55,11 @@ export default function SourceList({ items }: SourceListProps) {
               <div className="col-span-4 space-y-1.5">
                 <StepProgress
                   stepIndex={item.stepIndex}
-                  totalSteps={item.totalSteps || TOTAL_SEGMENTS}
+                  totalSteps={item.totalSteps}
                   isFailed={isFailed}
                 />
                 <p className="text-xs text-muted-foreground">
-                  {stepName} · {item.stepIndex}/{item.totalSteps || TOTAL_SEGMENTS}
+                  {stepName} · {item.stepIndex}/{item.totalSteps}
                 </p>
               </div>
 

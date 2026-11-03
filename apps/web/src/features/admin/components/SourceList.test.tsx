@@ -1,5 +1,5 @@
 /**
- * SourceList bileşeninin 8 adım gösterimini, durum rozetlerini ve hata metnini test eder.
+ * SourceList bileşeninin adım gösterimini, durum rozetlerini ve hata metnini test eder.
  * @vitest-environment jsdom
  */
 import "@testing-library/jest-dom/vitest";
@@ -25,8 +25,8 @@ describe("SourceList", () => {
         kind: "TEXTBOOK",
         status: "PROCESSING",
         lastCompletedStep: "EXTRACT",
-        stepIndex: 3,
-        totalSteps: 8,
+        stepIndex: 2,
+        totalSteps: 6,
         error: null,
         createdAt: "2026-11-02T10:00:00Z",
       },
@@ -36,10 +36,12 @@ describe("SourceList", () => {
 
     expect(screen.getByText("tde12-ders-kitabi.pdf")).toBeInTheDocument();
     expect(screen.getByText("Ders kitabı")).toBeInTheDocument();
-    expect(screen.getByText(/3\/8/)).toBeInTheDocument();
+    expect(screen.getByText(/2\/6/)).toBeInTheDocument();
 
     const segments = screen.getAllByTestId("step-segment");
-    expect(segments).toHaveLength(8);
+    expect(segments).toHaveLength(6);
+    const completed = segments.filter((segment) => !segment.className.includes("bg-muted"));
+    expect(completed).toHaveLength(2);
   });
 
   test("hatalı dosyada hata metnini ekranda gösterir (Kabul Kriteri 2)", () => {
@@ -50,8 +52,8 @@ describe("SourceList", () => {
         kind: "TEST",
         status: "FAILED",
         lastCompletedStep: "VALIDATE",
-        stepIndex: 2,
-        totalSteps: 8,
+        stepIndex: 3,
+        totalSteps: 6,
         error: "PDF sayfası okunamadı, dosya bozuk olabilir.",
         createdAt: "2026-11-02T10:00:00Z",
       },
@@ -73,8 +75,8 @@ describe("SourceList", () => {
         kind: "QUESTION_BANK",
         status: "REVIEW",
         lastCompletedStep: "OUTCOMES",
-        stepIndex: 6,
-        totalSteps: 8,
+        stepIndex: 5,
+        totalSteps: 6,
         error: null,
         createdAt: "2026-11-02T10:00:00Z",
       },
