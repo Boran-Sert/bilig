@@ -51,6 +51,8 @@ public final class AppConstants {
     // iş
 
     // inceleme
+    public static final String DEFAULT_REVIEW_PAGE_SIZE = "20";
+    public static final int MAX_REVIEW_PAGE_SIZE = 100;
     public static final String REVIEW_REASON_LOW_CONFIDENCE = "LOW_CONFIDENCE";
     public static final String REVIEW_STATUS_OPEN = "OPEN";
     public static final String REVIEW_STATUS_APPROVED = "APPROVED";

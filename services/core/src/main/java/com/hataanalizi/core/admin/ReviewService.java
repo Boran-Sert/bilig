@@ -317,7 +317,7 @@ public class ReviewService {
 
     /** Sayfa ve boyut sınırlarını doğrular. */
     private void validatePage(int page, int size) {
-        if (page < 0 || size < 1 || size > AppConstants.MAX_SOURCE_PAGE_SIZE) {
+        if (page < 0 || size < 1 || size > AppConstants.MAX_REVIEW_PAGE_SIZE) {
             throw new ApiException(ErrorCode.VALIDATION_FAILED);
         }
     }
