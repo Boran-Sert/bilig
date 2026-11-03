@@ -41,8 +41,7 @@ public interface DashboardRepository extends Repository<StudySession, Long> {
                     FROM answer_summary
                     LEFT JOIN latest_completed ON true
                     """, nativeQuery = true)
-    SummaryRow findSummaryByUserId(
-            @Param("userId") Long userId, @Param("completedStatus") String completedStatus);
+    SummaryRow findSummaryByUserId(@Param("userId") Long userId, @Param("completedStatus") String completedStatus);
 
     /** Öğrencinin yayındaki testlerdeki devam eden oturumlarını döndürür. */
     @Query(value = """

@@ -10,8 +10,7 @@ public record DashboardResponse(
         @Schema(requiredMode = Schema.RequiredMode.REQUIRED) List<DashboardActiveSession> activeSessions,
         @Schema(requiredMode = Schema.RequiredMode.REQUIRED) List<DashboardFailedOutcome> failedOutcomes,
         @Schema(requiredMode = Schema.RequiredMode.REQUIRED) List<DashboardUnitAccuracy> unitAccuracy,
-        @Schema(requiredMode = Schema.RequiredMode.REQUIRED)
-                List<DashboardErrorTypeCount> errorTypeDistribution) {
+        @Schema(requiredMode = Schema.RequiredMode.REQUIRED) List<DashboardErrorTypeCount> errorTypeDistribution) {
 
     /** Genel cevap başarısını ve son tamamlanan test netini taşır. */
     public record DashboardSummary(
@@ -29,7 +28,6 @@ public record DashboardResponse(
 
     /** Devam eden testin öğrenci ilerlemesini taşır. */
     public record DashboardActiveSession(
-
             @Schema(requiredMode = Schema.RequiredMode.REQUIRED)
             Long sessionId,
 
