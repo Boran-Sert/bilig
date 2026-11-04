@@ -11,7 +11,6 @@
   },
   "solve": {
     "backToTests": "Testler",
-    "metaDescription": "AYT Türk Dili ve Edebiyatı test sorusunu çöz, cevabının doğru olup olmadığını hemen gör.",
     "questionNumber": "Soru {{current}} / {{total}}",
     "progressText": "%{{percent}} tamamlandı · kaldığın yerden devam ediyorsun",
     "yourAnswer": "Senin cevabın",
@@ -27,11 +26,17 @@
     "finishing": "Tamamlanıyor...",
     "loading": "Soru yükleniyor...",
     "submitting": "Cevap kaydediliyor...",
-    "alreadyAnswered": "Bu soru zaten cevaplandı."
+    "alreadyAnswered": "Bu soru zaten cevaplandı.",
+    "openPage": "Sayfayı aç",
+    "close": "Kapat",
+    "textbookHeader": "DERS KİTABINDA",
+    "pageNumber": "s. {{page}}",
+    "pageImageAlt": "{{source}} - Sayfa {{page}} görüntüsü",
+    "styleLabel": "Tarz: Adım adım ▾",
+    "citationLoading": "Alıntı yükleniyor..."
   },
   "result": {
     "title": "Test Sonucu",
-    "loading": "Sonuç yükleniyor...",
     "metaDescription": "Tamamlanan testin net puanı ve kazanım bazlı analiz özeti.",
     "netScore": "Net",
     "correct": "Doğru",

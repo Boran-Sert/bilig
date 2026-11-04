@@ -32,6 +32,13 @@ vi.mock("../api", () => ({
   useCompleteSession: useCompleteSessionMock,
 }));
 
+vi.mock("../components/ExplanationSection", () => ({
+  /** Test için anlatım bölümü sahte bileşenini sunar. */
+  default: ({ questionId }: { questionId: number }) => (
+    <div data-testid="explanation-section">Anlatım {questionId}</div>
+  ),
+}));
+
 const mockQuestions = [
   {
     id: 10,
@@ -233,5 +240,25 @@ describe("SolvePage", () => {
 
     fireEvent.click(finishButton);
     expect(completeMutateMock).toHaveBeenCalledWith(99, expect.any(Object));
+  });
+
+  test("yanlış cevap verildiğinde Neden yanlış bölümü açılır", async () => {
+    submitMutateMock.mockImplementation((_params, options) => {
+      options?.onSuccess?.({
+        isCorrect: false,
+        correctOption: "B",
+        outcomes: [{ code: "A.2.15", title: "Türün yazar ve eserleri" }],
+      });
+    });
+
+    renderSolvePage(1);
+
+    const optionA = screen.getByText("A şıkkı").closest("button")!;
+    fireEvent.click(optionA);
+
+    await waitFor(() => {
+      expect(screen.getByTestId("explanation-section")).toBeInTheDocument();
+    });
+    expect(screen.getByRole("button", { name: "Neden yanlış?" })).toBeInTheDocument();
   });
 });
