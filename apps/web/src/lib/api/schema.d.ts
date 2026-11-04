@@ -573,7 +573,7 @@ export interface components {
       id: number;
       reason: string;
       /** @enum {string} */
-      targetType: "QUESTION" | "BLOCK";
+      targetType: "QUESTION" | "BLOCK" | "SOURCE";
       /** Format: int64 */
       targetId: number;
       questionContent: {
@@ -586,8 +586,20 @@ export interface components {
       /** Format: int32 */
       pageNo: number | null;
       outcomes: components["schemas"]["OutcomeLink"][];
+      problems: components["schemas"]["ReviewProblem"][];
       /** Format: date-time */
       createdAt: string;
+    };
+    ReviewProblem: {
+      code: string;
+      /** Format: int32 */
+      pageNo: number | null;
+      /** Format: int64 */
+      pageId: number | null;
+      /** Format: int32 */
+      test: number | null;
+      /** Format: int32 */
+      number: number | null;
     };
     ReviewOutcomeResponse: {
       /** Format: int64 */
