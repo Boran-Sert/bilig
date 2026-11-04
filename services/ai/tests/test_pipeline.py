@@ -219,6 +219,28 @@ async def test_extract_rejects_source_of_unknown_kind(db: Connection, tmp_path: 
         await pipeline.extract_source(source_id, make_context(db, tmp_path))
 
 
-def test_registered_and_extract_steps_are_registered() -> None:
-    """Bu aşamada sadece REGISTERED ve EXTRACT kayıtlıdır; diğer adımlar atlanır."""
-    assert set(STEPS) == {IngestStep.REGISTERED, IngestStep.EXTRACT}
+@pytest.mark.asyncio
+async def test_outcomes_step_matches_source(
+    db: Connection, tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    """OUTCOMES adımı kaynağın içeriğini kazanım eşleştirmeye verir."""
+    calls: list[int] = []
+
+    async def record(connection: Connection, source_id: int) -> None:
+        """Eşleştirilen kaynağın numarasını kaydeder."""
+        calls.append(source_id)
+
+    monkeypatch.setattr(pipeline, "match_source_outcomes", record)
+
+    await pipeline.match_source(7, make_context(db, tmp_path))
+
+    assert calls == [7]
+
+
+def test_outcomes_step_is_registered() -> None:
+    """REGISTERED, EXTRACT ve OUTCOMES kayıtlıdır; VALIDATE, ENTITIES ve INDEX atlanır."""
+    assert STEPS == {
+        IngestStep.REGISTERED: pipeline.register_source,
+        IngestStep.EXTRACT: pipeline.extract_source,
+        IngestStep.OUTCOMES: pipeline.match_source,
+    }
