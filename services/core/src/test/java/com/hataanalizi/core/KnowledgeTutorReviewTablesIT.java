@@ -108,6 +108,7 @@ class KnowledgeTutorReviewTablesIT {
                         "review_item.created_at:timestamptz",
                         "review_item.decided_at:timestamptz",
                         "review_item.decided_by:int8",
+                        "review_item.detail:jsonb",
                         "review_item.id:int8",
                         "review_item.knowledge_edge_id:int8",
                         "review_item.knowledge_node_id:int8",
