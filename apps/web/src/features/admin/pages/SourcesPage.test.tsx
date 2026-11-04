@@ -51,6 +51,11 @@ function dropFiles(files: File[]) {
   fireEvent.change(input, { target: { files } });
 }
 
+/** Kaynak türü seçimini yapar. */
+function selectKind(kind: string) {
+  fireEvent.change(screen.getByLabelText("Kaynak türü"), { target: { value: kind } });
+}
+
 /** Yükleme hook'unu verilen durumla taklit eder. */
 function mockUploadState(state: { isPending?: boolean; error?: ApiError; data?: unknown }) {
   useUploadSourcesMock.mockReturnValue({
@@ -132,10 +137,13 @@ describe("SourcesPage", () => {
   test("karışık bırakmada PDF'leri yükler, diğerlerini adıyla bildirir", async () => {
     const pdf = createFile("kitap.pdf", "application/pdf");
     renderSourcesPage();
+    selectKind("TEXTBOOK");
 
     dropFiles([pdf, createFile("tablo.docx", "application/msword")]);
 
-    await waitFor(() => expect(mutateMock).toHaveBeenCalledWith([pdf]));
+    await waitFor(() =>
+      expect(mutateMock).toHaveBeenCalledWith({ files: [pdf], kind: "TEXTBOOK" }),
+    );
     expect(screen.getByRole("alert")).toHaveTextContent("tablo.docx");
   });
 
@@ -143,11 +151,21 @@ describe("SourcesPage", () => {
     const firstPdf = createFile("kitap1.pdf", "application/pdf");
     const secondPdf = createFile("kitap2.pdf", "application/pdf");
     renderSourcesPage();
+    selectKind("TEST");
 
     dropFiles([firstPdf, secondPdf]);
 
     await waitFor(() => expect(mutateMock).toHaveBeenCalledTimes(1));
-    expect(mutateMock).toHaveBeenCalledWith([firstPdf, secondPdf]);
+    expect(mutateMock).toHaveBeenCalledWith({ files: [firstPdf, secondPdf], kind: "TEST" });
+  });
+
+  test("tür seçilmeden bırakılan PDF'i yüklemez ve tür seçmeyi ister", async () => {
+    renderSourcesPage();
+
+    dropFiles([createFile("kitap.pdf", "application/pdf")]);
+
+    expect(await screen.findByRole("alert")).toHaveTextContent("Önce kaynağın türünü seç.");
+    expect(mutateMock).not.toHaveBeenCalled();
   });
 
   test("her dosyanın sonucunu ve daha önce yüklenmiş uyarısını gösterir", () => {

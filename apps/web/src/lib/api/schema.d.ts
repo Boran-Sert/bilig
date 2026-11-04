@@ -816,7 +816,9 @@ export interface operations {
   };
   upload: {
     parameters: {
-      query?: never;
+      query: {
+        kind: "UNKNOWN" | "PROGRAM" | "TEXTBOOK" | "TEST" | "QUESTION_BANK" | "ANSWER_KEY";
+      };
       header?: never;
       path?: never;
       cookie?: never;
