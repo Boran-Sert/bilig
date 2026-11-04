@@ -15,10 +15,12 @@ from psycopg.rows import TupleRow
 from app.db.queries.content import save_content_blocks
 from app.ingest import pdf
 from app.ingest.pdf import ReaderOptions
+from app.ingest.readers import page_image
 from app.ingest.readers.textbook import extract_textbook
+from app.schemas.page_extract import ExtractedBlock, PageExtraction
 from app.schemas.pdf import PageReport, TextbookReading
 from app.schemas.textbook import TextbookBlock
-from app.storage import source_key
+from app.storage import page_image_key, source_key
 from tests.pdf_factory import Text, make_pdf
 from tests.test_pipeline import make_context, make_source
 from tests.word_list import KNOWN_WORDS
@@ -198,3 +200,37 @@ async def test_empty_book_with_weak_page_opens_review(
             {"code": "NO_CONTENT"},
         ]
     }
+
+
+@pytest.mark.asyncio
+async def test_weak_page_read_from_image_replaces_blocks_without_review(
+    db: Connection, tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    """Metin katmanı bozuk sayfa görüntüden okunursa blokları değişir, inceleme açılmaz."""
+    source_id = await prepare_source(db, tmp_path)
+    context = make_context(db, tmp_path)
+    context.storage.write(page_image_key(source_id, 2), b"png-bytes")
+    page = PageReport(page_no=2, source="TEXT", notes=["LOW_TEXT_LAYER"], text_ratio=0.3)
+    engine_block = TextbookBlock(
+        block_type="METIN",
+        markdown="Bzk mtn",
+        title_path=TITLE,
+        page_no=2,
+        position=0,
+        pages=[2],
+    )
+    reading = TextbookReading(blocks=[engine_block], pages=[page])
+    monkeypatch.setattr(pdf, "read_textbook", lambda _content, _title: reading)
+    extraction = PageExtraction(blocks=[ExtractedBlock(block_type="METIN", markdown="Düz metin")])
+
+    async def fake_run_task(*_args: object, **_kwargs: object) -> PageExtraction:
+        """Haiku'nun okumasını taklit eder."""
+        return extraction
+
+    monkeypatch.setattr(page_image, "run_task", fake_run_task)
+
+    await extract_textbook(source_id, context)
+
+    markdowns = [row[3] for row in await stored_blocks(db, source_id)]
+    assert markdowns == ["Düz metin"]
+    assert await (await db.execute(READ_REVIEW_DETAIL, (source_id,))).fetchall() == []

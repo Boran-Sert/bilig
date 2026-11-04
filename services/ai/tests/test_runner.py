@@ -188,6 +188,25 @@ async def test_task_name_selects_model_and_prompt(messages: FakeMessages) -> Non
 
 
 @pytest.mark.asyncio
+async def test_images_precede_text_in_user_message(messages: FakeMessages) -> None:
+    """Görüntü verilirse mesaja base64 PNG bloğu olarak, metnin önünde eklenir."""
+    await run_task(LlmTask.HINT, VARIABLES, images=[b"png"])
+
+    assert messages.requests[0]["messages"] == [
+        {
+            "role": "user",
+            "content": [
+                {
+                    "type": "image",
+                    "source": {"type": "base64", "media_type": "image/png", "data": "cG5n"},
+                },
+                {"type": "text", "text": "Soru: Roman nedir?"},
+            ],
+        }
+    ]
+
+
+@pytest.mark.asyncio
 async def test_system_text_is_cached(messages: FakeMessages) -> None:
     """Prompt'un system bloğu önbellek işaretiyle sistem metni olarak gider."""
     await run_task(LlmTask.HINT, VARIABLES)

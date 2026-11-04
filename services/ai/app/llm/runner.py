@@ -8,19 +8,26 @@ kullanılamasa bile token, maliyet ve süresiyle llm_call_log'a yazılır. user_
 gider; Claude'a kullanıcıya ait bilgi gönderilmez. stream_task alıntılı serbest metin görevleri
 içindir: kaynaklar search_result bloğu olarak gider, metin ve alıntılar geldikçe verilir, çağrı
 akış bitince kaydedilir. Akış yarıda koparsa token bilgisi gelmediği için kayıt yazılmaz.
-Tool henüz yoktur.
+Görüntü (PNG) verilirse mesaja metnin önünde eklenir. Tool henüz yoktur.
 """
 
+import base64
 import time
-from collections.abc import AsyncIterator, Mapping
+from collections.abc import AsyncIterator, Mapping, Sequence
 from functools import lru_cache
 from typing import overload
 
 from anthropic import AsyncAnthropic
-from anthropic.types import SearchResultBlockParam, TextBlockParam, Usage
+from anthropic.types import (
+    ImageBlockParam,
+    MessageParam,
+    SearchResultBlockParam,
+    TextBlockParam,
+    Usage,
+)
 from pydantic import BaseModel
 
-from app.constants import LLM_MAX_RETRIES, MILLISECONDS_PER_SECOND, PROMPTS_DIR
+from app.constants import IMAGE_MEDIA_TYPE, LLM_MAX_RETRIES, MILLISECONDS_PER_SECOND, PROMPTS_DIR
 from app.db.pool import get_pool
 from app.db.queries.llm_call_log import LlmCall, save_llm_call
 from app.llm.pricing import calculate_cost, get_prices
@@ -42,6 +49,7 @@ async def run_task(
     *,
     output_model: None = None,
     user_id: int | None = None,
+    images: Sequence[bytes] = (),
 ) -> str: ...
 
 
@@ -52,6 +60,7 @@ async def run_task[OutputT: BaseModel](
     *,
     output_model: type[OutputT],
     user_id: int | None = None,
+    images: Sequence[bytes] = (),
 ) -> OutputT: ...
 
 
@@ -61,6 +70,7 @@ async def run_task[OutputT: BaseModel](
     *,
     output_model: type[OutputT] | None = None,
     user_id: int | None = None,
+    images: Sequence[bytes] = (),
 ) -> OutputT | str:
     """Görevi ayarındaki model ve prompt'la çalıştırır, çağrıyı kaydeder ve sonucu döner."""
     config = get_task_configs()[task]
@@ -70,7 +80,7 @@ async def run_task[OutputT: BaseModel](
         model=config.model,
         max_tokens=config.max_tokens,
         system=[{"type": "text", "text": prompt.system, "cache_control": {"type": "ephemeral"}}],
-        messages=[{"role": "user", "content": prompt.user}],
+        messages=[user_message(prompt.user, images)],
         output_format=output_model,
         timeout=config.timeout_seconds,
     )
@@ -89,6 +99,25 @@ async def run_task[OutputT: BaseModel](
     if response.parsed_output is None:
         raise ValueError(f"{task} returned no {output_model.__name__} ({response.stop_reason})")
     return response.parsed_output
+
+
+def user_message(text: str, images: Sequence[bytes]) -> MessageParam:
+    """Kullanıcı mesajını kurar; görüntü varsa PNG blokları metnin önüne konur."""
+    if not images:
+        return {"role": "user", "content": text}
+    content: list[ImageBlockParam | TextBlockParam] = [
+        {
+            "type": "image",
+            "source": {
+                "type": "base64",
+                "media_type": IMAGE_MEDIA_TYPE,
+                "data": base64.b64encode(image).decode("ascii"),
+            },
+        }
+        for image in images
+    ]
+    content.append({"type": "text", "text": text})
+    return {"role": "user", "content": content}
 
 
 async def stream_task(
