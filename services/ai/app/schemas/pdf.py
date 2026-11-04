@@ -4,7 +4,8 @@ Sayfa raporu bir sayfanın nasıl okunduğunu söyler: metin katmanından (TEXT)
 boş (EMPTY); notlar onarılan harfleri (REPAIRED_GLYPHS), çözülemeyenleri (UNDECODED_GLYPHS),
 OCR'la okunan resimleri (IMAGE_OCR), uygulanan font düzeltmesini (FONT_FIX_...), OCR'ın yerini
 aldığı (TEXT_LAYER_REPLACED) ya da zayıf kalan (LOW_TEXT_LAYER) metin katmanını gösterir.
-text_ratio sayfa metninin Türkçe kök listesindeki kelime payıdır; kısa sayfada ölçülmez.
+text_ratio sayfa metninin Türkçe kök listesindeki kelime payıdır; kısa sayfada ölçülmez. Test
+okumasında kökünde soru olmadığı için atılan şık kümelerinin sayfaları da döner.
 """
 
 from typing import Literal
@@ -27,10 +28,11 @@ class PageReport(BaseModel):
 
 
 class QuestionReading(BaseModel):
-    """Test PDF'inden okunanlar: numarası başa dönünce ayrılan testler ve sayfa raporları."""
+    """Test PDF'inden okunanlar: testler, sayfa raporları ve atılan şık kümelerinin sayfaları."""
 
     tests: list[list[ParsedQuestion]]
     pages: list[PageReport]
+    not_multiple_choice_pages: list[int] = []
 
 
 class TextbookReading(BaseModel):

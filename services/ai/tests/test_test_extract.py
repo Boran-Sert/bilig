@@ -13,7 +13,7 @@ from psycopg.rows import TupleRow
 from app.ingest import pdf
 from app.ingest.pipeline import IngestContext
 from app.ingest.readers.test import extract_tests
-from app.schemas.pdf import QuestionReading
+from app.schemas.pdf import PageReport, QuestionReading
 from app.schemas.question import ParsedQuestion
 from app.storage import source_key
 from tests.test_pipeline import make_context
@@ -62,6 +62,12 @@ ORDER BY exam.title, exam_question.position
 COUNT_REVIEWS = """
 SELECT reason FROM review_item WHERE source_document_id = %s AND status = 'OPEN' ORDER BY reason
 """
+READ_REVIEW_DETAILS = """
+SELECT reason, detail FROM review_item
+WHERE source_document_id = %s AND status = 'OPEN'
+ORDER BY reason
+"""
+READ_PAGE_ID = "SELECT id FROM source_page WHERE source_document_id = %s AND page_no = 1"
 
 
 def make_test(*stems: str) -> list[ParsedQuestion]:
@@ -85,6 +91,19 @@ async def prepare(
     reading = QuestionReading(tests=tests, pages=[])
     monkeypatch.setattr(pdf, "read_questions", lambda _content: reading)
     return source_id, context
+
+
+async def review_details(db: Connection, source_id: int) -> dict[str, list[dict[str, object]]]:
+    """Kaynağın açık kayıtlarının sorunlarını nedenine göre döner."""
+    rows = await (await db.execute(READ_REVIEW_DETAILS, (source_id,))).fetchall()
+    return {str(reason): detail["problems"] for reason, detail in rows}
+
+
+async def first_page_id(db: Connection, source_id: int) -> int:
+    """Kaynağın ilk sayfasının kaydını döner."""
+    row = await (await db.execute(READ_PAGE_ID, (source_id,))).fetchone()
+    assert row is not None
+    return int(row[0])
 
 
 @pytest.mark.asyncio
@@ -122,8 +141,16 @@ async def test_unanswered_and_broken_questions_are_not_written(
     await extract_tests(source_id, context)
 
     assert await (await db.execute(COUNT_QUESTIONS, (source_id,))).fetchone() == (1,)
-    reasons = [row[0] for row in await (await db.execute(COUNT_REVIEWS, (source_id,))).fetchall()]
-    assert reasons == ["NO_ANSWER_KEY", "VALIDATION_FAILED"]
+    page_id = await first_page_id(db, source_id)
+    assert await review_details(db, source_id) == {
+        "NO_ANSWER_KEY": [
+            {"code": "NO_ANSWER_KEY", "pageNo": 1, "pageId": page_id, "test": 1, "number": 2}
+        ],
+        "VALIDATION_FAILED": [
+            {"code": "OPTION_COUNT", "pageNo": 1, "pageId": page_id, "test": 1, "number": 3},
+            {"code": "ANSWER_NOT_OPTION", "pageNo": 1, "pageId": page_id, "test": 1, "number": 3},
+        ],
+    }
 
 
 @pytest.mark.asyncio
@@ -138,5 +165,45 @@ async def test_unknown_unit_writes_nothing_and_opens_review(
     await extract_tests(source_id, context)
 
     assert await (await db.execute(COUNT_QUESTIONS, (source_id,))).fetchone() == (0,)
+    assert await review_details(db, source_id) == {
+        "VALIDATION_FAILED": [{"code": "UNIT_NOT_FOUND"}]
+    }
+
+
+@pytest.mark.asyncio
+async def test_source_without_questions_opens_one_review(
+    db: Connection, tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    """Hiç soru çıkmayan kaynak incelemeye düşer; adım tekrar çalışınca kayıt çoğalmaz."""
+    source_id, context = await prepare(db, tmp_path, monkeypatch, [])
+
+    for _ in range(2):
+        await extract_tests(source_id, context)
+
     reasons = [row[0] for row in await (await db.execute(COUNT_REVIEWS, (source_id,))).fetchall()]
     assert reasons == ["VALIDATION_FAILED"]
+    assert await review_details(db, source_id) == {"VALIDATION_FAILED": [{"code": "NO_CONTENT"}]}
+
+
+@pytest.mark.asyncio
+async def test_weak_pages_and_dropped_option_sets_open_review(
+    db: Connection, tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    """Metin katmanı bozuk sayfa ve kökünde soru olmayan şık kümesi sayfasıyla incelemeye düşer."""
+    source_id, context = await prepare(db, tmp_path, monkeypatch, [])
+    page = PageReport(page_no=1, source="TEXT", notes=["LOW_TEXT_LAYER"], text_ratio=0.4)
+    reading = QuestionReading(
+        tests=[make_test("Soru metni")], pages=[page], not_multiple_choice_pages=[1]
+    )
+    monkeypatch.setattr(pdf, "read_questions", lambda _content: reading)
+
+    await extract_tests(source_id, context)
+
+    page_id = await first_page_id(db, source_id)
+    assert await (await db.execute(COUNT_QUESTIONS, (source_id,))).fetchone() == (1,)
+    assert await review_details(db, source_id) == {
+        "VALIDATION_FAILED": [
+            {"code": "LOW_TEXT_LAYER", "pageNo": 1, "pageId": page_id},
+            {"code": "NOT_MULTIPLE_CHOICE", "pageNo": 1, "pageId": page_id},
+        ]
+    }

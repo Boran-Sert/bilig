@@ -16,10 +16,12 @@ from app.ingest.validators import (
     check_question,
     matches_text_layer,
     normalize_for_comparison,
+    page_problems,
     positions_out_of_sequence,
     text_similarity,
     validate_questions,
 )
+from app.schemas.pdf import PageReport
 from app.schemas.question import (
     Block,
     OptionLabel,
@@ -27,6 +29,7 @@ from app.schemas.question import (
     QuestionContent,
     QuestionOption,
 )
+from app.schemas.review import SourceProblem
 
 LABELS: list[OptionLabel] = ["A", "B", "C", "D", "E"]
 CONTROL_SET = Path(__file__).resolve().parents[3] / "data" / "kontrol_seti" / "sorular.jsonl"
@@ -241,3 +244,17 @@ def test_real_control_set_questions_pass() -> None:
 
     assert len(questions) == 100
     assert [check_question(question) for question in questions] == [[]] * 100
+
+
+def test_weak_pages_become_problems() -> None:
+    """Metin katmanı bozuk kalan ve harfi çözülemeyen sayfa soruna döner; öbür notlar dönmez."""
+    pages = [
+        PageReport(page_no=1, source="TEXT", notes=["REPAIRED_GLYPHS"], text_ratio=0.95),
+        PageReport(page_no=2, source="TEXT", notes=["LOW_TEXT_LAYER"], text_ratio=0.4),
+        PageReport(page_no=3, source="OCR", notes=["UNDECODED_GLYPHS"], text_ratio=None),
+    ]
+
+    assert page_problems(pages) == [
+        SourceProblem(code="LOW_TEXT_LAYER", page_no=2),
+        SourceProblem(code="UNDECODED_GLYPHS", page_no=3),
+    ]
