@@ -2,11 +2,12 @@
  * Test tamamlandığında öğrencinin net puanını ve kazanım bazlı özetini gösterir.
  */
 import { useTranslation } from "react-i18next";
-import { Link, useLocation } from "react-router";
+import { Link, useParams } from "react-router";
 import PageMeta from "../../../components/PageMeta";
 import { Button } from "../../../components/ui/button";
 import { ROUTES } from "../../../lib/constants";
-import type { SessionCompletionOutcome, SessionCompletionResponse } from "../types";
+import { useSessionResult } from "../api";
+import type { SessionCompletionOutcome } from "../types";
 
 /**
  * Başarısız kazanımları en üste, ardından yanlış sayısına göre sıralar.
@@ -25,8 +26,12 @@ function sortOutcomes(outcomes: SessionCompletionOutcome[]): SessionCompletionOu
  */
 export default function ResultPage() {
   const { t } = useTranslation("test");
-  const location = useLocation();
-  const result = (location.state as { result?: SessionCompletionResponse } | undefined)?.result;
+  const { sessionId } = useParams();
+  const { data: result, isPending } = useSessionResult(Number(sessionId));
+
+  if (isPending) {
+    return <p className="py-12 text-center text-muted-foreground">{t("result.loading")}</p>;
+  }
 
   if (!result) {
     return (

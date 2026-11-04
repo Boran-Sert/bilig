@@ -5,10 +5,14 @@
 import "@testing-library/jest-dom/vitest";
 import { cleanup, render, screen } from "@testing-library/react";
 import { MemoryRouter, Route, Routes } from "react-router";
-import { afterEach, describe, expect, test } from "vitest";
+import { afterEach, describe, expect, test, vi } from "vitest";
 import "../../../lib/i18n";
 import type { SessionCompletionResponse } from "../types";
 import ResultPage from "./ResultPage";
+
+const { useSessionResultMock } = vi.hoisted(() => ({ useSessionResultMock: vi.fn() }));
+
+vi.mock("../api", () => ({ useSessionResult: useSessionResultMock }));
 
 const mockResult: SessionCompletionResponse = {
   correct: 18,
@@ -37,19 +41,13 @@ const mockResult: SessionCompletionResponse = {
   ],
 };
 
-/** Sonuç sayfasını verilen state ile oluşturur. */
+/** Sonuç sayfasını URL'deki oturum numarasıyla ve verilen sunucu cevabıyla oluşturur. */
 function renderResultPage(result?: SessionCompletionResponse) {
+  useSessionResultMock.mockReturnValue({ data: result, isPending: false, isError: !result });
   return render(
-    <MemoryRouter
-      initialEntries={[
-        {
-          pathname: "/tests/1/result",
-          state: result ? { result } : undefined,
-        },
-      ]}
-    >
+    <MemoryRouter initialEntries={["/sessions/99/result"]}>
       <Routes>
-        <Route path="/tests/:testId/result" element={<ResultPage />} />
+        <Route path="/sessions/:sessionId/result" element={<ResultPage />} />
       </Routes>
     </MemoryRouter>,
   );
@@ -86,6 +84,12 @@ describe("ResultPage", () => {
     expect(outcomeElements[1]).toHaveTextContent("Başarılı");
     expect(outcomeElements[2]).toHaveTextContent("A.1.1");
     expect(outcomeElements[2]).toHaveTextContent("Başarılı");
+  });
+
+  test("sonucu yönlendirme bilgisine değil URL'deki oturum numarasına göre sunucudan okur", () => {
+    renderResultPage(mockResult);
+
+    expect(useSessionResultMock).toHaveBeenCalledWith(99);
   });
 
   test("sonuç bilgisi olmadığında boş durum uyarısı gösterir", () => {

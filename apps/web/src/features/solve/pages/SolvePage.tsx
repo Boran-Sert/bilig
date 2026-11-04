@@ -3,7 +3,7 @@
  */
 import { useEffect, useState } from "react";
 import { useTranslation } from "react-i18next";
-import { Link, useNavigate, useParams } from "react-router";
+import { generatePath, Link, useNavigate, useParams } from "react-router";
 import PageMeta from "../../../components/PageMeta";
 import { Button } from "../../../components/ui/button";
 import { getProblemMessage } from "../../../lib/api/problem";
@@ -70,8 +70,8 @@ export default function SolvePage() {
 
     completeSession.mutate(sessionId, {
       /** Başarılı tamamlamada sonuç sayfasına geçer. */
-      onSuccess: (result) => {
-        navigate(`/tests/${testId}/result`, { state: { result } });
+      onSuccess: () => {
+        navigate(generatePath(ROUTES.testResult, { sessionId: String(sessionId) }));
       },
     });
   }

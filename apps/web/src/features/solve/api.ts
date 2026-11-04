@@ -1,7 +1,7 @@
 /**
  * Test çözme ve oturum yönetimi API işlemlerini TanStack Query hook'larıyla sunar.
  */
-import { useMutation, useQuery } from "@tanstack/react-query";
+import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { client } from "../../lib/api/client";
 import { ApiError } from "../../lib/api/problem";
 import type {
@@ -16,7 +16,31 @@ export const solveKeys = {
   tests: ["solve", "tests"] as const,
   /** Test oturumu sorgu anahtarını üretir. */
   session: (testId: number) => ["solve", "session", testId] as const,
+  /** Oturum sonucu sorgu anahtarını üretir. */
+  result: (sessionId: number) => ["solve", "result", sessionId] as const,
 };
+
+/**
+ * Tamamlanmış oturumun net ve kazanım özetini sunucudan getirir.
+ */
+export function useSessionResult(sessionId: number) {
+  return useQuery<SessionCompletionResponse, ApiError>({
+    queryKey: solveKeys.result(sessionId),
+    /** Sonucu GET /api/sessions/{id}/result ucundan okur. */
+    queryFn: async (): Promise<SessionCompletionResponse> => {
+      const { data, error, response } = await client.GET("/api/sessions/{id}/result", {
+        params: { path: { id: sessionId } },
+      });
+      const status = response.status;
+
+      if (error || !data) {
+        throw new ApiError(error, status);
+      }
+
+      return data;
+    },
+  });
+}
 
 /**
  * Öğrencinin çözebileceği testleri sunucudan getirir.
@@ -98,7 +122,13 @@ export function useSubmitAnswer() {
  * Test oturumunu tamamlar ve net ile kazanım bazlı özet sonucunu döner.
  */
 export function useCompleteSession() {
+  const queryClient = useQueryClient();
+
   return useMutation<SessionCompletionResponse, ApiError, number>({
+    /** Sonuç sayfası yeniden istemesin diye sonucu önbelleğe yazar. */
+    onSuccess: (result, sessionId) => {
+      queryClient.setQueryData(solveKeys.result(sessionId), result);
+    },
     /** Oturumu POST /api/sessions/{id}/complete ucundan tamamlar. */
     mutationFn: async (sessionId: number): Promise<SessionCompletionResponse> => {
       const { data, error, response } = await client.POST("/api/sessions/{id}/complete", {
