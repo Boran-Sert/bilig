@@ -8,6 +8,8 @@ en az TEXT_SIMILARITY_MIN_RATIO benzemeli.
 Sayfa görüntüsü REGISTERED adımında depolamaya yazılmıştır, burada yeniden çizilmez.
 """
 
+import asyncio
+
 from pydantic import BaseModel
 
 from app.ingest.validators import matches_text_layer
@@ -51,7 +53,7 @@ async def extract_page_image(
     text_layer: str | None = None,
 ) -> PageImageResult:
     """Sayfa görüntüsünü Haiku'ya verir; kontrol geçmezse Sonnet'e verir."""
-    image = storage.read(page_image_key(source_id, page_no))
+    image = await asyncio.to_thread(storage.read, page_image_key(source_id, page_no))
     variables = {"source_title": source_title, "page_no": page_no}
     result = PageImageResult(page_no=page_no, blocks=[], task=IMAGE_TASKS[0], passed=False)
     for task in IMAGE_TASKS:
