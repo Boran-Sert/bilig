@@ -98,6 +98,7 @@ def test_unit_title_is_turkish_title_case(text: str, expected: str) -> None:
         ("Makale", ["A.4"]),
         ("Deneme", ["A.4"]),
         ("Deneme - Söylev (Nutuk)", ["A.4"]),
+        ("Söylev (Nutuk)", ["A.4"]),
         ("Roman ve Şiir", ["A.2", "A.1"]),
         ("Hikâye ve Roman", ["A.2"]),
         ("Giriş", []),

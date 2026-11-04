@@ -8,3 +8,4 @@ hikâye = Hikâye
 roman = Roman
 tiyatro = Tiyatro
 deneme - söylev (nutuk) = Deneme
+söylev = Söylev (Nutuk)
