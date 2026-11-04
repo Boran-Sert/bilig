@@ -253,22 +253,24 @@ async def test_explanation_searches_question_outcomes_with_correct_option(
 
 
 @pytest.mark.asyncio
-async def test_sources_are_published_info_and_quote_blocks_in_rank_order(
+async def test_sources_are_published_text_blocks_in_rank_order(
     db: Connection, seed: Seed, monkeypatch: pytest.MonkeyPatch
 ) -> None:
-    """Taslak ve etkinlik blokları atlanır; kalanlar arama sırasıyla ve en fazla dört tanedir."""
+    """Taslak, etkinlik ve başlık blokları atlanır; kalanlar arama sırasıyla, en fazla dört tane."""
     question_id = await add_question(db, seed)
     draft = await add_block(db, seed, "BILGI", 0, status="DRAFT")
     activity = await add_block(db, seed, "ETKINLIK", 1)
     quote = await add_block(db, seed, "ALINTI", 2)
-    infos = [await add_block(db, seed, "BILGI", position) for position in range(3, 7)]
-    use_search(monkeypatch, [draft, activity, quote, *infos])
+    heading = await add_block(db, seed, "BASLIK", 3)
+    text = await add_block(db, seed, "METIN", 4)
+    infos = [await add_block(db, seed, "BILGI", position) for position in range(5, 9)]
+    use_search(monkeypatch, [draft, activity, quote, heading, text, *infos])
     request = ExplanationRequest(user_id=seed.user_id, question_id=question_id, selected_option="A")
 
     prepared = await prepare_explanation(db, request)
 
     assert prepared is not None
-    assert [source.block_id for source in prepared.sources] == [quote, *infos[:3]]
+    assert [source.block_id for source in prepared.sources] == [quote, text, *infos[:2]]
     first = prepared.sources[0]
     assert (first.source_title, first.page_no, first.markdown) == (
         "TDE 12 Ders Kitabı",

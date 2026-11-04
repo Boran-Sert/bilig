@@ -1,9 +1,9 @@
 """Anlatım ve sohbetin ortak parçaları: kaynak arama ve olay akışı (plan Bölüm 9, 13.5).
 
 Kaynaklar sorunun kazanımlarına bağlı yayındaki paragraflarda hybrid_search ile aranır; bütün
-adaylar reranker'dan geçer, bilgi ve alıntı blokları arasından ilk TUTOR_SOURCE_LIMIT tanesi
-alınır, etkinlikler alınmaz. Her paragraf Claude'a ayrı bir search_result olarak gider; başlığı
-"Kitap · s. 174" biçimindedir. Olaylar SSE biçiminde yazılır: delta {text}, citation
+adaylar reranker'dan geçer, bilgi, alıntı ve metin blokları arasından ilk TUTOR_SOURCE_LIMIT tanesi
+alınır; etkinlikler ve başlıklar alınmaz. Her paragraf Claude'a ayrı bir search_result olarak gider;
+başlığı "Kitap · s. 174" biçimindedir. Olaylar SSE biçiminde yazılır: delta {text}, citation
 {blockId, sourceTitle, page}, done {} ve error (Problem Details). Aynı paragraf bir cevapta bir kez
 alıntılanır. Akış hata verirse hata log'a yazılır ve error olayıyla biter; Java yarım cevabı
 kaydetmez.
@@ -51,7 +51,7 @@ class PreparedStream(BaseModel):
 async def find_sources(
     connection: AsyncConnection, query: str, outcome_ids: list[int] | None
 ) -> list[SourceBlock]:
-    """Sorguya en uygun yayındaki bilgi ve alıntı paragraflarını sırasıyla döner."""
+    """Sorguya en uygun yayındaki bilgi, alıntı ve metin paragraflarını sırasıyla döner."""
     filters = SearchFilters(target=SearchTarget.CONTENT_BLOCK, learning_outcome_ids=outcome_ids)
     hits = await hybrid_search(connection, query, filters, RRF_RESULT_LIMIT, rerank=True)
     blocks = await fetch_source_blocks(
