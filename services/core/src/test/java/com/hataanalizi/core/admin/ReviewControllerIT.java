@@ -197,6 +197,25 @@ class ReviewControllerIT extends ReviewControllerTestSupport {
                 .isEqualTo("DRAFT");
     }
 
+    /** Kaynağın son açık kaydı karara bağlanınca REVIEW kaynağı PUBLISHED olur. */
+    @Test
+    @WithAuthUser(role = "CONTENT_ADMIN", id = 1001)
+    void publishesSourceWhenLastOpenReviewIsDecided() throws Exception {
+        Long sourceId = jdbcTemplate.queryForObject("""
+                SELECT source_page.source_document_id
+                FROM question
+                JOIN source_page ON source_page.id = question.source_page_id
+                WHERE question.id = ?
+                """, Long.class, fixture.questionId());
+        jdbcTemplate.update("UPDATE source_document SET status = 'REVIEW' WHERE id = ?", sourceId);
+
+        postDecision(fixture.questionReviewId(), "{\"decision\":\"APPROVE\"}").andExpect(status().isNoContent());
+        assertThat(sourceStatus(sourceId)).isEqualTo("REVIEW");
+
+        postDecision(fixture.blockReviewId(), "{\"decision\":\"REJECT\"}").andExpect(status().isNoContent());
+        assertThat(sourceStatus(sourceId)).isEqualTo("PUBLISHED");
+    }
+
     /** Daha önce karara bağlanan kaydın ikinci kararını 409 ile reddeder. */
     @Test
     @WithAuthUser(role = "CONTENT_ADMIN", id = 1001)
@@ -273,6 +292,11 @@ class ReviewControllerIT extends ReviewControllerTestSupport {
                 .header("X-XSRF-TOKEN", csrfToken)
                 .contentType(MediaType.APPLICATION_JSON)
                 .content(body));
+    }
+
+    /** Kaynağın durumunu okur. */
+    private String sourceStatus(long sourceId) {
+        return jdbcTemplate.queryForObject("SELECT status FROM source_document WHERE id = ?", String.class, sourceId);
     }
 
     /** Karar durumu, karar veren ve zamanı veritabanında kaydedildiğini doğrular. */

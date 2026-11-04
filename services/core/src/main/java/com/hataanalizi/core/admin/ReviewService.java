@@ -146,6 +146,38 @@ public class ReviewService {
             WHERE id = :reviewId
             """;
 
+    private static final String PUBLISH_REVIEWED_SOURCE_QUERY = """
+            WITH reviewed AS (
+                SELECT coalesce(
+                           review_item.source_document_id,
+                           question_page.source_document_id,
+                           block_page.source_document_id) AS source_id
+                FROM review_item
+                LEFT JOIN question ON question.id = review_item.question_id
+                LEFT JOIN source_page question_page ON question_page.id = question.source_page_id
+                LEFT JOIN content_block ON content_block.id = review_item.content_block_id
+                LEFT JOIN source_page block_page ON block_page.id = content_block.source_page_id
+                WHERE review_item.id = :reviewId
+            )
+            UPDATE source_document SET status = :publishedStatus, updated_at = now()
+            FROM reviewed
+            WHERE source_document.id = reviewed.source_id
+              AND source_document.status = :reviewStatus
+              AND NOT EXISTS (
+                  SELECT 1
+                  FROM review_item
+                  LEFT JOIN question ON question.id = review_item.question_id
+                  LEFT JOIN source_page question_page ON question_page.id = question.source_page_id
+                  LEFT JOIN content_block ON content_block.id = review_item.content_block_id
+                  LEFT JOIN source_page block_page ON block_page.id = content_block.source_page_id
+                  WHERE review_item.status = :openStatus
+                    AND coalesce(
+                            review_item.source_document_id,
+                            question_page.source_document_id,
+                            block_page.source_document_id) = source_document.id
+              )
+            """;
+
     private final NamedParameterJdbcTemplate jdbcTemplate;
     private final ReviewItemRepository reviewItemRepository;
     private final ObjectMapper objectMapper;
@@ -186,7 +218,7 @@ public class ReviewService {
                                 result.getLong("id"), result.getString("code"), result.getString("title")));
     }
 
-    /** İnceleme kararını hedef, kazanım bağları ve kayıtla birlikte yazar. */
+    /** Kararı hedefe, kazanım bağlarına ve kayda yazar; kaynağın açık kaydı kalmadıysa yayına alır. */
     @Transactional
     public void decideReview(long reviewId, long reviewerId, ReviewDecisionRequest request) {
         if (request == null || request.decision() == null) {
@@ -207,6 +239,17 @@ public class ReviewService {
         jdbcTemplate.update(
                 UPDATE_REVIEW_DECISION_QUERY,
                 Map.of("status", reviewStatus, "reviewerId", reviewerId, "reviewId", reviewId));
+        jdbcTemplate.update(
+                PUBLISH_REVIEWED_SOURCE_QUERY,
+                Map.of(
+                        "reviewId",
+                        reviewId,
+                        "openStatus",
+                        AppConstants.REVIEW_STATUS_OPEN,
+                        "reviewStatus",
+                        SourceStatus.REVIEW.name(),
+                        "publishedStatus",
+                        SourceStatus.PUBLISHED.name()));
     }
 
     /** Seçilen kararı kazanım ve hedef tablolarına uygular. */
