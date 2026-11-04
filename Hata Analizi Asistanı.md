@@ -266,7 +266,7 @@ Metin katmanı A3'ten sonra da zayıf mı (LOW_TEXT_LAYER), çözülemeyen harf 
 
 Kaynak
 
-Hiç içerik çıktı mı (NO_CONTENT), testin ünitesi bulundu mu (UNIT_NOT_FOUND), kökünde soru olmayan şık kümesi var mı (NOT_MULTIPLE_CHOICE).
+Hiç içerik çıktı mı (NO_CONTENT), kökünde soru olmayan şık kümesi var mı (NOT_MULTIPLE_CHOICE). Ünitenin bulunamaması sorun değildir: sorular yine yazılır, ünite kazanımlardan çıkarılır (A8).
 
 Sonuç
 
@@ -290,7 +290,7 @@ Türkçe küçük harf, aksan ve noktalama temizliğinden sonra aynı kalan adla
 
 MEB soruları sık sık birden çok kazanımı aynı anda ölçer. Bu yüzden bir soru birden çok kazanıma bağlanabilir. Kazanımlar arasında sıra, ağırlık ya da "ana kazanım" yok; MEB'deki gibi soru bir kazanımı ya ölçer ya ölçmez.
 
-1. **Ünite:** Kaynakta yazıyorsa ("Hikâye - 5", kitabın ünite başlığı) oradan alınır. Ünite bulunamazsa ya da ünitenin bağlı kazanımı yoksa (Giriş, Söylev) adaylar bütün kazanımlardan aranır.
+1. **Ünite:** Testte önce kaynak adından, o da yoksa ilk sayfanın "Hikâye - 5" biçimli başlığından bulunur; kitapta ünite başlığından alınır. Ünite sadece ipucudur: bulunamazsa ya da ünitenin bağlı kazanımı yoksa (Giriş, Söylev) adaylar bütün kazanımlardan aranır. Ünitesiz yazılan sorunun ünitesi, bağlanan kazanımların hepsi aynı üniteye aitse o ünite olur; farklı ünitelere aitse boş kalır.
 2. **Adaylar:** O ünitenin kazanımları vektör ve BM25 aramasıyla sıralanır; iki sonuç RRF ile birleştirilir. Sorularda ilk 16, paragraflarda ilk 5 aday alınır. Kelime araması soru köküyle birlikte şıklarda da yapılır; "mekân", "bakış açısı" gibi boyutlar çoğu zaman şıklarda geçer. Kazanım vektörü yoluyla birlikte hesaplanır: "12. sınıf › Roman › Metnin olay örgüsünü belirler".
 3. **Seçim:** Haiku her seferinde temiz bağlamla adaylar arasından sorunun ölçtüğü bütün kazanımları seçer, her biri için bir güven verir.
 4. **Kontrol (kod):** En az bir kazanım var ve kodlar aday listesinde. Herhangi bir kazanımın güveni orta ya da düşükse soru incelemeye düşer (LOW_CONFIDENCE) ve taslak kalır; düşmeyen içerik hemen yayına girer. Güven sadece bu karar için; kayıtta kazanım ya vardır ya yoktur.
