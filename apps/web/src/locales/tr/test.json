@@ -33,7 +33,13 @@
     "pageNumber": "s. {{page}}",
     "pageImageAlt": "{{source}} - Sayfa {{page}} görüntüsü",
     "styleLabel": "Tarz: Adım adım ▾",
-    "citationLoading": "Alıntı yükleniyor..."
+    "citationLoading": "Alıntı yükleniyor...",
+    "chatInputPlaceholder": "Anlamadığın yeri yaz…",
+    "send": "Gönder",
+    "anotherExample": "Başka örnekle anlat",
+    "anotherExamplePrompt": "Başka bir örnekle açıklar mısın?",
+    "dailyMessageCount": "Bugün {{used}} / {{total}} mesaj",
+    "dailyLimitReached": "Günlük mesaj limitine ulaşıldı."
   },
   "result": {
     "title": "Test Sonucu",
