@@ -91,14 +91,36 @@ public class SessionService {
     @Transactional
     public SessionCompletionResponse completeSession(Long sessionId, AuthUser authUser) {
         requireOwnedInProgressSession(sessionId, authUser.id());
-        StudentAnswerRepository.SessionAnswerCounts counts =
-                studentAnswerRepository.findSessionAnswerCounts(sessionId, AppConstants.QUESTION_STATUS_PUBLISHED);
-        BigDecimal net = scoringPolicy.calculateNet(counts.getCorrectCount(), counts.getWrongCount());
+        SessionCompletionResponse result = summarize(sessionId);
         if (studySessionRepository.completeSession(
-                        sessionId, net, AppConstants.SESSION_STATUS_COMPLETED, AppConstants.SESSION_STATUS_IN_PROGRESS)
+                        sessionId,
+                        result.net(),
+                        AppConstants.SESSION_STATUS_COMPLETED,
+                        AppConstants.SESSION_STATUS_IN_PROGRESS)
                 != 1) {
             throw new IllegalStateException("In-progress study session was not completed.");
         }
+        return result;
+    }
+
+    /** Öğrencinin tamamlanmış oturumunun puanını ve kazanım özetini döndürür. */
+    @Transactional(readOnly = true)
+    public SessionCompletionResponse getResult(Long sessionId, AuthUser authUser) {
+        StudySession session = studySessionRepository
+                .findById(sessionId)
+                .filter(candidate -> candidate.getUserId().equals(authUser.id()))
+                .orElseThrow(() -> new ApiException(ErrorCode.SESSION_NOT_FOUND));
+        if (!AppConstants.SESSION_STATUS_COMPLETED.equals(session.getStatus())) {
+            throw new ApiException(ErrorCode.SESSION_NOT_COMPLETED);
+        }
+        return summarize(sessionId);
+    }
+
+    /** Oturumun cevap sayılarını, AYT netini ve kazanım bazlı yanlışlarını hesaplar. */
+    private SessionCompletionResponse summarize(Long sessionId) {
+        StudentAnswerRepository.SessionAnswerCounts counts =
+                studentAnswerRepository.findSessionAnswerCounts(sessionId, AppConstants.QUESTION_STATUS_PUBLISHED);
+        BigDecimal net = scoringPolicy.calculateNet(counts.getCorrectCount(), counts.getWrongCount());
         List<SessionCompletionResponse.SessionCompletionOutcome> outcomes =
                 studentAnswerRepository
                         .findOutcomeWrongCountsBySessionId(sessionId, AppConstants.QUESTION_STATUS_PUBLISHED)
