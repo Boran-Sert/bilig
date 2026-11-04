@@ -41,6 +41,15 @@ class ReviewControllerTestData {
                 """, Long.class, reason, questionId, contentBlockId, status, createdAt);
     }
 
+    /** Soruyu ilk sırasında taşıyan taslak test ekler. */
+    long createDraftExam(long questionId) {
+        Long examId = jdbcTemplate.queryForObject(
+                "INSERT INTO exam (title) VALUES ('İnceleme testi') RETURNING id", Long.class);
+        jdbcTemplate.update(
+                "INSERT INTO exam_question (exam_id, question_id, position) VALUES (?, ?, 1)", examId, questionId);
+        return examId;
+    }
+
     /** İçerik yöneticisi kullanıcısını test tenant'ına ekler. */
     private void createAdmin() {
         jdbcTemplate.update("""

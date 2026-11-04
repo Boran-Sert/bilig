@@ -173,6 +173,30 @@ class ReviewControllerIT extends ReviewControllerTestSupport {
         assertDecision(fixture.questionReviewId(), "REJECTED");
     }
 
+    /** Onaylanan soru taslaktaki testini yayına alır. */
+    @Test
+    @WithAuthUser(role = "CONTENT_ADMIN", id = 1001)
+    void approvedQuestionPublishesItsDraftExam() throws Exception {
+        long examId = testData.createDraftExam(fixture.questionId());
+
+        postDecision(fixture.questionReviewId(), "{\"decision\":\"APPROVE\"}").andExpect(status().isNoContent());
+
+        assertThat(jdbcTemplate.queryForObject("SELECT status FROM exam WHERE id = ?", String.class, examId))
+                .isEqualTo("PUBLISHED");
+    }
+
+    /** Reddedilen soru taslaktaki testini yayına almaz. */
+    @Test
+    @WithAuthUser(role = "CONTENT_ADMIN", id = 1001)
+    void rejectedQuestionKeepsItsExamDraft() throws Exception {
+        long examId = testData.createDraftExam(fixture.questionId());
+
+        postDecision(fixture.questionReviewId(), "{\"decision\":\"REJECT\"}").andExpect(status().isNoContent());
+
+        assertThat(jdbcTemplate.queryForObject("SELECT status FROM exam WHERE id = ?", String.class, examId))
+                .isEqualTo("DRAFT");
+    }
+
     /** Daha önce karara bağlanan kaydın ikinci kararını 409 ile reddeder. */
     @Test
     @WithAuthUser(role = "CONTENT_ADMIN", id = 1001)

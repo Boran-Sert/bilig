@@ -96,6 +96,17 @@ public class ReviewService {
             WHERE id = :targetId AND status = :draftStatus
             """;
 
+    private static final String PUBLISH_QUESTION_EXAMS_QUERY = """
+            UPDATE exam SET status = :examPublishedStatus
+            WHERE status = :examDraftStatus
+              AND id IN (
+                  SELECT exam_question.exam_id
+                  FROM exam_question
+                  JOIN question ON question.id = exam_question.question_id
+                  WHERE question.id = :targetId AND question.status = :publishedStatus
+              )
+            """;
+
     private static final String PUBLISH_BLOCK_QUERY = """
             UPDATE content_block SET status = :publishedStatus, updated_at = now()
             WHERE id = :targetId AND status = :draftStatus
@@ -236,7 +247,7 @@ public class ReviewService {
         }
     }
 
-    /** Taslak hedef içeriği yayına alır. */
+    /** Taslak hedef içeriği yayına alır; yayına giren soru taslaktaki testlerini de alır. */
     private void publishTarget(TargetType targetType, long targetId) {
         if (targetType == TargetType.QUESTION) {
             jdbcTemplate.update(
@@ -245,6 +256,13 @@ public class ReviewService {
                             "targetId", targetId,
                             "draftStatus", AppConstants.QUESTION_STATUS_DRAFT,
                             "publishedStatus", AppConstants.QUESTION_STATUS_PUBLISHED));
+            jdbcTemplate.update(
+                    PUBLISH_QUESTION_EXAMS_QUERY,
+                    Map.of(
+                            "targetId", targetId,
+                            "publishedStatus", AppConstants.QUESTION_STATUS_PUBLISHED,
+                            "examDraftStatus", AppConstants.EXAM_STATUS_DRAFT,
+                            "examPublishedStatus", AppConstants.EXAM_STATUS_PUBLISHED));
         } else {
             jdbcTemplate.update(
                     PUBLISH_BLOCK_QUERY,

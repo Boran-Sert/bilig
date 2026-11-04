@@ -31,6 +31,7 @@ public final class AppConstants {
 
     // sınav
     public static final String EXAM_STATUS_PUBLISHED = "PUBLISHED";
+    public static final String EXAM_STATUS_DRAFT = "DRAFT";
 
     // soru
     public static final String QUESTION_STATUS_PUBLISHED = "PUBLISHED";
