@@ -196,6 +196,7 @@ erDiagram
 | source_document_id | bigint | hayır | | FK → source_document(id) ON DELETE CASCADE |
 | page_no | integer | hayır | | |
 | image_path | text | evet | | `/data/pages/{source_id}/{page_no}.png` |
+| entities_extracted_at | timestamptz | evet | | Bilgi katmanı adımı sayfayı ne zaman işledi; doluysa sayfa tekrar modele gitmez |
 | created_at | timestamptz | hayır | now() | |
 
 - `uq_source_page_source_document_id_page_no` UNIQUE (source_document_id, page_no)
