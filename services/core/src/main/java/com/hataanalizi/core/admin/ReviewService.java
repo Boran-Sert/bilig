@@ -4,6 +4,7 @@ import com.hataanalizi.core.admin.dto.ReviewDecisionRequest;
 import com.hataanalizi.core.admin.dto.ReviewDecisionRequest.Decision;
 import com.hataanalizi.core.admin.dto.ReviewItemResponse;
 import com.hataanalizi.core.admin.dto.ReviewItemResponse.OutcomeLink;
+import com.hataanalizi.core.admin.dto.ReviewItemResponse.ReviewProblem;
 import com.hataanalizi.core.admin.dto.ReviewItemResponse.TargetType;
 import com.hataanalizi.core.admin.dto.ReviewOutcomeResponse;
 import com.hataanalizi.core.common.ApiException;
@@ -23,28 +24,38 @@ import org.springframework.transaction.annotation.Transactional;
 import tools.jackson.databind.JsonNode;
 import tools.jackson.databind.ObjectMapper;
 
-/** Açık kazanım incelemelerini listeler ve içerik kararlarını yönetir. */
+/** Açık kazanım ve kaynak incelemelerini listeler, içerik ve kaynak kararlarını yönetir. */
 @Service
 public class ReviewService {
 
     private static final String REVIEW_LIST_QUERY = """
             SELECT review_item.id,
                    review_item.reason,
-                   CASE WHEN review_item.question_id IS NOT NULL THEN 'QUESTION' ELSE 'BLOCK' END,
-                   COALESCE(review_item.question_id, review_item.content_block_id),
+                   CASE
+                       WHEN review_item.question_id IS NOT NULL THEN 'QUESTION'
+                       WHEN review_item.content_block_id IS NOT NULL THEN 'BLOCK'
+                       ELSE 'SOURCE'
+                   END,
+                   COALESCE(
+                       review_item.question_id,
+                       review_item.content_block_id,
+                       review_item.source_document_id),
                    question.content::text,
                    content_block.markdown,
                    source_document.title,
                    source_page.id,
                    source_page.page_no,
                    COALESCE(question_outcomes.items, block_outcomes.items, '[]'::jsonb)::text,
+                   COALESCE(review_item.detail -> 'problems', '[]'::jsonb)::text,
                    review_item.created_at
             FROM review_item
             LEFT JOIN question ON question.id = review_item.question_id
             LEFT JOIN content_block ON content_block.id = review_item.content_block_id
             LEFT JOIN source_page
                 ON source_page.id = COALESCE(question.source_page_id, content_block.source_page_id)
-            LEFT JOIN source_document ON source_document.id = source_page.source_document_id
+            LEFT JOIN source_document
+                ON source_document.id = COALESCE(
+                    review_item.source_document_id, source_page.source_document_id)
             LEFT JOIN LATERAL (
                 SELECT jsonb_agg(jsonb_build_object(
                     'id', learning_outcome.id,
@@ -68,7 +79,10 @@ public class ReviewService {
                     ON learning_outcome.id = content_block_outcome.learning_outcome_id
                 WHERE content_block_outcome.content_block_id = review_item.content_block_id
             ) block_outcomes ON true
-            WHERE review_item.status = :openStatus AND review_item.reason = :lowConfidenceReason
+            WHERE review_item.status = :openStatus
+              AND (review_item.reason = :lowConfidenceReason
+                   OR (review_item.source_document_id IS NOT NULL
+                       AND review_item.reason IN (:sourceReasons)))
             ORDER BY review_item.created_at, review_item.id
             LIMIT :size OFFSET :offset
             """;
@@ -82,7 +96,9 @@ public class ReviewService {
     private static final String REVIEW_COUNT_QUERY = """
             SELECT count(*)
             FROM review_item
-            WHERE status = :openStatus AND reason = :lowConfidenceReason
+            WHERE status = :openStatus
+              AND (reason = :lowConfidenceReason
+                   OR (source_document_id IS NOT NULL AND reason IN (:sourceReasons)))
             """;
 
     private static final String SELECT_OUTCOME_COUNT_QUERY = """
@@ -114,6 +130,26 @@ public class ReviewService {
 
     private static final String REJECT_QUESTION_QUERY = """
             UPDATE question SET status = :rejectedStatus, updated_at = now()
+            WHERE id = :targetId
+            """;
+
+    private static final String REJECT_SOURCE_DRAFTS_QUERY = """
+            WITH rejected_questions AS (
+                UPDATE question SET status = :rejectedStatus, updated_at = now()
+                FROM source_page
+                WHERE source_page.id = question.source_page_id
+                  AND source_page.source_document_id = :targetId
+                  AND question.status = :draftStatus
+            )
+            UPDATE content_block SET status = :rejectedStatus, updated_at = now()
+            FROM source_page
+            WHERE source_page.id = content_block.source_page_id
+              AND source_page.source_document_id = :targetId
+              AND content_block.status = :draftStatus
+            """;
+
+    private static final String FAIL_SOURCE_QUERY = """
+            UPDATE source_document SET status = :failedStatus, updated_at = now()
             WHERE id = :targetId
             """;
 
@@ -192,13 +228,14 @@ public class ReviewService {
         this.objectMapper = objectMapper;
     }
 
-    /** Açık düşük güvenli incelemeleri eskiden yeniye sayfalı döner. */
+    /** Açık düşük güvenli ve kaynak incelemelerini eskiden yeniye sayfalı döner. */
     @Transactional(readOnly = true)
     public PageResponse<ReviewItemResponse> listReviews(int page, int size) {
         validatePage(page, size);
         MapSqlParameterSource parameters = new MapSqlParameterSource()
                 .addValue("openStatus", AppConstants.REVIEW_STATUS_OPEN)
                 .addValue("lowConfidenceReason", AppConstants.REVIEW_REASON_LOW_CONFIDENCE)
+                .addValue("sourceReasons", AppConstants.SOURCE_REVIEW_REASONS)
                 .addValue("size", size)
                 .addValue("offset", (long) page * size);
         List<ReviewItemResponse> items =
@@ -225,7 +262,8 @@ public class ReviewService {
             throw new ApiException(ErrorCode.VALIDATION_FAILED);
         }
         ReviewItem reviewItem = reviewItemRepository
-                .findByIdForUpdate(reviewId, AppConstants.REVIEW_REASON_LOW_CONFIDENCE)
+                .findByIdForUpdate(reviewId)
+                .filter(ReviewService::isDecidable)
                 .orElseThrow(() -> new ApiException(ErrorCode.NOT_FOUND));
         if (!AppConstants.REVIEW_STATUS_OPEN.equals(reviewItem.getStatus())) {
             throw new ApiException(ErrorCode.REVIEW_ALREADY_DECIDED);
@@ -252,8 +290,19 @@ public class ReviewService {
                         SourceStatus.PUBLISHED.name()));
     }
 
+    /** Kaydın karar verilebilen düşük güven ya da kaynak kaydı olup olmadığını söyler. */
+    private static boolean isDecidable(ReviewItem reviewItem) {
+        return AppConstants.REVIEW_REASON_LOW_CONFIDENCE.equals(reviewItem.getReason())
+                || (reviewItem.getSourceDocumentId() != null
+                        && AppConstants.SOURCE_REVIEW_REASONS.contains(reviewItem.getReason()));
+    }
+
     /** Seçilen kararı kazanım ve hedef tablolarına uygular. */
     private void applyDecision(ReviewDecisionRequest request, TargetType targetType, long targetId) {
+        if (targetType == TargetType.SOURCE) {
+            applySourceDecision(request, targetId);
+            return;
+        }
         switch (request.decision()) {
             case APPROVE -> publishTarget(targetType, targetId);
             case FIX -> {
@@ -261,6 +310,24 @@ public class ReviewService {
                 publishTarget(targetType, targetId);
             }
             case REJECT -> rejectTarget(targetType, targetId);
+        }
+    }
+
+    /** Kaynak kaydında onayı kapatmaya bırakır; reddi taslak içeriğe ve kaynağa uygular. */
+    private void applySourceDecision(ReviewDecisionRequest request, long sourceId) {
+        switch (request.decision()) {
+            case APPROVE -> {}
+            case FIX -> throw new ApiException(ErrorCode.VALIDATION_FAILED);
+            case REJECT -> {
+                jdbcTemplate.update(
+                        REJECT_SOURCE_DRAFTS_QUERY,
+                        Map.of(
+                                "targetId", sourceId,
+                                "draftStatus", AppConstants.QUESTION_STATUS_DRAFT,
+                                "rejectedStatus", AppConstants.QUESTION_STATUS_REJECTED));
+                jdbcTemplate.update(
+                        FAIL_SOURCE_QUERY, Map.of("targetId", sourceId, "failedStatus", SourceStatus.FAILED.name()));
+            }
         }
     }
 
@@ -329,7 +396,7 @@ public class ReviewService {
         }
     }
 
-    /** İnceleme kaydının soru veya paragraf hedefini belirler. */
+    /** İnceleme kaydının soru, paragraf veya kaynak hedefini belirler. */
     private TargetType targetType(ReviewItem reviewItem) {
         if (reviewItem.getQuestionId() != null) {
             return TargetType.QUESTION;
@@ -337,13 +404,19 @@ public class ReviewService {
         if (reviewItem.getContentBlockId() != null) {
             return TargetType.BLOCK;
         }
+        if (reviewItem.getSourceDocumentId() != null) {
+            return TargetType.SOURCE;
+        }
         throw new ApiException(ErrorCode.INTERNAL_ERROR);
     }
 
     /** İnceleme kaydının hedef kimliğini döndürür. */
     private long targetId(ReviewItem reviewItem) {
-        Long targetId =
-                reviewItem.getQuestionId() != null ? reviewItem.getQuestionId() : reviewItem.getContentBlockId();
+        Long targetId = reviewItem.getQuestionId() != null
+                ? reviewItem.getQuestionId()
+                : reviewItem.getContentBlockId() != null
+                        ? reviewItem.getContentBlockId()
+                        : reviewItem.getSourceDocumentId();
         if (targetId == null) {
             throw new ApiException(ErrorCode.INTERNAL_ERROR);
         }
@@ -363,7 +436,12 @@ public class ReviewService {
                         item.get("title").asString(),
                         item.get("mappedBy").asString()))
                 .toList();
-        OffsetDateTime createdAt = result.getObject(11, OffsetDateTime.class);
+        List<ReviewProblem> problems = objectMapper
+                .readTree(result.getString(11))
+                .valueStream()
+                .map(item -> objectMapper.treeToValue(item, ReviewProblem.class))
+                .toList();
+        OffsetDateTime createdAt = result.getObject(12, OffsetDateTime.class);
         return new ReviewItemResponse(
                 result.getLong(1),
                 result.getString(2),
@@ -375,6 +453,7 @@ public class ReviewService {
                 (Long) result.getObject(8),
                 (Integer) result.getObject(9),
                 outcomes,
+                problems,
                 createdAt.toInstant());
     }
 

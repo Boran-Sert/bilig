@@ -33,6 +33,13 @@ import org.springframework.transaction.annotation.Transactional;
 @Transactional
 class ReviewControllerIT extends ReviewControllerTestSupport {
 
+    private static final String SOURCE_PROBLEMS = """
+            {"problems": [
+                {"code": "NO_ANSWER_KEY", "pageNo": 3, "pageId": 1, "test": 1, "number": 2},
+                {"code": "NO_CONTENT"}
+            ]}
+            """;
+
     private final MockMvc mockMvc;
     private final JdbcTemplate jdbcTemplate;
     private final ReviewControllerTestData testData;
@@ -214,6 +221,77 @@ class ReviewControllerIT extends ReviewControllerTestSupport {
 
         postDecision(fixture.blockReviewId(), "{\"decision\":\"REJECT\"}").andExpect(status().isNoContent());
         assertThat(sourceStatus(sourceId)).isEqualTo("PUBLISHED");
+    }
+
+    /** Kaynak kaydı hedefi, kaynak adı ve sorunlarıyla listelenir. */
+    @Test
+    @WithAuthUser(role = "CONTENT_ADMIN", id = 1001)
+    void listsSourceReviewWithProblems() throws Exception {
+        long sourceId = testData.sourceIdOf(fixture.questionId());
+        long reviewId = testData.createSourceReview(sourceId, "NO_ANSWER_KEY", SOURCE_PROBLEMS);
+
+        mockMvc.perform(get("/api/admin/review?page=0&size=1").with(testSecurityContext()))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.items[0].id").value(reviewId))
+                .andExpect(jsonPath("$.items[0].targetType").value("SOURCE"))
+                .andExpect(jsonPath("$.items[0].targetId").value(sourceId))
+                .andExpect(jsonPath("$.items[0].sourceTitle").value("İnceleme kaynağı"))
+                .andExpect(jsonPath("$.items[0].problems[0].code").value("NO_ANSWER_KEY"))
+                .andExpect(jsonPath("$.items[0].problems[0].pageNo").value(3))
+                .andExpect(jsonPath("$.items[0].problems[0].test").value(1))
+                .andExpect(jsonPath("$.items[0].problems[0].number").value(2))
+                .andExpect(jsonPath("$.items[0].problems[1].code").value("NO_CONTENT"))
+                .andExpect(jsonPath("$.items[0].problems[1].pageNo").doesNotExist())
+                .andExpect(jsonPath("$.total").value(3));
+    }
+
+    /** Kaynak kaydında APPROVE kaydı kapatır ve içeriğe dokunmaz. */
+    @Test
+    @WithAuthUser(role = "CONTENT_ADMIN", id = 1001)
+    void approveClosesSourceReview() throws Exception {
+        long sourceId = testData.sourceIdOf(fixture.questionId());
+        long reviewId = testData.createSourceReview(sourceId, "VALIDATION_FAILED", SOURCE_PROBLEMS);
+
+        postDecision(reviewId, "{\"decision\":\"APPROVE\"}").andExpect(status().isNoContent());
+
+        assertDecision(reviewId, "APPROVED");
+        assertThat(jdbcTemplate.queryForObject(
+                        "SELECT status FROM question WHERE id = ?", String.class, fixture.questionId()))
+                .isEqualTo("DRAFT");
+    }
+
+    /** Kaynak kaydında REJECT taslak soru ve paragrafları reddeder, kaynağı FAILED yapar. */
+    @Test
+    @WithAuthUser(role = "CONTENT_ADMIN", id = 1001)
+    void rejectRejectsDraftContentOfSource() throws Exception {
+        long sourceId = testData.sourceIdOf(fixture.questionId());
+        long reviewId = testData.createSourceReview(sourceId, "VALIDATION_FAILED", SOURCE_PROBLEMS);
+        jdbcTemplate.update("UPDATE content_block SET status = 'PUBLISHED' WHERE id = ?", fixture.blockId());
+
+        postDecision(reviewId, "{\"decision\":\"REJECT\"}").andExpect(status().isNoContent());
+
+        assertDecision(reviewId, "REJECTED");
+        assertThat(jdbcTemplate.queryForObject(
+                        "SELECT status FROM question WHERE id = ?", String.class, fixture.questionId()))
+                .isEqualTo("REJECTED");
+        assertThat(jdbcTemplate.queryForObject(
+                        "SELECT status FROM content_block WHERE id = ?", String.class, fixture.blockId()))
+                .isEqualTo("PUBLISHED");
+        assertThat(sourceStatus(sourceId)).isEqualTo("FAILED");
+    }
+
+    /** Kaynak kaydında FIX isteği 400 ile reddedilir. */
+    @Test
+    @WithAuthUser(role = "CONTENT_ADMIN", id = 1001)
+    void rejectsFixForSourceReview() throws Exception {
+        long sourceId = testData.sourceIdOf(fixture.questionId());
+        long reviewId = testData.createSourceReview(sourceId, "VALIDATION_FAILED", SOURCE_PROBLEMS);
+
+        postDecision(reviewId, "{\"decision\":\"FIX\",\"outcomeIds\":[" + fixture.firstOutcomeId() + "]}")
+                .andExpect(status().isBadRequest());
+
+        assertThat(jdbcTemplate.queryForObject("SELECT status FROM review_item WHERE id = ?", String.class, reviewId))
+                .isEqualTo("OPEN");
     }
 
     /** Daha önce karara bağlanan kaydın ikinci kararını 409 ile reddeder. */

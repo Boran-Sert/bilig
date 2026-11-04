@@ -9,7 +9,6 @@ import static org.mockito.Mockito.when;
 import com.hataanalizi.core.admin.dto.ReviewDecisionRequest;
 import com.hataanalizi.core.admin.dto.ReviewDecisionRequest.Decision;
 import com.hataanalizi.core.common.ApiException;
-import com.hataanalizi.core.common.AppConstants;
 import com.hataanalizi.core.common.ErrorCode;
 import java.util.List;
 import java.util.Optional;
@@ -43,15 +42,14 @@ class ReviewServiceTest {
     @Test
     void rejectsAlreadyDecidedReview() {
         ReviewItem reviewItem = reviewItem("APPROVED");
-        when(reviewItemRepository.findByIdForUpdate(7L, AppConstants.REVIEW_REASON_LOW_CONFIDENCE))
-                .thenReturn(Optional.of(reviewItem));
+        when(reviewItemRepository.findByIdForUpdate(7L)).thenReturn(Optional.of(reviewItem));
 
         assertThatThrownBy(() -> reviewService.decideReview(7L, 10L, new ReviewDecisionRequest(Decision.APPROVE, null)))
                 .isInstanceOfSatisfying(
                         ApiException.class,
                         exception -> assertThat(exception.getErrorCode()).isEqualTo(ErrorCode.REVIEW_ALREADY_DECIDED));
 
-        verify(reviewItemRepository).findByIdForUpdate(7L, AppConstants.REVIEW_REASON_LOW_CONFIDENCE);
+        verify(reviewItemRepository).findByIdForUpdate(7L);
         verifyNoInteractions(jdbcTemplate);
     }
 
@@ -59,8 +57,7 @@ class ReviewServiceTest {
     @Test
     void rejectsEmptyFixBeforeChangingData() {
         ReviewItem reviewItem = reviewItem("OPEN");
-        when(reviewItemRepository.findByIdForUpdate(7L, AppConstants.REVIEW_REASON_LOW_CONFIDENCE))
-                .thenReturn(Optional.of(reviewItem));
+        when(reviewItemRepository.findByIdForUpdate(7L)).thenReturn(Optional.of(reviewItem));
 
         assertThatThrownBy(
                         () -> reviewService.decideReview(7L, 10L, new ReviewDecisionRequest(Decision.FIX, List.of())))
