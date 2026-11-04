@@ -4,7 +4,9 @@
     "metaDescription": "AYT Edebiyat içerik kaynaklarını PDF olarak sisteme yükleyin.",
     "dropTitle": "PDF'leri buraya bırak",
     "dropActive": "Dosyaları bırakabilirsin",
-    "dropDescription": "Ders kitabı, kazanım testi, soru bankası, cevap anahtarı ya da öğretim programı. Birden çok dosya olabilir.",
+    "dropDescription": "Ders kitabı, test ya da soru bankası. Birden çok dosya olabilir; hepsi seçilen türle yüklenir.",
+    "kindLabel": "Kaynak türü",
+    "kindPlaceholder": "Tür seç",
     "selectButton": "Dosya seç",
     "uploading": "Yükleniyor...",
     "emptyList": "Henüz yüklenmiş bir kaynak bulunmuyor.",
@@ -43,7 +45,8 @@
     },
     "errors": {
       "rejectedFiles": "PDF olmadığı için yüklenmeyen dosyalar: {{files}}",
-      "accessDenied": "Bu ekranı yalnızca içerik yöneticileri görüntüleyebilir."
+      "accessDenied": "Bu ekranı yalnızca içerik yöneticileri görüntüleyebilir.",
+      "kindRequired": "Önce kaynağın türünü seç."
     }
   }
 }

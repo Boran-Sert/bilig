@@ -146,7 +146,7 @@ describe("admin api - useUploadSources", () => {
     });
 
     const file = new File(["dummy pdf content"], "test.pdf", { type: "application/pdf" });
-    result.current.mutate([file]);
+    result.current.mutate({ files: [file], kind: "TEST" });
 
     await waitFor(() => expect(result.current.isSuccess).toBe(true));
 
@@ -155,6 +155,7 @@ describe("admin api - useUploadSources", () => {
     const serializedBody = options.bodySerializer(options.body) as FormData;
     expect(serializedBody).toBeInstanceOf(FormData);
     expect(serializedBody.getAll("files")).toHaveLength(1);
+    expect(options.params).toEqual({ query: { kind: "TEST" } });
   });
 
   test("yükleme bitince kaynak listesini yeniler", async () => {
@@ -167,7 +168,10 @@ describe("admin api - useUploadSources", () => {
     const { result } = renderHook(() => useUploadSources(), {
       wrapper: createWrapper(queryClient),
     });
-    result.current.mutate([new File(["içerik"], "test.pdf", { type: "application/pdf" })]);
+    result.current.mutate({
+      files: [new File(["içerik"], "test.pdf", { type: "application/pdf" })],
+      kind: "TEXTBOOK",
+    });
 
     await waitFor(() => expect(result.current.isSuccess).toBe(true));
     expect(invalidateSpy).toHaveBeenCalledWith({ queryKey: adminKeys.sources });
@@ -183,7 +187,10 @@ describe("admin api - useUploadSources", () => {
       wrapper: createWrapper(queryClient),
     });
 
-    result.current.mutate([new File(["bad content"], "not-pdf.txt", { type: "text/plain" })]);
+    result.current.mutate({
+      files: [new File(["bad content"], "not-pdf.txt", { type: "text/plain" })],
+      kind: "TEXTBOOK",
+    });
 
     await waitFor(() => expect(result.current.isError).toBe(true));
     expect(result.current.error).toBeInstanceOf(ApiError);

@@ -5,7 +5,7 @@ import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { client } from "../../lib/api/client";
 import { ApiError } from "../../lib/api/problem";
 import { SOURCES_PAGE_SIZE, SOURCES_POLL_INTERVAL_MS } from "../../lib/constants";
-import type { SourceListItem, SourceListResponse, UploadResponse } from "./types";
+import type { SourceListItem, SourceListResponse, UploadRequest, UploadResponse } from "./types";
 
 export const adminKeys = {
   sources: ["admin", "sources"] as const,
@@ -53,10 +53,11 @@ export function useSources(enabled: boolean, page = 0, size = SOURCES_PAGE_SIZE)
 export function useUploadSources() {
   const queryClient = useQueryClient();
 
-  return useMutation<UploadResponse, ApiError, File[]>({
-    /** Dosyaları bodySerializer ile FormData'ya dönüştürerek sunucuya gönderir. */
-    mutationFn: async (files: File[]): Promise<UploadResponse> => {
+  return useMutation<UploadResponse, ApiError, UploadRequest>({
+    /** Dosyaları seçilen türle bodySerializer ile FormData'ya dönüştürerek sunucuya gönderir. */
+    mutationFn: async ({ files, kind }: UploadRequest): Promise<UploadResponse> => {
       const { data, error, response } = await client.POST("/api/admin/sources", {
+        params: { query: { kind } },
         // Sadece tip için
         body: { files: files.map((file) => file.name) },
         /** Dosyaları tarayıcının boundary ekleyeceği FormData nesnesine serileştirir. */
