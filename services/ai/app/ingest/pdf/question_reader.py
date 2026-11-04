@@ -2635,7 +2635,7 @@ def parse(pages: list[PageIR]) -> tuple[list[Question], dict[str, object]]:
     position_of = {id(line): p for p, line in enumerate(body.lines)}
     questions: list[Question] = []
     passages: list[tuple[set[int], list[str], int]] = []
-    zone_start, previous, rejected = 0, None, 0
+    zone_start, previous, rejected = 0, None, []
     for k, option_set in enumerate(sets):
         end = sets[k + 1].start if k + 1 < len(sets) else len(body.lines)
         zone = [p for p in range(zone_start, option_set.start) if id(body.lines[p]) not in excluded]
@@ -2647,7 +2647,7 @@ def parse(pages: list[PageIR]) -> tuple[list[Question], dict[str, object]]:
         question = build_question(body, lines, option_set, marker)
         zone_start = position_of[id(question.tail[0])] if question.tail else end
         if not QUESTION_CUE.search(tr_lower(" ".join(question.stem))):
-            rejected += 1
+            rejected.append(question.page_no)
             continue
         pre = [body.lines[p] for p in zone[:start]]
         zone_passage(body, pre, question, passages, len(questions))

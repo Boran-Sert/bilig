@@ -10,11 +10,8 @@ from collections.abc import Sequence
 
 from psycopg import AsyncConnection
 
+from app.db.queries.source import fetch_page_ids
 from app.schemas.textbook import TextbookBlock
-
-SELECT_PAGE_IDS = """
-SELECT page_no, id FROM source_page WHERE source_document_id = %(source_id)s
-"""
 
 UPSERT_CONTENT_BLOCK = """
 INSERT INTO content_block (source_page_id, block_type, position, title_path, markdown, search_text)
@@ -41,8 +38,7 @@ async def save_content_blocks(
     connection: AsyncConnection, source_id: int, blocks: Sequence[TextbookBlock]
 ) -> None:
     """Blokları ilk sayfalarının satırına ekler; varsa değişen alanları günceller."""
-    cursor = await connection.execute(SELECT_PAGE_IDS, {"source_id": source_id})
-    page_ids = {int(page_no): int(page_id) for page_no, page_id in await cursor.fetchall()}
+    page_ids = await fetch_page_ids(connection, source_id)
     rows = []
     for block in blocks:
         if block.page_no not in page_ids:

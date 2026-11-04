@@ -16,6 +16,7 @@ from app.db.queries.content import save_content_blocks
 from app.ingest import pdf
 from app.ingest.pdf import ReaderOptions
 from app.ingest.readers.textbook import extract_textbook
+from app.schemas.pdf import PageReport, TextbookReading
 from app.schemas.textbook import TextbookBlock
 from app.storage import source_key
 from tests.pdf_factory import Text, make_pdf
@@ -163,3 +164,37 @@ async def test_block_on_unregistered_page_raises(db: Connection, tmp_path: Path)
 
     with pytest.raises(LookupError, match="no page 1"):
         await save_content_blocks(db, source_id, read_blocks()[:1])
+
+
+READ_REVIEW_DETAIL = """
+SELECT reason, detail FROM review_item WHERE source_document_id = %s AND status = 'OPEN'
+"""
+
+
+@pytest.mark.asyncio
+async def test_empty_book_with_weak_page_opens_review(
+    db: Connection, tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    """Hiç blok çıkmayan ve metin katmanı bozuk sayfası olan kitap incelemeye düşer."""
+    source_id = await prepare_source(db, tmp_path)
+    page = PageReport(page_no=2, source="TEXT", notes=["UNDECODED_GLYPHS"], text_ratio=0.5)
+    reading = TextbookReading(blocks=[], pages=[page])
+    monkeypatch.setattr(pdf, "read_textbook", lambda _content, _title: reading)
+
+    await extract_textbook(source_id, make_context(db, tmp_path))
+
+    [(reason, detail)] = await (await db.execute(READ_REVIEW_DETAIL, (source_id,))).fetchall()
+    page_id = await (
+        await db.execute(
+            "SELECT id FROM source_page WHERE source_document_id = %s AND page_no = 2",
+            (source_id,),
+        )
+    ).fetchone()
+    assert page_id is not None
+    assert reason == "VALIDATION_FAILED"
+    assert detail == {
+        "problems": [
+            {"code": "UNDECODED_GLYPHS", "pageNo": 2, "pageId": page_id[0]},
+            {"code": "NO_CONTENT"},
+        ]
+    }

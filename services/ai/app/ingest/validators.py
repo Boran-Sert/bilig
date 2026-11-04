@@ -9,7 +9,8 @@ varsa ona en az TEXT_SIMILARITY_MIN_RATIO oranında benzemelidir. Benzerlik mark
 tablo ayırıcı satırları, liste imleri, satır sonu tireleri, yumuşak tireler, boşluk ve büyük-küçük
 harf farkları atılarak rapidfuzz ile ölçülür; okuma sırası farklıysa benzerlik düşer. Kontroller
 sadece sorunları döner; geçemeyen içeriği inceleme listesine (VALIDATION_FAILED) sonraki hazırlık
-adımı yazar.
+adımı yazar. Okuma raporunda metin katmanı bozuk kalan (LOW_TEXT_LAYER) ya da harfi çözülemeyen
+(UNDECODED_GLYPHS) sayfa da sorundur.
 """
 
 import re
@@ -20,7 +21,9 @@ from pydantic import BaseModel
 from rapidfuzz import fuzz
 
 from app.constants import TEXT_SIMILARITY_MIN_RATIO
+from app.schemas.pdf import PageReport
 from app.schemas.question import OPTION_LABELS, Block, ParsedQuestion
+from app.schemas.review import ProblemCode, SourceProblem
 from app.text.turkish import normalize_nfc, tr_lower
 
 _TABLE_SEPARATOR = re.compile(
@@ -32,6 +35,10 @@ _HYPHEN_BREAK = re.compile(r"(\w)-[ \t]*\n\s*(\w)")
 _SOFT_HYPHEN = re.compile(r"\N{SOFT HYPHEN}\s*")
 _WHITESPACE = re.compile(r"\s+")
 _HORIZONTAL_SPACE = re.compile(r"[ \t]+")
+_PAGE_NOTE_PROBLEMS: dict[str, ProblemCode] = {
+    "LOW_TEXT_LAYER": "LOW_TEXT_LAYER",
+    "UNDECODED_GLYPHS": "UNDECODED_GLYPHS",
+}
 
 
 class ValidationProblem(StrEnum):
@@ -120,3 +127,13 @@ def normalize_for_comparison(text: str) -> str:
     joined = _HYPHEN_BREAK.sub(r"\1\2", spaced)
     plain = _MARKDOWN_MARK.sub(" ", _LIST_MARKER.sub("", _TABLE_SEPARATOR.sub(" ", joined)))
     return tr_lower(_WHITESPACE.sub(" ", plain).strip())
+
+
+def page_problems(pages: Sequence[PageReport]) -> list[SourceProblem]:
+    """Metin katmanı bozuk kalan ya da harfi çözülemeyen sayfaları sorun olarak döner."""
+    return [
+        SourceProblem(code=_PAGE_NOTE_PROBLEMS[note], page_no=page.page_no)
+        for page in pages
+        for note in page.notes
+        if note in _PAGE_NOTE_PROBLEMS
+    ]

@@ -9,8 +9,14 @@ import pytest
 from psycopg.rows import TupleRow
 
 from app.db.queries.question import content_hash
-from app.ingest.readers.test import ReadingProblems, find_problems, report_problems
+from app.ingest.readers.test import (
+    answer_problems,
+    failed_problems,
+    find_problems,
+    report_problems,
+)
 from app.ingest.validators import ValidationProblem
+from app.schemas.pdf import QuestionReading
 from tests.test_pipeline import make_source
 from tests.test_validators import build_question
 
@@ -67,12 +73,13 @@ def test_same_question_gets_same_hash_and_other_question_differs() -> None:
 async def test_problems_open_one_review_per_reason_and_mark_source_review(db: Connection) -> None:
     """Cevapsız ve kontrolü geçemeyen soru ayrı neden açar; tekrar çalışınca kopya olmaz."""
     source_id = await make_source(db)
-    problems = find_problems(
-        [[build_question(1, correct_option=None), build_question(2, labels=["A", "B"])]]
-    )
+    tests = [[build_question(1, correct_option=None), build_question(2, labels=["A", "B"])]]
+    problems = find_problems(tests)
+    reading = QuestionReading(tests=tests, pages=[])
+    failed = failed_problems(reading, problems, unit_found=True)
 
-    await report_problems(db, source_id, problems)
-    await report_problems(db, source_id, problems)
+    await report_problems(db, source_id, answer_problems(problems), failed)
+    await report_problems(db, source_id, answer_problems(problems), failed)
 
     for reason in ("NO_ANSWER_KEY", "VALIDATION_FAILED"):
         row = await (await db.execute(COUNT_REVIEWS, (source_id, reason))).fetchone()
@@ -85,7 +92,7 @@ async def test_clean_reading_opens_no_review(db: Connection) -> None:
     """Sorun yoksa kayıt açılmaz ve kaynak durumu değişmez."""
     source_id = await make_source(db)
 
-    await report_problems(db, source_id, ReadingProblems(missing_answers=[], failed=[]))
+    await report_problems(db, source_id, [], [])
 
     row = await (await db.execute(COUNT_REVIEWS, (source_id, "NO_ANSWER_KEY"))).fetchone()
     assert row == (0,)

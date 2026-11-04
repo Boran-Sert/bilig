@@ -97,6 +97,30 @@ def test_read_questions_starts_new_test_when_numbers_restart() -> None:
     assert reading.tests[1][0].content.options[0].blocks[0].md == "*Şair Evlenmesi*"
 
 
+def test_option_set_without_question_is_dropped_with_its_page() -> None:
+    """Kökünde soru olmayan şık kümesi soru sayılmaz; sayfası okumada döner."""
+    lines = [
+        "**1.** Aşağıdakilerden hangisi bir roman türüdür?",
+        "A) Gazel",
+        "B) Tarihî roman",
+        "C) Kaside",
+        "D) Mesnevi",
+        "E) Rubai",
+        "",
+        "**2.** Eserleri yazarlarıyla eşleştiriniz.",
+        "A) Gazel",
+        "B) Kaside",
+        "C) Koşma",
+        "D) Rubai",
+        "E) Mesnevi",
+    ]
+
+    reading = pdf.read_questions(lines_pdf([lines]), OPTIONS)
+
+    assert [[q.number for q in test] for test in reading.tests] == [[1]]
+    assert reading.not_multiple_choice_pages == [1]
+
+
 def test_read_textbook_gives_types_paths_and_positions() -> None:
     """Başlık BASLIK, kutudaki metin BILGI, gerisi METIN; yol kaynak adıyla başlar."""
     source = make_pdf(

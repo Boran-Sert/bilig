@@ -14,6 +14,10 @@ VALUES (%(source_id)s, %(page_no)s, %(image_path)s)
 ON CONFLICT (source_document_id, page_no) DO UPDATE SET image_path = EXCLUDED.image_path
 """
 
+SELECT_PAGE_IDS = """
+SELECT page_no, id FROM source_page WHERE source_document_id = %(source_id)s
+"""
+
 SELECT_SOURCE_TITLE = "SELECT title FROM source_document WHERE id = %(source_id)s"
 
 SELECT_SOURCE_KIND = "SELECT kind FROM source_document WHERE id = %(source_id)s"
@@ -66,6 +70,12 @@ async def save_source_pages(
                 for page_no, image_path in enumerate(image_paths, start=1)
             ],
         )
+
+
+async def fetch_page_ids(connection: AsyncConnection, source_id: int) -> dict[int, int]:
+    """Kaynağın sayfa numaralarını sayfa kayıtlarının kimliğine eşler."""
+    cursor = await connection.execute(SELECT_PAGE_IDS, {"source_id": source_id})
+    return {int(page_no): int(page_id) for page_no, page_id in await cursor.fetchall()}
 
 
 async def fetch_source_title(connection: AsyncConnection, source_id: int) -> str:

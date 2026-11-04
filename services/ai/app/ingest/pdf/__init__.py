@@ -25,6 +25,7 @@ from contextlib import contextmanager
 from dataclasses import dataclass
 from functools import partial
 from pathlib import Path
+from typing import cast
 
 import pypdfium2 as pdfium
 from PIL import Image
@@ -82,8 +83,12 @@ def read_questions(source: PdfSource, options: ReaderOptions | None = None) -> Q
 
     with _reading():
         pages = question_reader.read_document(source, ocr, check)
-        questions, _ = question_reader.parse(pages)
-    return QuestionReading(tests=to_tests(questions), pages=to_page_reports(pages))
+        questions, profile = question_reader.parse(pages)
+    return QuestionReading(
+        tests=to_tests(questions),
+        pages=to_page_reports(pages),
+        not_multiple_choice_pages=cast(list[int], profile["not_multiple_choice"]),
+    )
 
 
 def read_textbook(
