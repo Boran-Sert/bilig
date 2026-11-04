@@ -50,6 +50,25 @@ class ReviewControllerTestData {
         return examId;
     }
 
+    /** Kaynak düzeyinde verilen nedenle ve ayrıntıyla açık inceleme kaydı ekler. */
+    long createSourceReview(long sourceId, String reason, String detail) {
+        return jdbcTemplate.queryForObject("""
+                INSERT INTO review_item (reason, source_document_id, detail, created_at)
+                VALUES (?, ?, ?::jsonb, '2026-11-02T08:00:00Z')
+                RETURNING id
+                """, Long.class, reason, sourceId, detail);
+    }
+
+    /** Sorunun bulunduğu kaynağın kimliğini döner. */
+    long sourceIdOf(long questionId) {
+        return jdbcTemplate.queryForObject("""
+                SELECT source_page.source_document_id
+                FROM question
+                JOIN source_page ON source_page.id = question.source_page_id
+                WHERE question.id = ?
+                """, Long.class, questionId);
+    }
+
     /** İçerik yöneticisi kullanıcısını test tenant'ına ekler. */
     private void createAdmin() {
         jdbcTemplate.update("""

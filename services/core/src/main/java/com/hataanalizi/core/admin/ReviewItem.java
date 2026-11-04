@@ -26,6 +26,9 @@ public class ReviewItem {
     @Column(nullable = false, columnDefinition = "text")
     private String reason;
 
+    @Column(name = "source_document_id")
+    private Long sourceDocumentId;
+
     @Column(name = "content_block_id")
     private Long contentBlockId;
 
