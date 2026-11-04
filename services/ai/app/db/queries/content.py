@@ -12,8 +12,6 @@ from psycopg import AsyncConnection
 
 from app.schemas.textbook import TextbookBlock
 
-SELECT_SOURCE_TITLE = "SELECT title FROM source_document WHERE id = %(source_id)s"
-
 SELECT_PAGE_IDS = """
 SELECT page_no, id FROM source_page WHERE source_document_id = %(source_id)s
 """
@@ -37,15 +35,6 @@ WHERE (content_block.block_type, content_block.title_path, content_block.markdow
     IS DISTINCT FROM (EXCLUDED.block_type, EXCLUDED.title_path, EXCLUDED.markdown,
                       EXCLUDED.search_text)
 """
-
-
-async def read_source_title(connection: AsyncConnection, source_id: int) -> str:
-    """Kaynağın başlığını verir; kaynak yoksa LookupError fırlatır."""
-    cursor = await connection.execute(SELECT_SOURCE_TITLE, {"source_id": source_id})
-    row = await cursor.fetchone()
-    if row is None:
-        raise LookupError(f"Source {source_id} not found")
-    return str(row[0])
 
 
 async def save_content_blocks(

@@ -3,7 +3,9 @@
 run_ingest, INGEST_SOURCE işini last_completed_step'ten sonraki adımdan başlatıp adımları sırayla
 çalıştırır; her adımın çıktısı yazıldıktan sonra adım işe kaydedilir, böylece hata alan iş
 kaldığı adımdan devam eder. Adım listesi bir sözlüktür (STEPS): yeni adım bir satırla eklenir,
-sözlükte olmayan adım atlanır ve kaydedilmez. Kaynak başlarken PROCESSING olur; FAILED yalnızca
+sözlükte olmayan adım atlanır ve kaydedilmez. EXTRACT kaynağı türünün okuyucusuyla okur (kitap ya
+da test); program ve cevap anahtarı komutla yüklendiği için atlanır, türü bilinmeyen kaynak hata
+verir. Kaynak başlarken PROCESSING olur; FAILED yalnızca
 son denemede yazılır, tekrar denenecek iş listede hatalı görünmez. PUBLISHED burada yazılmaz:
 yayın içerik bazındadır. Hata her zaman yeniden fırlatılır, hata metnini çalışan kaydeder.
 """
@@ -17,10 +19,16 @@ import structlog
 from pydantic import BaseModel, ConfigDict, Field
 
 from app.config import load_storage_settings
-from app.constants import JOB_MAX_ATTEMPTS
+from app.constants import JOB_MAX_ATTEMPTS, TEST_SOURCE_KINDS
 from app.db.pool import get_pool
-from app.db.queries.source import mark_failed, mark_processing, save_source_pages
+from app.db.queries.source import (
+    fetch_source_kind,
+    mark_failed,
+    mark_processing,
+    save_source_pages,
+)
 from app.ingest import pdf
+from app.ingest.readers.test import extract_tests
 from app.ingest.readers.textbook import extract_textbook
 from app.ingest.steps import IngestStep, remaining_steps
 from app.jobs.postgres_queue import ConnectionFactory, PostgresJobQueue
@@ -62,9 +70,21 @@ async def register_source(source_id: int, context: IngestContext) -> None:
         await save_source_pages(connection, source_id, keys)
 
 
+async def extract_source(source_id: int, context: IngestContext) -> None:
+    """Kaynağı türünün okuyucusuyla bloklara ya da sorulara çevirir."""
+    async with context.connect() as connection:
+        kind = await fetch_source_kind(connection, source_id)
+    if kind == "TEXTBOOK":
+        await extract_textbook(source_id, context)
+    elif kind in TEST_SOURCE_KINDS:
+        await extract_tests(source_id, context)
+    elif kind == "UNKNOWN":
+        raise ValueError(f"Source {source_id} kind is UNKNOWN; set its kind before EXTRACT")
+
+
 STEPS: dict[IngestStep, StepFunction] = {
     IngestStep.REGISTERED: register_source,
-    IngestStep.EXTRACT: extract_textbook,
+    IngestStep.EXTRACT: extract_source,
 }
 
 

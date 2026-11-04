@@ -9,7 +9,8 @@ ve markdown'dır. Adım tekrar çalıştırılabilir: ikinci çalışmada kopya 
 import asyncio
 from typing import TYPE_CHECKING
 
-from app.db.queries.content import read_source_title, save_content_blocks
+from app.db.queries.content import save_content_blocks
+from app.db.queries.source import fetch_source_title
 from app.ingest import pdf
 from app.storage import source_key
 
@@ -21,7 +22,7 @@ async def extract_textbook(source_id: int, context: "IngestContext") -> None:
     """Kitap PDF'ini okuyup bloklarını content_block'a yazar."""
     content = await asyncio.to_thread(context.storage.read, source_key(source_id))
     async with context.connect() as connection:
-        title = await read_source_title(connection, source_id)
+        title = await fetch_source_title(connection, source_id)
     reading = await asyncio.to_thread(pdf.read_textbook, content, title)
     async with context.connect() as connection:
         await save_content_blocks(connection, source_id, reading.blocks)
