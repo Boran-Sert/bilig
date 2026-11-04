@@ -89,8 +89,12 @@ public class SourceService {
 
     /** Dosyaları önce doğrular, sonra kaynakları tek transaction içinde kaydeder. */
     @Transactional
-    public UploadResponse upload(List<MultipartFile> files, Long uploadedBy) {
-        if (files == null || files.isEmpty() || uploadedBy == null) {
+    public UploadResponse upload(List<MultipartFile> files, SourceKind kind, Long uploadedBy) {
+        if (files == null
+                || files.isEmpty()
+                || uploadedBy == null
+                || kind == null
+                || !AppConstants.UPLOADABLE_SOURCE_KINDS.contains(kind.name())) {
             throw new ApiException(ErrorCode.VALIDATION_FAILED);
         }
 
@@ -98,7 +102,7 @@ public class SourceService {
 
         List<String> filesToCleanup = new ArrayList<>();
         registerRollbackCleanup(filesToCleanup);
-        return persistFiles(validatedFiles, uploadedBy, filesToCleanup);
+        return persistFiles(validatedFiles, kind, uploadedBy, filesToCleanup);
     }
 
     /** Kaynakları ve en güncel hazırlık işlerini tek sorguyla sayfalı döner. */
@@ -210,7 +214,8 @@ public class SourceService {
     }
 
     /** Yeni dosyaları yazar, işlerini sıraya koyar ve yinelenen kimlikleri döndürür. */
-    private UploadResponse persistFiles(List<ValidatedFile> files, Long uploadedBy, List<String> filesToCleanup) {
+    private UploadResponse persistFiles(
+            List<ValidatedFile> files, SourceKind kind, Long uploadedBy, List<String> filesToCleanup) {
         Map<String, Long> knownSourceIds = new HashMap<>();
         List<UploadedFile> uploadedFiles = new ArrayList<>(files.size());
         for (ValidatedFile file : files) {
@@ -227,7 +232,7 @@ public class SourceService {
                 continue;
             }
             Optional<Long> insertedId = sourceDocumentRepository.insertIfAbsent(
-                    file.fileName(), file.sha256(), "sources/pending.pdf", uploadedBy);
+                    file.fileName(), file.sha256(), "sources/pending.pdf", kind.name(), uploadedBy);
             if (insertedId.isEmpty()) {
                 existingId = sourceDocumentRepository
                         .findBySha256(file.sha256())

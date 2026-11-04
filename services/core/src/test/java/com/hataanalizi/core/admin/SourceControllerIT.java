@@ -105,7 +105,7 @@ class SourceControllerIT {
                         "SELECT file_path FROM source_document WHERE id = ?", String.class, sourceId))
                 .isEqualTo("sources/" + sourceId + ".pdf");
         assertThat(jdbcTemplate.queryForObject("SELECT kind FROM source_document WHERE id = ?", String.class, sourceId))
-                .isEqualTo("UNKNOWN");
+                .isEqualTo("TEXTBOOK");
         assertThat(jdbcTemplate.queryForObject(
                         "SELECT status FROM source_document WHERE id = ?", String.class, sourceId))
                 .isEqualTo("UPLOADED");
@@ -252,6 +252,35 @@ class SourceControllerIT {
         assertThat(storedFileCount()).isEqualTo(storedFilesBeforeRequest);
     }
 
+    /** Seçilen test türünü kaynağa yazar. */
+    @Test
+    @WithAuthUser(role = "CONTENT_ADMIN", id = 1001)
+    void savesSelectedKindOnSource() throws Exception {
+        MvcResult result = mockMvc.perform(
+                        uploadRequest("TEST", pdfFile("test-1.pdf", "tiny.pdf")).with(testSecurityContext()))
+                .andExpect(status().isAccepted())
+                .andReturn();
+
+        assertThat(jdbcTemplate.queryForObject(
+                        "SELECT kind FROM source_document WHERE id = ?", String.class, sourceIdFrom(result)))
+                .isEqualTo("TEST");
+    }
+
+    /** Türü seçilmemiş ya da yüklenemeyen türdeki dosyayı kayıt açmadan reddeder. */
+    @Test
+    @WithAuthUser(role = "CONTENT_ADMIN", id = 1001)
+    void rejectsMissingOrNonUploadableKind() throws Exception {
+        for (String kind : new String[] {null, "UNKNOWN", "PROGRAM", "ANSWER_KEY"}) {
+            mockMvc.perform(uploadRequest(kind, pdfFile("dosya.pdf", "tiny.pdf"))
+                            .with(testSecurityContext()))
+                    .andExpect(status().isBadRequest())
+                    .andExpect(jsonPath("$.code").value("VALIDATION_FAILED"));
+        }
+
+        assertThat(jdbcTemplate.queryForObject("SELECT count(*) FROM source_document", Long.class))
+                .isZero();
+    }
+
     /** Girişsiz isteğin ortak kimlik doğrulama hatasıyla reddedildiğini doğrular. */
     @Test
     void requiresAuthenticationForUpload() throws Exception {
@@ -274,12 +303,20 @@ class SourceControllerIT {
         return mockMvc.perform(uploadRequest(file).with(testSecurityContext()));
     }
 
-    /** Dosyaları CSRF çerezi ve başlığı bulunan çok parçalı isteğe ekler. */
+    /** Dosyaları ders kitabı türüyle CSRF korumalı çok parçalı isteğe ekler. */
     private MockMultipartHttpServletRequestBuilder uploadRequest(MockMultipartFile... files) {
+        return uploadRequest("TEXTBOOK", files);
+    }
+
+    /** Dosyaları verilen türle CSRF çerezi ve başlığı bulunan çok parçalı isteğe ekler. */
+    private MockMultipartHttpServletRequestBuilder uploadRequest(String kind, MockMultipartFile... files) {
         String csrfToken = UUID.randomUUID().toString();
         MockMultipartHttpServletRequestBuilder request = multipart("/api/admin/sources");
         for (MockMultipartFile file : files) {
             request.file(file);
+        }
+        if (kind != null) {
+            request.param("kind", kind);
         }
         return request.cookie(new Cookie("XSRF-TOKEN", csrfToken)).header("X-XSRF-TOKEN", csrfToken);
     }

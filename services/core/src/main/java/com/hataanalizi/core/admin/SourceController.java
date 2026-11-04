@@ -31,8 +31,10 @@ public class SourceController {
     /** Çoklu PDF yüklemesini başlatır ve kabul edilen dosya sonuçlarını döndürür. */
     @PostMapping(consumes = MediaType.MULTIPART_FORM_DATA_VALUE)
     public ResponseEntity<UploadResponse> upload(
-            @RequestParam("files") List<MultipartFile> files, @AuthenticationPrincipal AuthUser authUser) {
-        UploadResponse response = sourceService.upload(files, authUser.id());
+            @RequestParam("files") List<MultipartFile> files,
+            @RequestParam("kind") SourceKind kind,
+            @AuthenticationPrincipal AuthUser authUser) {
+        UploadResponse response = sourceService.upload(files, kind, authUser.id());
         return ResponseEntity.accepted().body(response);
     }
 
