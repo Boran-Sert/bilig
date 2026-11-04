@@ -5,12 +5,21 @@ import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { client } from "../../lib/api/client";
 import { ApiError } from "../../lib/api/problem";
 import { SOURCES_PAGE_SIZE, SOURCES_POLL_INTERVAL_MS } from "../../lib/constants";
-import type { SourceListItem, SourceListResponse, UploadRequest, UploadResponse } from "./types";
+import type {
+  ReviewDecisionRequest,
+  ReviewListResponse,
+  ReviewOutcomeResponse,
+  SourceListItem,
+  SourceListResponse,
+  UploadRequest,
+  UploadResponse,
+} from "./types";
 
 export const adminKeys = {
   sources: ["admin", "sources"] as const,
+  reviews: ["admin", "reviews"] as const,
+  outcomes: ["admin", "outcomes"] as const,
 };
-
 /**
  * Listede hâlâ işlenmekte olan dosya olup olmadığını kontrol eder.
  */
@@ -80,5 +89,80 @@ export function useUploadSources() {
     },
     /** Yeni dosyaların listede görünmesi için kaynak listesini yeniler. */
     onSuccess: () => queryClient.invalidateQueries({ queryKey: adminKeys.sources }),
+  });
+}
+
+/**
+ * İnceleme bekleyen kayıtları sayfalı olarak sunucudan çeker.
+ */
+export function useReviews(enabled: boolean, page = 0, size = SOURCES_PAGE_SIZE) {
+  return useQuery<ReviewListResponse, ApiError>({
+    queryKey: [...adminKeys.reviews, page, size] as const,
+    enabled,
+    /** İnceleme kayıtlarını GET /api/admin/review ucundan çeker. */
+    queryFn: async (): Promise<ReviewListResponse> => {
+      const { data, error, response } = await client.GET("/api/admin/review", {
+        params: { query: { page, size } },
+      });
+      const status = response.status;
+
+      if (error || !data) {
+        throw new ApiError(error, status);
+      }
+
+      return data;
+    },
+  });
+}
+
+/**
+ * Düzeltme seçicisi için tüm kazanımları sunucudan çeker.
+ */
+export function useOutcomes() {
+  return useQuery<ReviewOutcomeResponse[], ApiError>({
+    queryKey: adminKeys.outcomes,
+    /** Bütün kazanımları GET /api/admin/outcomes ucundan çeker. */
+    queryFn: async (): Promise<ReviewOutcomeResponse[]> => {
+      const { data, error, response } = await client.GET("/api/admin/outcomes");
+      const status = response.status;
+
+      if (error || !data) {
+        throw new ApiError(error, status);
+      }
+
+      return data;
+    },
+  });
+}
+
+interface DecideReviewParams {
+  id: number;
+  request: ReviewDecisionRequest;
+}
+
+/**
+ * İnceleme kaydı için onayla, düzelt veya reddet kararını sunucuya iletir.
+ */
+export function useDecideReview() {
+  const queryClient = useQueryClient();
+
+  return useMutation<void, ApiError, DecideReviewParams>({
+    /** Kararı POST /api/admin/review/{id} ucuna gönderir. */
+    mutationFn: async ({ id, request }: DecideReviewParams): Promise<void> => {
+      const { error, response } = await client.POST("/api/admin/review/{id}", {
+        params: { path: { id } },
+        body: request,
+      });
+      const status = response.status;
+
+      if (error) {
+        throw new ApiError(error, status);
+      }
+    },
+    /** İnceleme listesini ve kaynak listesini yeniler. */
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: adminKeys.reviews });
+      queryClient.invalidateQueries({ queryKey: adminKeys.sources });
+    },
   });
 }

@@ -8,7 +8,15 @@ import type { ReactNode } from "react";
 import { afterEach, beforeEach, describe, expect, test, vi } from "vitest";
 import { ApiError } from "../../lib/api/problem";
 import { SOURCES_POLL_INTERVAL_MS } from "../../lib/constants";
-import { adminKeys, hasProcessingSources, useSources, useUploadSources } from "./api";
+import {
+  adminKeys,
+  hasProcessingSources,
+  useDecideReview,
+  useOutcomes,
+  useReviews,
+  useSources,
+  useUploadSources,
+} from "./api";
 import type { SourceListItem } from "./types";
 
 const { getMock, postMock } = vi.hoisted(() => ({
@@ -196,5 +204,66 @@ describe("admin api - useUploadSources", () => {
     expect(result.current.error).toBeInstanceOf(ApiError);
     expect(result.current.error?.status).toBe(400);
     expect(result.current.error?.message).toBe("FILE_NOT_PDF");
+  });
+});
+
+describe("admin api - review", () => {
+  let queryClient: QueryClient;
+
+  beforeEach(() => {
+    getMock.mockReset();
+    postMock.mockReset();
+    queryClient = new QueryClient({
+      defaultOptions: { queries: { retry: false }, mutations: { retry: false } },
+    });
+  });
+
+  test("useReviews inceleme kayıtlarını başarıyla çeker", async () => {
+    const mockReviews = {
+      items: [{ id: 1, reason: "LOW_CONFIDENCE", targetType: "QUESTION" }],
+      page: 0,
+      size: 20,
+      total: 1,
+    };
+    getMock.mockResolvedValue({ data: mockReviews, response: { status: 200 } });
+
+    const { result } = renderHook(() => useReviews(true, 0, 20), {
+      wrapper: createWrapper(queryClient),
+    });
+
+    await waitFor(() => expect(result.current.isSuccess).toBe(true));
+    expect(getMock).toHaveBeenCalledWith("/api/admin/review", {
+      params: { query: { page: 0, size: 20 } },
+    });
+    expect(result.current.data?.total).toBe(1);
+  });
+
+  test("useOutcomes tüm kazanımları başarıyla çeker", async () => {
+    const mockOutcomes = [{ id: 10, code: "A.2.15", title: "Yazar ve eserler" }];
+    getMock.mockResolvedValue({ data: mockOutcomes, response: { status: 200 } });
+
+    const { result } = renderHook(() => useOutcomes(), {
+      wrapper: createWrapper(queryClient),
+    });
+
+    await waitFor(() => expect(result.current.isSuccess).toBe(true));
+    expect(getMock).toHaveBeenCalledWith("/api/admin/outcomes");
+    expect(result.current.data).toEqual(mockOutcomes);
+  });
+
+  test("useDecideReview kararı başarıyla iletir", async () => {
+    postMock.mockResolvedValue({ response: { status: 204 } });
+
+    const { result } = renderHook(() => useDecideReview(), {
+      wrapper: createWrapper(queryClient),
+    });
+
+    result.current.mutate({ id: 5, request: { decision: "APPROVE" } });
+
+    await waitFor(() => expect(result.current.isSuccess).toBe(true));
+    expect(postMock).toHaveBeenCalledWith("/api/admin/review/{id}", {
+      params: { path: { id: 5 } },
+      body: { decision: "APPROVE" },
+    });
   });
 });
