@@ -3,6 +3,7 @@ package com.hataanalizi.core.session;
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.springframework.security.test.web.servlet.request.SecurityMockMvcRequestPostProcessors.authentication;
 import static org.springframework.security.test.web.servlet.request.SecurityMockMvcRequestPostProcessors.csrf;
+import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.post;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.jsonPath;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
@@ -83,6 +84,36 @@ class SessionCompletionControllerIT {
         completeSession(fixture.sessionId(), fixture.userId())
                 .andExpect(status().isConflict())
                 .andExpect(jsonPath("$.code").value("SESSION_ALREADY_COMPLETED"));
+    }
+
+    /** Tamamlanmış oturumun sonucunu tamamlama cevabıyla aynı değerlerle tekrar döndürür. */
+    @Test
+    void returnsCompletedSessionResultAgain() throws Exception {
+        SessionFixture fixture = createScoringSession();
+        completeSession(fixture.sessionId(), fixture.userId()).andExpect(status().isOk());
+
+        var result = sessionResult(fixture.sessionId(), fixture.userId())
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.correct").value(2))
+                .andExpect(jsonPath("$.wrong").value(4))
+                .andExpect(jsonPath("$.blank").value(2))
+                .andExpect(jsonPath("$.net").value(1.00))
+                .andReturn();
+        assertOutcomeFailures(result.getResponse().getContentAsString());
+    }
+
+    /** Başka öğrencinin oturum sonucunu ve bitmemiş oturumun sonucunu vermez. */
+    @Test
+    void rejectsAnotherUsersAndUnfinishedSessionResults() throws Exception {
+        SessionFixture fixture = createEmptySession();
+
+        sessionResult(fixture.sessionId(), fixture.userId())
+                .andExpect(status().isConflict())
+                .andExpect(jsonPath("$.code").value("SESSION_NOT_COMPLETED"));
+        completeSession(fixture.sessionId(), fixture.userId()).andExpect(status().isOk());
+        sessionResult(fixture.sessionId(), insertUser())
+                .andExpect(status().isNotFound())
+                .andExpect(jsonPath("$.code").value("SESSION_NOT_FOUND"));
     }
 
     /** Tamamlanma yanıtındaki kazanım sayımlarını kodlarına göre doğrular. */
@@ -259,6 +290,11 @@ class SessionCompletionControllerIT {
         return mockMvc.perform(post("/api/sessions/{id}/complete", sessionId)
                 .with(student(userId))
                 .with(csrf()));
+    }
+
+    /** Oturum sonucunu okumak için istek gönderir. */
+    private ResultActions sessionResult(Long sessionId, Long userId) throws Exception {
+        return mockMvc.perform(get("/api/sessions/{id}/result", sessionId).with(student(userId)));
     }
 
     /** İstek için test öğrencisinin kimliğini hazırlar. */

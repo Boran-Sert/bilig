@@ -7,7 +7,13 @@ import { cleanup, renderHook, waitFor } from "@testing-library/react";
 import type { ReactNode } from "react";
 import { afterEach, beforeEach, describe, expect, test, vi } from "vitest";
 import { ApiError } from "../../lib/api/problem";
-import { useCompleteSession, useStartSession, useSubmitAnswer, useTests } from "./api";
+import {
+  useCompleteSession,
+  useSessionResult,
+  useStartSession,
+  useSubmitAnswer,
+  useTests,
+} from "./api";
 
 const { getMock, postMock, putMock } = vi.hoisted(() => ({
   getMock: vi.fn(),
@@ -126,6 +132,23 @@ describe("solve api", () => {
     });
     expect(result.current.data?.net).toBe(17);
     expect(result.current.data?.outcomes[0].failed).toBe(true);
+  });
+
+  test("useSessionResult tamamlanmış oturumun sonucunu sunucudan okur", async () => {
+    getMock.mockResolvedValue({
+      data: { correct: 1, wrong: 0, blank: 0, net: 1, outcomes: [] },
+      response: { status: 200 },
+    });
+
+    const { result } = renderHook(() => useSessionResult(99), {
+      wrapper: createWrapper(queryClient),
+    });
+
+    await waitFor(() => expect(result.current.isSuccess).toBe(true));
+    expect(getMock).toHaveBeenCalledWith("/api/sessions/{id}/result", {
+      params: { path: { id: 99 } },
+    });
+    expect(result.current.data?.net).toBe(1);
   });
 
   test("sunucu hatasında ApiError fırlatır", async () => {

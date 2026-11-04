@@ -20,6 +20,38 @@ export interface paths {
     patch?: never;
     trace?: never;
   };
+  "/api/tutor/explanations": {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    get?: never;
+    put?: never;
+    post: operations["explain"];
+    delete?: never;
+    options?: never;
+    head?: never;
+    patch?: never;
+    trace?: never;
+  };
+  "/api/tutor/conversations/{id}/messages": {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    get?: never;
+    put?: never;
+    post: operations["chat"];
+    delete?: never;
+    options?: never;
+    head?: never;
+    patch?: never;
+    trace?: never;
+  };
   "/api/tests/{id}/sessions": {
     parameters: {
       query?: never;
@@ -148,6 +180,22 @@ export interface paths {
     patch?: never;
     trace?: never;
   };
+  "/api/sessions/{id}/result": {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    get: operations["getResult"];
+    put?: never;
+    post?: never;
+    delete?: never;
+    options?: never;
+    head?: never;
+    patch?: never;
+    trace?: never;
+  };
   "/api/questions/{id}/hint": {
     parameters: {
       query?: never;
@@ -156,6 +204,22 @@ export interface paths {
       cookie?: never;
     };
     get: operations["getHint"];
+    put?: never;
+    post?: never;
+    delete?: never;
+    options?: never;
+    head?: never;
+    patch?: never;
+    trace?: never;
+  };
+  "/api/pages/{id}/image": {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    get: operations["getImage"];
     put?: never;
     post?: never;
     delete?: never;
@@ -188,6 +252,22 @@ export interface paths {
       cookie?: never;
     };
     get: operations["dashboard"];
+    put?: never;
+    post?: never;
+    delete?: never;
+    options?: never;
+    head?: never;
+    patch?: never;
+    trace?: never;
+  };
+  "/api/blocks/{id}": {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    get: operations["getBlock"];
     put?: never;
     post?: never;
     delete?: never;
@@ -262,6 +342,19 @@ export interface components {
     Outcome: {
       code: string;
       title: string;
+    };
+    ExplanationRequest: {
+      /** Format: int64 */
+      sessionId: number;
+      /** Format: int64 */
+      questionId: number;
+    };
+    SseEmitter: {
+      /** Format: int64 */
+      timeout?: number;
+    };
+    ChatMessageRequest: {
+      text: string;
     };
     Block: {
       /** @enum {string} */
@@ -418,6 +511,16 @@ export interface components {
       correctCount: number;
       accuracyPercent: number;
     };
+    BlockResponse: {
+      /** Format: int64 */
+      id?: number;
+      markdown?: string;
+      sourceTitle?: string;
+      /** Format: int32 */
+      pageNo?: number;
+      /** Format: int64 */
+      pageId?: number;
+    };
     RegisterOptionsResponse: {
       grades: number[];
     };
@@ -524,6 +627,56 @@ export interface operations {
         };
         content: {
           "*/*": components["schemas"]["AnswerResponse"];
+        };
+      };
+    };
+  };
+  explain: {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    requestBody: {
+      content: {
+        "application/json": components["schemas"]["ExplanationRequest"];
+      };
+    };
+    responses: {
+      /** @description OK */
+      200: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          "text/event-stream": components["schemas"]["SseEmitter"];
+        };
+      };
+    };
+  };
+  chat: {
+    parameters: {
+      query?: never;
+      header?: never;
+      path: {
+        id: number;
+      };
+      cookie?: never;
+    };
+    requestBody: {
+      content: {
+        "application/json": components["schemas"]["ChatMessageRequest"];
+      };
+    };
+    responses: {
+      /** @description OK */
+      200: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          "text/event-stream": components["schemas"]["SseEmitter"];
         };
       };
     };
@@ -731,6 +884,28 @@ export interface operations {
       };
     };
   };
+  getResult: {
+    parameters: {
+      query?: never;
+      header?: never;
+      path: {
+        id: number;
+      };
+      cookie?: never;
+    };
+    requestBody?: never;
+    responses: {
+      /** @description OK */
+      200: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          "*/*": components["schemas"]["SessionCompletionResponse"];
+        };
+      };
+    };
+  };
   getHint: {
     parameters: {
       query?: never;
@@ -749,6 +924,28 @@ export interface operations {
         };
         content: {
           "*/*": components["schemas"]["HintResponse"];
+        };
+      };
+    };
+  };
+  getImage: {
+    parameters: {
+      query?: never;
+      header?: never;
+      path: {
+        id: number;
+      };
+      cookie?: never;
+    };
+    requestBody?: never;
+    responses: {
+      /** @description OK */
+      200: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          "*/*": string;
         };
       };
     };
@@ -789,6 +986,28 @@ export interface operations {
         };
         content: {
           "*/*": components["schemas"]["DashboardResponse"];
+        };
+      };
+    };
+  };
+  getBlock: {
+    parameters: {
+      query?: never;
+      header?: never;
+      path: {
+        id: number;
+      };
+      cookie?: never;
+    };
+    requestBody?: never;
+    responses: {
+      /** @description OK */
+      200: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          "*/*": components["schemas"]["BlockResponse"];
         };
       };
     };
