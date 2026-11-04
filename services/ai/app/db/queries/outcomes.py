@@ -10,6 +10,7 @@ buradan okunup yazılır. Tablolar core'un Flyway migration'larıyla kurulur.
 from pgvector import Vector
 from psycopg import AsyncConnection
 
+from app.constants import PROGRAM_CURRICULUM_NAME, PROGRAM_SUBJECT_CODE, SOURCE_DEFAULT_GRADE
 from app.schemas.outcome_match import ItemKind, MatchItem, OutcomeCandidate
 from app.schemas.question import QuestionContent
 
@@ -75,6 +76,30 @@ SELECT %(item_id)s, outcome_id, 'MODEL' FROM unnest(%(outcome_ids)s::bigint[]) A
 ON CONFLICT DO NOTHING
 """,
 }
+
+FILL_QUESTION_UNIT = """
+UPDATE question SET curriculum_unit_id = units.unit_id, updated_at = now()
+FROM (
+    SELECT min(curriculum_unit.id) AS unit_id, count(DISTINCT curriculum_unit.id) AS unit_count
+    FROM question
+    JOIN source_page ON source_page.id = question.source_page_id
+    JOIN source_document ON source_document.id = source_page.source_document_id
+    JOIN question_outcome ON question_outcome.question_id = question.id
+    JOIN curriculum_unit_outcome
+        ON curriculum_unit_outcome.learning_outcome_id = question_outcome.learning_outcome_id
+    JOIN curriculum_unit ON curriculum_unit.id = curriculum_unit_outcome.curriculum_unit_id
+    WHERE question.id = %(item_id)s
+        AND curriculum_unit.curriculum_id = coalesce(
+            source_document.curriculum_id,
+            (SELECT curriculum.id
+             FROM curriculum
+             JOIN subject ON subject.id = curriculum.subject_id
+             WHERE subject.code = %(subject_code)s AND curriculum.name = %(curriculum_name)s)
+        )
+        AND curriculum_unit.grade = coalesce(source_document.grade, %(default_grade)s)
+) AS units
+WHERE question.id = %(item_id)s AND question.curriculum_unit_id IS NULL AND units.unit_count = 1
+"""
 
 PUBLISH_ITEMS = {
     ItemKind.QUESTION: """
@@ -170,6 +195,17 @@ async def save_links(
     """İçeriği kazanımlara MODEL olarak bağlar; var olan bağı tekrar eklemez."""
     values = {"item_id": item_id, "outcome_ids": outcome_ids}
     await connection.execute(INSERT_LINKS[kind], values)
+
+
+async def fill_question_unit(connection: AsyncConnection, question_id: int) -> None:
+    """Ünitesiz sorunun ünitesini, kazanımları kaynağın sınıfında tek üniteye aitse yazar."""
+    values = {
+        "item_id": question_id,
+        "subject_code": PROGRAM_SUBJECT_CODE,
+        "curriculum_name": PROGRAM_CURRICULUM_NAME,
+        "default_grade": SOURCE_DEFAULT_GRADE,
+    }
+    await connection.execute(FILL_QUESTION_UNIT, values)
 
 
 async def publish_item(connection: AsyncConnection, kind: ItemKind, item_id: int) -> None:
