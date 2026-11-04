@@ -483,6 +483,7 @@ Adı ve kolonları Spring Security'nin `JdbcTokenRepositoryImpl` sınıfının b
 | status | text | hayır | 'OPEN' | CHECK IN ('OPEN', 'APPROVED', 'REJECTED') |
 | decided_by | bigint | evet | | FK → app_user(id) |
 | decided_at | timestamptz | evet | | |
+| detail | jsonb | evet | | Kaynak sorunları: `{"problems": [{"code", "pageNo", "pageId", "test", "number"}]}` |
 | created_at | timestamptz | hayır | now() | |
 
 - CHECK (num_nonnulls(source_document_id, content_block_id, question_id, knowledge_node_id, knowledge_edge_id) = 1) · her satır tek bir kaydı gösterir
