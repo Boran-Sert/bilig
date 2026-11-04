@@ -35,7 +35,7 @@ erDiagram
     learning_outcome ||--o{ content_block_outcome : ""
 
     source_page |o--o{ question : "çıktığı sayfa"
-    curriculum_unit ||--o{ question : "ünitesi"
+    curriculum_unit |o--o{ question : "ünitesi"
     question ||--o{ question_outcome : ""
     learning_outcome ||--o{ question_outcome : ""
 
@@ -242,7 +242,7 @@ Alıntı kartındaki "TDE 12 Ders Kitabı · s. 174" bilgisi saklanmaz; `source_
 |---|---|---|---|---|
 | id | bigint | hayır | identity | PK |
 | source_page_id | bigint | evet | | FK → source_page(id) · üretilen soruda boş |
-| curriculum_unit_id | bigint | hayır | | FK → curriculum_unit(id) |
+| curriculum_unit_id | bigint | evet | | FK → curriculum_unit(id) · ünitesi bulunamayan test sorusunda kazanımlardan doldurulur, bulunamazsa boş |
 | origin | text | hayır | | CHECK IN ('SOURCE', 'GENERATED') |
 | content | jsonb | hayır | | Kök, ortak parça ve şıklar (plan 13.6) |
 | correct_option | char(1) | hayır | | CHECK IN ('A', 'B', 'C', 'D', 'E') |
