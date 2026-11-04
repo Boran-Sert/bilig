@@ -68,6 +68,15 @@ WHERE source_document_id = %s AND status = 'OPEN'
 ORDER BY reason
 """
 READ_PAGE_ID = "SELECT id FROM source_page WHERE source_document_id = %s AND page_no = 1"
+READ_UNITS = """
+SELECT exam_unit.title, question_unit.title
+FROM exam
+JOIN exam_question ON exam_question.exam_id = exam.id
+JOIN question ON question.id = exam_question.question_id
+LEFT JOIN curriculum_unit AS exam_unit ON exam_unit.id = exam.curriculum_unit_id
+LEFT JOIN curriculum_unit AS question_unit ON question_unit.id = question.curriculum_unit_id
+WHERE exam.source_document_id = %s
+"""
 
 
 def make_test(*stems: str) -> list[ParsedQuestion]:
@@ -81,8 +90,9 @@ async def prepare(
     monkeypatch: pytest.MonkeyPatch,
     tests: list[list[ParsedQuestion]],
     title: str = "ÖDSGM 12 Şiir Kazanım Testi 1",
+    page_text: str = "",
 ) -> tuple[int, IngestContext]:
-    """Kaynağı ve sahte PDF okumasını kurar; kaynak numarasını ve bağlamı döner."""
+    """Kaynağı, sahte PDF okumasını ve ilk sayfa metnini kurar; kaynağı ve bağlamı döner."""
     row = await (await db.execute(SEED, {"title": title})).fetchone()
     assert row is not None
     source_id = int(row[0])
@@ -90,6 +100,7 @@ async def prepare(
     context.storage.write(source_key(source_id), b"%PDF")
     reading = QuestionReading(tests=tests, pages=[])
     monkeypatch.setattr(pdf, "read_questions", lambda _content: reading)
+    monkeypatch.setattr(pdf, "read_first_page_text", lambda _content: page_text)
     return source_id, context
 
 
@@ -154,20 +165,35 @@ async def test_unanswered_and_broken_questions_are_not_written(
 
 
 @pytest.mark.asyncio
-async def test_unknown_unit_writes_nothing_and_opens_review(
+async def test_unit_is_found_from_page_heading(
     db: Connection, tmp_path: Path, monkeypatch: pytest.MonkeyPatch
 ) -> None:
-    """Test adından ünite bulunamazsa hiçbir soru yazılmaz, kaynak incelemeye düşer."""
+    """Adında ünite olmayan testin ünitesi ilk sayfadaki "Şiir - 4" başlığından bulunur."""
+    page_text = "12. Sınıf\nTürk Dili ve\nEdebiyatı\n1. Soru metni\nŞiir - 4\r\n"
+    source_id, context = await prepare(
+        db, tmp_path, monkeypatch, [make_test("Soru metni")], title="14.pdf", page_text=page_text
+    )
+
+    await extract_tests(source_id, context)
+
+    units = await (await db.execute(READ_UNITS, (source_id,))).fetchall()
+    assert units == [("Şiir", "Şiir")]
+    assert await (await db.execute(COUNT_REVIEWS, (source_id,))).fetchall() == []
+
+
+@pytest.mark.asyncio
+async def test_unknown_unit_still_writes_questions_without_unit(
+    db: Connection, tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    """Ünite ne addan ne başlıktan bulunursa sorular ünitesiz yazılır, inceleme açılmaz."""
     source_id, context = await prepare(
         db, tmp_path, monkeypatch, [make_test("Soru metni")], title="Bilinmeyen Yayınevi Denemesi"
     )
 
     await extract_tests(source_id, context)
 
-    assert await (await db.execute(COUNT_QUESTIONS, (source_id,))).fetchone() == (0,)
-    assert await review_details(db, source_id) == {
-        "VALIDATION_FAILED": [{"code": "UNIT_NOT_FOUND"}]
-    }
+    assert await (await db.execute(READ_UNITS, (source_id,))).fetchall() == [(None, None)]
+    assert await (await db.execute(COUNT_REVIEWS, (source_id,))).fetchall() == []
 
 
 @pytest.mark.asyncio

@@ -1,12 +1,16 @@
-"""Test adından ünite bulma (hazırlık hattı A5, #130).
+"""Test adından ya da sayfa başlığından ünite bulma (hazırlık hattı A5, #130, #274).
 
 Kural dosyası (data/unit_map.txt) satır başına "anahtar = ünite adı" tutar; boş satırlar ve #
 ile başlayan satırlar atlanır. Kaynak adında anahtar aranır: büyük-küçük harf ve Türkçe harf
 işaretleri önemsizdir ("Hikâye" ile "hikaye" aynıdır); birden çok anahtar uyarsa en uzunu
-kazanır, eşitlikte dosyadaki ilki. Hiçbiri uymazsa ünite bulunamaz ve soru yazılmaz. Dosya
-değişince kod değişmez; ünite adı curriculum_unit.title ile aynı yazılmalıdır.
+kazanır, eşitlikte dosyadaki ilki. Kaynak adı uymazsa ilk sayfanın ham metninde "Şiir - 4"
+biçimli başlık aranır: anahtarın ardından tire ve sayı gelmelidir, böylece soru metnindeki
+sıradan "roman" kelimesi ünite sayılmaz. Bulunan ünite sadece ipucudur; bulunamazsa sorular yine
+yazılır ve ünite kazanımlardan çıkarılır. Dosya değişince kod değişmez; ünite adı
+curriculum_unit.title ile aynı yazılmalıdır.
 """
 
+import re
 from pathlib import Path
 
 from pydantic import BaseModel
@@ -15,6 +19,7 @@ from app.text.turkish import ascii_fold, tr_lower
 
 SEPARATOR = "="
 COMMENT_MARK = "#"
+DASHES = re.compile(r"[–—]")
 
 
 class UnitRule(BaseModel):
@@ -56,6 +61,22 @@ def find_unit_title(source_title: str, rules: list[UnitRule]) -> str | None:
     """Kaynak adına uyan en uzun anahtarın ünite adını verir; uyan yoksa boş döner."""
     title = comparable(source_title)
     matches = [rule for rule in rules if comparable(rule.keyword) in title]
+    return _longest(matches)
+
+
+def find_unit_heading(page_text: str, rules: list[UnitRule]) -> str | None:
+    """Sayfadaki "Şiir - 4" biçimli başlığa uyan en uzun anahtarın ünite adını verir."""
+    text = comparable(DASHES.sub("-", page_text))
+    matches = [
+        rule
+        for rule in rules
+        if re.search(rf"(?<![a-z]){re.escape(comparable(rule.keyword))}\s*-\s*\d", text)
+    ]
+    return _longest(matches)
+
+
+def _longest(matches: list[UnitRule]) -> str | None:
+    """Uyan kurallardan anahtarı en uzun olanın ünite adını verir; uyan yoksa boş döner."""
     if not matches:
         return None
     return max(matches, key=lambda rule: len(comparable(rule.keyword))).unit_title

@@ -1,14 +1,14 @@
-"""Test okuyucusu (hazırlık hattı A5, EXTRACT adımının test dalı, #130, #269).
+"""Test okuyucusu (hazırlık hattı A5, EXTRACT adımının test dalı, #130, #269, #274).
 
 PDF dış yüzünün (pdf.read_questions) testlere bölünmüş soruları incelenir: cevabı bulunamayan
 soru NO_ANSWER_KEY, A6 kontrollerinden (validators.py) geçemeyen soru VALIDATION_FAILED olur ve
-yazılmaz. Kaynaktan hiç soru çıkmaması, ünitenin bulunamaması, metin katmanı bozuk kalan ya da
-harfi çözülemeyen sayfa ve kökünde soru olmadığı için atılan şık kümesi de VALIDATION_FAILED'a
-girer. Her neden için kaynakta bir inceleme kaydı açılır; ayrıntısında her sorun testi, soru
-numarası ve sayfasıyla durur (db/queries/review.py). Kalan sorular kaynak adından bulunan ünite
-(data/unit_map.txt) ve testin sırasıyla question, exam ve exam_question tablolarına yazılır.
-Ünite bulunamazsa hiçbir soru yazılmaz. Doğru şık question.correct_option'a gider, content'e
-girmez.
+yazılmaz. Kaynaktan hiç soru çıkmaması, metin katmanı bozuk kalan ya da harfi çözülemeyen sayfa ve
+kökünde soru olmadığı için atılan şık kümesi de VALIDATION_FAILED'a girer. Her neden için kaynakta
+bir inceleme kaydı açılır; ayrıntısında her sorun testi, soru numarası ve sayfasıyla durur
+(db/queries/review.py). Kalan sorular testin sırasıyla question, exam ve exam_question tablolarına
+yazılır. Ünite ipucu kaynak adından, o da yoksa ilk sayfanın "Şiir - 4" biçimli başlığından
+bulunur (data/unit_map.txt); bulunamazsa sorular ünitesiz yazılır ve ünite kazanım eşleştirmesinde
+bağlanan kazanımlardan çıkarılır. Doğru şık question.correct_option'a gider, content'e girmez.
 """
 
 import asyncio
@@ -25,7 +25,7 @@ from app.db.queries.review import open_source_review
 from app.db.queries.source import fetch_source_title
 from app.db.queries.unit import fetch_unit_id
 from app.ingest import pdf
-from app.ingest.unit_map import find_unit_title, load_unit_map
+from app.ingest.unit_map import find_unit_heading, find_unit_title, load_unit_map
 from app.ingest.validators import QuestionCheck, page_problems, validate_questions
 from app.schemas.pdf import QuestionReading
 from app.schemas.question import ParsedQuestion
@@ -89,9 +89,7 @@ def answer_problems(problems: ReadingProblems) -> list[SourceProblem]:
     ]
 
 
-def failed_problems(
-    reading: QuestionReading, problems: ReadingProblems, unit_found: bool
-) -> list[SourceProblem]:
+def failed_problems(reading: QuestionReading, problems: ReadingProblems) -> list[SourceProblem]:
     """Okumanın VALIDATION_FAILED'a düşecek bütün sorunlarını ayrıntısıyla toplar."""
     found = [
         SourceProblem(
@@ -110,8 +108,6 @@ def failed_problems(
     ]
     if not any(reading.tests):
         found.append(SourceProblem(code="NO_CONTENT"))
-    if not unit_found:
-        found.append(SourceProblem(code="UNIT_NOT_FOUND"))
     return found
 
 
@@ -147,15 +143,16 @@ async def extract_tests(source_id: int, context: "IngestContext") -> None:
     """Test PDF'inin sorularını okur, sorunları incelemeye ayırır, kalanını yazar."""
     content = await asyncio.to_thread(context.storage.read, source_key(source_id))
     reading = await asyncio.to_thread(pdf.read_questions, content)
+    page_text = await asyncio.to_thread(pdf.read_first_page_text, content)
     problems = find_problems(reading.tests)
+    rules = load_unit_map(load_ingest_settings().unit_map_path)
     async with context.connect() as connection:
         title = await fetch_source_title(connection, source_id)
-        unit_title = find_unit_title(title, load_unit_map(load_ingest_settings().unit_map_path))
+        unit_title = find_unit_title(title, rules) or find_unit_heading(page_text, rules)
         unit_id = await fetch_unit_id(connection, source_id, unit_title) if unit_title else None
-        failed = failed_problems(reading, problems, unit_found=unit_id is not None)
+        failed = failed_problems(reading, problems)
         await report_problems(connection, source_id, answer_problems(problems), failed)
         if unit_id is None:
-            structlog.get_logger().warning("unit not found", source_id=source_id, title=title)
-            return
+            structlog.get_logger().info("unit hint not found", source_id=source_id, title=title)
         for number, questions in enumerate(writable_questions(reading.tests, problems), start=1):
             await save_exam(connection, source_id, unit_id, f"{title} Test {number}", questions)

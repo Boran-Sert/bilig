@@ -11,6 +11,7 @@ düzeltmesi uygulanır, o da yetmezse sayfa OCR'la da okunur ve oranı yüksek o
     reading = pdf.read_questions(pdf_bytes)        # testlere bölünmüş ParsedQuestion'lar
     book = pdf.read_textbook(pdf_bytes, "TDE 12 Ders Kitabı")
     lines = pdf.read_lines(path)                   # program, ünite tablosu, cevap anahtarı
+    header = pdf.read_first_page_text(pdf_bytes)   # ilk sayfanın ham metni, başlık dahil
     png = pdf.render_page(pdf_bytes, page_no=3)    # sayfa görüntüsü
 
 Girdi dosya yolu ya da PDF'in baytlarıdır. PDFium aynı anda birden çok iş parçacığından
@@ -106,6 +107,22 @@ def read_lines(source: PdfSource, options: ReaderOptions | None = None) -> list[
     with _reading():
         pages = _read_book_pages(source, options)
         return to_lines(book_reader.reading_order(pages))
+
+
+def read_first_page_text(source: PdfSource) -> str:
+    """İlk sayfanın ham metnini kenar temizliği yapmadan verir; sayfa başlığı da içindedir."""
+    with _reading():
+        document = pdfium.PdfDocument(source)
+        try:
+            page = document[0]
+            textpage = page.get_textpage()
+            try:
+                return str(textpage.get_text_range())
+            finally:
+                textpage.close()
+                page.close()
+        finally:
+            document.close()
 
 
 def render_page(source: PdfSource, page_no: int, dpi: int = PAGE_IMAGE_DPI) -> bytes:

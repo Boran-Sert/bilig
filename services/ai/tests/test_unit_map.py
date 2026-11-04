@@ -1,4 +1,4 @@
-"""Test adından ünite bulmayı (#130) kural metniyle ve gerçek Postgres'le sınar.
+"""Test adından ve sayfa başlığından ünite bulmayı (#130, #274) kural metniyle ve Postgres'le sınar.
 
 Kural dosyası testte de okunur: repodaki data/unit_map.txt gerçek ÖDSGM test adlarını doğru
 üniteye götürmelidir. Veritabanı testi kendi müfredatını ve kaynağını yazar, test bitince geri
@@ -11,7 +11,13 @@ from psycopg.rows import TupleRow
 
 from app.constants import PROGRAM_CURRICULUM_NAME, PROGRAM_SUBJECT_CODE, REPOSITORY_DATA_DIR
 from app.db.queries.unit import fetch_unit_id
-from app.ingest.unit_map import UnitMapError, find_unit_title, load_unit_map, parse_unit_map
+from app.ingest.unit_map import (
+    UnitMapError,
+    find_unit_heading,
+    find_unit_title,
+    load_unit_map,
+    parse_unit_map,
+)
 
 Connection = psycopg.AsyncConnection[TupleRow]
 
@@ -110,6 +116,26 @@ def test_longest_matching_keyword_wins() -> None:
     rules = parse_unit_map("deneme = Deneme\ndeneme - söylev = Söylev\n")
 
     assert find_unit_title("12 Deneme - Söylev Testi", rules) == "Söylev"
+
+
+@pytest.mark.parametrize(
+    ("page_text", "expected"),
+    [
+        ("12. Sınıf\nMEB\n1. Erzincan’da bir kuş var\nŞiir - 4\r\n", "Şiir"),
+        ("1. 1960 sonrası Türk hikâyesi\nHikâye - 7\r\n", "Hikâye"),
+        ("HİKÂYE – 2", "Hikâye"),
+        ("Deneme - Söylev (Nutuk) - 1", "Deneme"),
+        ("Bu roman 3 bölümdür. Şiir kitabı - okunur.", None),
+        ("", None),
+    ],
+)
+def test_page_heading_finds_unit_only_with_dash_and_number(
+    page_text: str, expected: str | None
+) -> None:
+    """Sayfada ünite adının ardından tire ve sayı gelirse ünite bulunur; düz metin sayılmaz."""
+    rules = load_unit_map(REPOSITORY_DATA_DIR / "unit_map.txt")
+
+    assert find_unit_heading(page_text, rules) == expected
 
 
 @pytest.mark.asyncio
