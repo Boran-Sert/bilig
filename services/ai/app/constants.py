@@ -30,7 +30,10 @@ UNIT_GROUP_KEYWORDS = {  # şapkasız küçük harf
     "tiyatro": "A.3",
     "makale": "A.4",
     "deneme": "A.4",
+    "söylev": "A.4",
+    "nutuk": "A.4",
 }
+SOURCE_DEFAULT_GRADE = 12
 
 TURKISH_LETTERS = frozenset("abcçdefgğhıijklmnoöprsştuüvyzâîû")
 TEXT_LAYER_MIN_RATIO = 0.90
