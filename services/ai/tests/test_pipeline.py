@@ -104,7 +104,7 @@ async def test_each_step_is_recorded_and_unregistered_steps_are_skipped(
     assert recorder.calls == [IngestStep.REGISTERED, IngestStep.EXTRACT]
     assert await read_step(db, job.id) == ("EXTRACT", "RUNNING")
     cursor = await db.execute(READ_SOURCE_STATUS, (source_id,))
-    assert await cursor.fetchone() == ("PROCESSING",)
+    assert await cursor.fetchone() == ("PUBLISHED",)
 
 
 @pytest.mark.asyncio

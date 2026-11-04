@@ -4,7 +4,8 @@ Soru content_hash ile tektir: aynı soru ikinci kez eklenmez, var olan satır ku
 adım tekrar çalışınca ve aynı soru başka testte geçince kopya oluşmaz. Test (exam) kaynak ve
 başlıkla bulunur, yoksa açılır. Soru testteki sırasıyla (position) bağlanır. Doğru şık
 correct_option kolonundadır, content'e girmez. Sorular DRAFT yazılır; yayın kazanım eşleştirmesinden
-sonra olur. Tablolar core'un Flyway migration'larıyla kurulur.
+sonra olur. Hazırlık bitince kaynağın en az bir yayındaki sorusu olan taslak testleri yayına girer.
+Tablolar core'un Flyway migration'larıyla kurulur.
 """
 
 import hashlib
@@ -43,6 +44,18 @@ VALUES (%(exam_id)s, %(question_id)s, %(position)s)
 ON CONFLICT DO NOTHING
 """
 
+PUBLISH_SOURCE_EXAMS = """
+UPDATE exam SET status = 'PUBLISHED'
+WHERE source_document_id = %(source_id)s
+    AND status = 'DRAFT'
+    AND EXISTS (
+        SELECT 1
+        FROM exam_question
+        JOIN question ON question.id = exam_question.question_id
+        WHERE exam_question.exam_id = exam.id AND question.status = 'PUBLISHED'
+    )
+"""
+
 
 def content_hash(content: QuestionContent) -> str:
     """Sorunun içeriğinden 64 karakterlik özet üretir; biçim farkları özeti değiştirmez."""
@@ -78,6 +91,11 @@ async def save_exam(
             {"exam_id": exam_id, "question_id": row[0], "position": position},
         )
     return len(questions)
+
+
+async def publish_source_exams(connection: AsyncConnection, source_id: int) -> None:
+    """Kaynağın en az bir yayındaki sorusu olan taslak testlerini yayına alır."""
+    await connection.execute(PUBLISH_SOURCE_EXAMS, {"source_id": source_id})
 
 
 async def _fetch_exam_id(

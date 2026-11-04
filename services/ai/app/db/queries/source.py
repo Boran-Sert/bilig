@@ -1,8 +1,9 @@
 """Yüklenen kaynağın durumunu ve sayfa kayıtlarını yazan sorgular (hazırlık hattı).
 
 Sayfa kaydı (source_document_id, page_no) anahtarıyla upsert edilir; adım tekrar çalışınca kopya
-satır oluşmaz, görüntü yolu güncellenir. Durum sadece PROCESSING ve FAILED yazılır: PUBLISHED'ı
-içerik bazında yayın kuralı belirler. Tablolar core'un Flyway migration'larıyla kurulur.
+satır oluşmaz, görüntü yolu güncellenir. İş başlarken PROCESSING, son denemedeki hatada FAILED
+yazılır. Bütün adımlar bitince kaynağın, sorularının ya da bloklarının açık inceleme kaydı varsa
+REVIEW, yoksa PUBLISHED yazılır. Tablolar core'un Flyway migration'larıyla kurulur.
 """
 
 from psycopg import AsyncConnection
@@ -20,6 +21,35 @@ SELECT_SOURCE_KIND = "SELECT kind FROM source_document WHERE id = %(source_id)s"
 SET_SOURCE_STATUS = """
 UPDATE source_document
 SET status = %(status)s, updated_at = now()
+WHERE id = %(source_id)s
+"""
+
+SET_FINISHED_STATUS = """
+UPDATE source_document
+SET status = CASE
+        WHEN EXISTS (
+            SELECT 1
+            FROM review_item
+            WHERE review_item.status = 'OPEN'
+                AND (
+                    review_item.source_document_id = source_document.id
+                    OR review_item.question_id IN (
+                        SELECT question.id
+                        FROM question
+                        JOIN source_page ON source_page.id = question.source_page_id
+                        WHERE source_page.source_document_id = source_document.id
+                    )
+                    OR review_item.content_block_id IN (
+                        SELECT content_block.id
+                        FROM content_block
+                        JOIN source_page ON source_page.id = content_block.source_page_id
+                        WHERE source_page.source_document_id = source_document.id
+                    )
+                )
+        ) THEN 'REVIEW'
+        ELSE 'PUBLISHED'
+    END,
+    updated_at = now()
 WHERE id = %(source_id)s
 """
 
@@ -64,3 +94,8 @@ async def mark_processing(connection: AsyncConnection, source_id: int) -> None:
 async def mark_failed(connection: AsyncConnection, source_id: int) -> None:
     """Kaynağı FAILED yapar."""
     await connection.execute(SET_SOURCE_STATUS, {"source_id": source_id, "status": "FAILED"})
+
+
+async def mark_finished(connection: AsyncConnection, source_id: int) -> None:
+    """Kaynağın açık inceleme kaydı varsa REVIEW, yoksa PUBLISHED yapar."""
+    await connection.execute(SET_FINISHED_STATUS, {"source_id": source_id})

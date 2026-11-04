@@ -7,8 +7,10 @@ sözlükte olmayan adım atlanır ve kaydedilmez. EXTRACT kaynağı türünün o
 da test); program ve cevap anahtarı komutla yüklendiği için atlanır, türü bilinmeyen kaynak hata
 verir. OUTCOMES içeriği kazanımlara bağlar (outcomes.py), INDEX vektörleri yazar (index.py);
 VALIDATE ve ENTITIES henüz yoktur. Kaynak başlarken PROCESSING olur; FAILED yalnızca
-son denemede yazılır, tekrar denenecek iş listede hatalı görünmez. PUBLISHED burada yazılmaz:
-yayın içerik bazındadır. Hata her zaman yeniden fırlatılır, hata metnini çalışan kaydeder.
+son denemede yazılır, tekrar denenecek iş listede hatalı görünmez. Bütün adımlar bitince en az bir
+yayındaki sorusu olan testler yayına girer; kaynak açık inceleme kaydı varsa REVIEW, yoksa
+PUBLISHED olur. İş başka çalışana geçtiyse bu son yazma yapılmaz. Hata her zaman yeniden
+fırlatılır, hata metnini çalışan kaydeder.
 """
 
 import asyncio
@@ -22,9 +24,11 @@ from pydantic import BaseModel, ConfigDict, Field
 from app.config import load_storage_settings
 from app.constants import JOB_MAX_ATTEMPTS, TEST_SOURCE_KINDS
 from app.db.pool import get_pool
+from app.db.queries.question import publish_source_exams
 from app.db.queries.source import (
     fetch_source_kind,
     mark_failed,
+    mark_finished,
     mark_processing,
     save_source_pages,
 )
@@ -113,7 +117,7 @@ async def run_ingest(job: Job) -> None:
 async def run_steps(
     job: Job, context: IngestContext, steps: Mapping[IngestStep, StepFunction]
 ) -> None:
-    """Kalan adımları sırayla çalıştırır; hata olursa son denemede kaynağı FAILED yapıp fırlatır."""
+    """Kalan adımları çalıştırıp son durumu yazar; hata son denemedeyse FAILED yazıp fırlatır."""
     source_id = IngestSourcePayload.model_validate(job.payload).source_id
     async with context.connect() as connection:
         await mark_processing(connection, source_id)
@@ -126,6 +130,9 @@ async def run_steps(
             if not await context.queue.record_step(job, step):
                 structlog.get_logger().warning("job taken by another worker", step=step.value)
                 return
+        async with context.connect() as connection:
+            await publish_source_exams(connection, source_id)
+            await mark_finished(connection, source_id)
     except Exception:
         if job.attempts >= JOB_MAX_ATTEMPTS:
             async with context.connect() as connection:
