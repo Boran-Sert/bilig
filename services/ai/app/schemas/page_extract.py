@@ -1,18 +1,20 @@
 """Görüntü yolunun çıktısı: Claude'un sayfa görüntüsünden okuduğu bloklar (#142).
 
-Blok türü ve markdown ortak formattır; başlık yolu ve sıra kitap okuyucudaki gibi sonradan,
-sayfaların birleştirilmesinde verilir.
+Blok türü ve markdown ortak formattır; kitap motoru gibi yalnız başlık, bilgi kutusu ve metin
+üretilir. Başlık yolu ve sıra sayfa kitabın bloklarına eklenirken verilir.
 """
+
+from typing import Literal
 
 from pydantic import BaseModel
 
-from app.schemas.textbook import BlockType
+PageBlockType = Literal["BASLIK", "BILGI", "METIN"]
 
 
 class ExtractedBlock(BaseModel):
     """Sayfa görüntüsünden okunan blok: tür ve markdown."""
 
-    block_type: BlockType
+    block_type: PageBlockType
     markdown: str
 
 
