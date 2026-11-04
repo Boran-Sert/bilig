@@ -237,10 +237,11 @@ async def test_outcomes_step_matches_source(
     assert calls == [7]
 
 
-def test_outcomes_step_is_registered() -> None:
-    """REGISTERED, EXTRACT ve OUTCOMES kayıtlıdır; VALIDATE, ENTITIES ve INDEX atlanır."""
+def test_outcomes_and_index_steps_are_registered() -> None:
+    """REGISTERED, EXTRACT, OUTCOMES ve INDEX kayıtlıdır; VALIDATE ve ENTITIES atlanır."""
     assert STEPS == {
         IngestStep.REGISTERED: pipeline.register_source,
         IngestStep.EXTRACT: pipeline.extract_source,
         IngestStep.OUTCOMES: pipeline.match_source,
+        IngestStep.INDEX: pipeline.index_source,
     }

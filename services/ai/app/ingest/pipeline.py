@@ -5,8 +5,8 @@ run_ingest, INGEST_SOURCE işini last_completed_step'ten sonraki adımdan başla
 kaldığı adımdan devam eder. Adım listesi bir sözlüktür (STEPS): yeni adım bir satırla eklenir,
 sözlükte olmayan adım atlanır ve kaydedilmez. EXTRACT kaynağı türünün okuyucusuyla okur (kitap ya
 da test); program ve cevap anahtarı komutla yüklendiği için atlanır, türü bilinmeyen kaynak hata
-verir. OUTCOMES içeriği kazanımlara bağlar (outcomes.py); VALIDATE, ENTITIES ve INDEX henüz
-yoktur. Kaynak başlarken PROCESSING olur; FAILED yalnızca
+verir. OUTCOMES içeriği kazanımlara bağlar (outcomes.py), INDEX vektörleri yazar (index.py);
+VALIDATE ve ENTITIES henüz yoktur. Kaynak başlarken PROCESSING olur; FAILED yalnızca
 son denemede yazılır, tekrar denenecek iş listede hatalı görünmez. PUBLISHED burada yazılmaz:
 yayın içerik bazındadır. Hata her zaman yeniden fırlatılır, hata metnini çalışan kaydeder.
 """
@@ -29,6 +29,7 @@ from app.db.queries.source import (
     save_source_pages,
 )
 from app.ingest import pdf
+from app.ingest.index import index_source
 from app.ingest.outcomes import match_source_outcomes
 from app.ingest.readers.test import extract_tests
 from app.ingest.readers.textbook import extract_textbook
@@ -94,6 +95,7 @@ STEPS: dict[IngestStep, StepFunction] = {
     IngestStep.REGISTERED: register_source,
     IngestStep.EXTRACT: extract_source,
     IngestStep.OUTCOMES: match_source,
+    IngestStep.INDEX: index_source,
 }
 
 
