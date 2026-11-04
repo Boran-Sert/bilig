@@ -50,6 +50,7 @@ class IngestSettings(BaseSettings):
     model_config = SettingsConfigDict(extra="ignore")
 
     word_list_path: Path
+    unit_map_path: Path
 
 
 class WorkerSettings(BaseSettings):

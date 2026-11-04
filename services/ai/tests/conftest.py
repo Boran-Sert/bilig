@@ -25,6 +25,7 @@ from app.log import clear_request_context
 from tests.word_list import REPOSITORY_WORD_LIST
 
 os.environ.setdefault("WORD_LIST_PATH", str(REPOSITORY_WORD_LIST))
+os.environ.setdefault("UNIT_MAP_PATH", str(REPOSITORY_WORD_LIST.parent / "unit_map.txt"))
 os.environ.setdefault("INTERNAL_TOKEN", "test-internal-token")
 
 

@@ -11,6 +11,7 @@ from pathlib import Path
 import pytest
 
 from app.constants import JOB_MAX_ATTEMPTS
+from app.ingest import pipeline
 from app.ingest.pipeline import STEPS, IngestContext, StepFunction, register_source, run_steps
 from app.ingest.steps import IngestStep
 from app.jobs.queue import Job
@@ -184,6 +185,40 @@ async def test_source_is_failed_when_last_attempt_is_abandoned(db: Connection) -
     assert await cursor.fetchone() == ("FAILED",)
 
 
-def test_registered_step_is_the_only_registered_step() -> None:
-    """Bu PR'da sadece REGISTERED kayıtlıdır; diğer adımlar atlanır."""
-    assert set(STEPS) == {IngestStep.REGISTERED}
+@pytest.mark.asyncio
+@pytest.mark.parametrize(
+    ("kind", "expected"),
+    [("TEXTBOOK", "textbook"), ("TEST", "tests"), ("QUESTION_BANK", "tests"), ("PROGRAM", None)],
+)
+async def test_extract_reads_source_with_reader_of_its_kind(
+    db: Connection, tmp_path: Path, monkeypatch: pytest.MonkeyPatch, kind: str, expected: str | None
+) -> None:
+    """EXTRACT kaynağı türünün okuyucusuyla okur; program ve cevap anahtarı burada okunmaz."""
+    source_id = await make_source(db)
+    await db.execute("UPDATE source_document SET kind = %s WHERE id = %s", (kind, source_id))
+    calls: list[str] = []
+
+    async def record(name: str) -> None:
+        """Çağrılan okuyucunun adını kaydeder."""
+        calls.append(name)
+
+    monkeypatch.setattr(pipeline, "extract_textbook", lambda *_: record("textbook"))
+    monkeypatch.setattr(pipeline, "extract_tests", lambda *_: record("tests"))
+
+    await pipeline.extract_source(source_id, make_context(db, tmp_path))
+
+    assert calls == ([expected] if expected else [])
+
+
+@pytest.mark.asyncio
+async def test_extract_rejects_source_of_unknown_kind(db: Connection, tmp_path: Path) -> None:
+    """Türü belirlenmemiş kaynak tahminle okunmaz, hata verir."""
+    source_id = await make_source(db)
+
+    with pytest.raises(ValueError, match="UNKNOWN"):
+        await pipeline.extract_source(source_id, make_context(db, tmp_path))
+
+
+def test_registered_and_extract_steps_are_registered() -> None:
+    """Bu aşamada sadece REGISTERED ve EXTRACT kayıtlıdır; diğer adımlar atlanır."""
+    assert set(STEPS) == {IngestStep.REGISTERED, IngestStep.EXTRACT}

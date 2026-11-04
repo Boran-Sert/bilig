@@ -1,0 +1,10 @@
+# Test adından ünite bulma kuralları (#130).
+# Biçim: anahtar = ünite adı. Anahtar kaynak adında aranır (büyük-küçük harf ve Türkçe
+# harf işaretleri önemsiz); en uzun anahtar kazanır. Ünite adı curriculum_unit.title ile aynı yazılır.
+# Yeni test serisi ya da ünite adı değişince sadece bu dosya düzenlenir.
+giriş = Giriş
+hikâye = Hikâye
+şiir = Şiir
+roman = Roman
+tiyatro = Tiyatro
+deneme - söylev (nutuk) = Deneme
