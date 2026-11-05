@@ -5,7 +5,7 @@ import jakarta.validation.constraints.NotBlank;
 import jakarta.validation.constraints.Pattern;
 import jakarta.validation.constraints.PositiveOrZero;
 
-/** Öğrencinin şık ve cevaplama bilgilerini taşır. */
+/** Öğrencinin şık ve cevaplama bilgilerini taşır; ipucu bilgisi gönderilmezse ipucusuz sayılır. */
 public record AnswerRequest(
         @NotBlank(message = "{validation.answer.option}")
         @Pattern(regexp = AppConstants.ANSWER_OPTION_PATTERN, message = "{validation.answer.option}")
@@ -14,4 +14,4 @@ public record AnswerRequest(
         @PositiveOrZero(message = "{validation.answer.duration}")
         Integer durationMs,
 
-        boolean hintUsed) {}
+        Boolean hintUsed) {}

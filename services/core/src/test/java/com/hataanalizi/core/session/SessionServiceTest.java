@@ -23,6 +23,7 @@ import java.util.List;
 import java.util.Optional;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
+import org.mockito.ArgumentCaptor;
 import org.mockito.InjectMocks;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
@@ -120,6 +121,24 @@ class SessionServiceTest {
         verify(studentAnswerRepository).save(any(StudentAnswer.class));
         verify(jobQueue, never()).enqueue(any(), any());
         verify(studentAnswerRepository).moveToFirstUnansweredPosition(31L, AppConstants.QUESTION_STATUS_PUBLISHED);
+    }
+
+    /** İpucu bilgisi gönderilmeyen cevabı ipucusuz kaydeder. */
+    @Test
+    void savesAnswerWithoutHintWhenHintUsedIsMissing() {
+        StudentAnswerRepository.SessionContext sessionContext = sessionContext(7L, "IN_PROGRESS");
+        StudentAnswerRepository.QuestionContext questionContext = questionContext("B");
+        when(studentAnswerRepository.lockSessionById(31L)).thenReturn(Optional.of(sessionContext));
+        when(studentAnswerRepository.findPublishedQuestionInSession(31L, 42L, AppConstants.QUESTION_STATUS_PUBLISHED))
+                .thenReturn(Optional.of(questionContext));
+        when(studentAnswerRepository.findLearningOutcomesByQuestionId(42L)).thenReturn(List.of());
+        ArgumentCaptor<StudentAnswer> savedAnswer = ArgumentCaptor.forClass(StudentAnswer.class);
+
+        sessionService.submitAnswer(
+                31L, 42L, new AuthUser(7L, "student@example.test", "STUDENT"), new AnswerRequest("B", null, null));
+
+        verify(studentAnswerRepository).save(savedAnswer.capture());
+        assertThat(savedAnswer.getValue().isHintUsed()).isFalse();
     }
 
     /** Yanlış cevabın kimliğini analiz işi olarak kuyruğa ekler. */
