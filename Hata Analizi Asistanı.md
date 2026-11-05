@@ -202,7 +202,7 @@ Fatih çıktıyı tablo hâlinde kontrol eder. Ders başına bir kez.
 
 Nasıl
 
-Dosyanın parmak izi (sha256) alınır; aynı dosya ikinci kez işlenmez. Türü dosyayı yükleyen seçer: ders kitabı, test ya da soru bankası. Program ve cevap anahtarı komutla yüklenir. İzin durumu ve yayıncı kaydedilir. REGISTERED adımı her sayfayı 150 dpi PNG olarak saklar; "Sayfayı aç" ve görüntü yolu bu görüntüyü kullanır.
+Dosyanın parmak izi (sha256) alınır; aynı dosya ikinci kez işlenmez. Türü dosyayı yükleyen seçer: ders kitabı, test, soru bankası ya da cevap anahtarı. Cevapları ayrı dosyada olan test yüklenirken o cevap anahtarı seçilir; anahtar sonradan gelirse kaynak listesinden bağlanır ve test yeniden işlenir. Yarıda kalan kaynak da aynı yerden yeniden işlenir. Program komutla yüklenir. İzin durumu ve yayıncı kaydedilir. REGISTERED adımı her sayfayı 150 dpi PNG olarak saklar; "Sayfayı aç" ve görüntü yolu bu görüntüyü kullanır.
 
 Sonuç
 
@@ -238,7 +238,7 @@ Her zaman metin ve görüntü birlikte gider. Altı çizili "değildir", kelime 
 
 Cevap
 
-Sorunun altındaysa ("Cevap: A") ayrıştırmada alınır. Ayrı sayfa ya da dosyaysa ("1-B 2-E") düzenli ifadeyle okunup numarayla eşlenir. Yoksa Sonnet çözer, soru incelemeye düşer.
+Sorunun altındaysa ("Cevap: A") ayrıştırmada alınır. Ayrı sayfadaysa ("1-B 2-E") düzenli ifadeyle okunup numarayla eşlenir. Ayrı dosyadaysa (ÖDSGM: tek sayfada "Test 1 … Test 40") teste bağlanan anahtarın, testin numarasındaki bölümü alınır. Numara dosya adında değil, ilk sayfanın altında ünite satırından sonra yazar ("Şiir - 4" ve altında "14"). Anahtarda testte olmayan numara ya da sayfadakiyle çelişen cevap varsa anahtar uygulanmaz. Yoksa Sonnet çözer, soru incelemeye düşer.
 
 Kayıt
 
