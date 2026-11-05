@@ -411,6 +411,19 @@ Sorunun kazanım kolonu yoktur; kazanımlar `question_outcome`'da.
 - `idx_student_answer_question_id` (question_id)
 - Boş bırakılan sorunun satırı olmaz.
 
+### `answer_analysis` · Cevap hata türü analizi
+
+| Kolon | Tip | Boş | Varsayılan | Kısıt |
+|---|---|---|---|---|
+| id | bigint | hayır | identity | PK |
+| student_answer_id | bigint | hayır | | UNIQUE, FK → student_answer(id) ON DELETE CASCADE |
+| error_type | text | hayır | | CHECK IN ('KNOWLEDGE', 'MISCONCEPTION', 'ATTENTION', 'READING') |
+| needs_review | boolean | hayır | false | |
+| created_at | timestamptz | hayır | now() | |
+
+- AI analizi tamamlandığında oluşur; sınıflandırma dashboard uyumluluğu için
+  `student_answer.error_type` alanına da yazılır.
+
 ### `tutor_conversation` · Anlatım ve sohbet
 
 | Kolon | Tip | Boş | Varsayılan | Kısıt |
