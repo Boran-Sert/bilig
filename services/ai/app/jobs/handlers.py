@@ -9,8 +9,12 @@ from collections.abc import Callable, Coroutine
 from typing import Any
 
 from app.ingest.pipeline import run_ingest
+from app.jobs.analyze_answer import run_analyze_answer
 from app.jobs.queue import Job, JobType
 
 JobHandler = Callable[[Job], Coroutine[Any, Any, None]]
 
-HANDLERS: dict[JobType, JobHandler] = {JobType.INGEST_SOURCE: run_ingest}
+HANDLERS: dict[JobType, JobHandler] = {
+    JobType.INGEST_SOURCE: run_ingest,
+    JobType.ANALYZE_ANSWER: run_analyze_answer,
+}
