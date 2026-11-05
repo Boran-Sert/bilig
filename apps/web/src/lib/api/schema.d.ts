@@ -84,6 +84,22 @@ export interface paths {
     patch?: never;
     trace?: never;
   };
+  "/api/reports": {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    get?: never;
+    put?: never;
+    post: operations["createReport"];
+    delete?: never;
+    options?: never;
+    head?: never;
+    patch?: never;
+    trace?: never;
+  };
   "/api/auth/register": {
     parameters: {
       query?: never;
@@ -204,6 +220,22 @@ export interface paths {
       cookie?: never;
     };
     get: operations["getResult"];
+    put?: never;
+    post?: never;
+    delete?: never;
+    options?: never;
+    head?: never;
+    patch?: never;
+    trace?: never;
+  };
+  "/api/questions/{id}/similar": {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    get: operations["getSimilar"];
     put?: never;
     post?: never;
     delete?: never;
@@ -419,6 +451,13 @@ export interface components {
       net: number;
       outcomes: components["schemas"]["SessionCompletionOutcome"][];
     };
+    ReportRequest: {
+      /** Format: int64 */
+      questionId?: number;
+      /** Format: int64 */
+      messageId?: number;
+      note?: string;
+    };
     RegisterRequest: {
       /** Format: email */
       email: string;
@@ -473,6 +512,11 @@ export interface components {
       /** Format: int64 */
       sessionId: number | null;
       status: string | null;
+    };
+    SimilarQuestionResponse: {
+      /** Format: int64 */
+      questionId: number;
+      content: components["schemas"]["QuestionContent"];
     };
     HintResponse: {
       hint: string;
@@ -753,6 +797,28 @@ export interface operations {
       };
     };
   };
+  createReport: {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    requestBody: {
+      content: {
+        "application/json": components["schemas"]["ReportRequest"];
+      };
+    };
+    responses: {
+      /** @description OK */
+      200: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content?: never;
+      };
+    };
+  };
   register: {
     parameters: {
       query?: never;
@@ -956,6 +1022,28 @@ export interface operations {
         };
         content: {
           "*/*": components["schemas"]["SessionCompletionResponse"];
+        };
+      };
+    };
+  };
+  getSimilar: {
+    parameters: {
+      query?: never;
+      header?: never;
+      path: {
+        id: number;
+      };
+      cookie?: never;
+    };
+    requestBody?: never;
+    responses: {
+      /** @description OK */
+      200: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          "*/*": components["schemas"]["SimilarQuestionResponse"];
         };
       };
     };
