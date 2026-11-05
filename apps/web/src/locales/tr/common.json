@@ -10,7 +10,8 @@
   },
   "navigation": {
     "home": "Ana sayfa",
-    "adminSources": "İçerik yükle"
+    "adminSources": "İçerik yükle",
+    "adminReview": "İnceleme listesi"
   },
   "notFound": {
     "title": "Sayfa bulunamadı",

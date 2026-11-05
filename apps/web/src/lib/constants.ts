@@ -8,6 +8,7 @@ export const ROUTES = {
   login: "/login",
   register: "/register",
   adminSources: "/admin/sources",
+  adminReview: "/admin/review",
   tests: "/tests",
   solve: "/tests/:testId/solve",
   testResult: "/sessions/:sessionId/result",

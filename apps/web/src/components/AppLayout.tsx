@@ -39,9 +39,14 @@ export default function AppLayout() {
           {user && (
             <div className="flex items-center gap-3">
               {user.canManageContent && (
-                <Link to={ROUTES.adminSources} className="text-sm font-medium hover:underline">
-                  {t("navigation.adminSources")}
-                </Link>
+                <>
+                  <Link to={ROUTES.adminSources} className="text-sm font-medium hover:underline">
+                    {t("navigation.adminSources")}
+                  </Link>
+                  <Link to={ROUTES.adminReview} className="text-sm font-medium hover:underline">
+                    {t("navigation.adminReview")}
+                  </Link>
+                </>
               )}
               {logout.isError && (
                 <p role="alert" className="text-sm text-destructive">

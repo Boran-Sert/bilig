@@ -52,5 +52,60 @@
       "accessDenied": "Bu ekranı yalnızca içerik yöneticileri görüntüleyebilir.",
       "kindRequired": "Önce kaynağın türünü seç."
     }
+  },
+  "review": {
+    "title": "İnceleme Listesi",
+    "metaDescription": "Düşük güvenli eşleşmeler ve kaynak sorunlarının inceleme listesi.",
+    "empty": "İnceleme bekleyen kayıt bulunmuyor.",
+    "recordCount": "{{count}} kayıt",
+    "targetTypes": {
+      "QUESTION": "Soru",
+      "BLOCK": "Paragraf",
+      "SOURCE": "Kaynak"
+    },
+    "reasons": {
+      "LOW_CONFIDENCE": "Düşük güvenli eşleşme",
+      "NO_ANSWER_KEY": "Cevap anahtarı yok",
+      "VALIDATION_FAILED": "Doğrulama hatası"
+    },
+    "problems": {
+      "NO_ANSWER_KEY": "Sorunun cevabı bulunamadı",
+      "OPTION_COUNT": "Şık sayısı 5 değil",
+      "OPTION_LABELS": "Şık harfleri sıralı değil",
+      "EMPTY_OPTION": "Boş şık var",
+      "EMPTY_STEM": "Soru kökü boş",
+      "ANSWER_NOT_OPTION": "Cevap şıklardan biri değil",
+      "NUMBER_SEQUENCE": "Soru numaraları sıralı değil",
+      "UNIT_NOT_FOUND": "Testin ünitesi bulunamadı",
+      "NO_CONTENT": "Kaynaktan hiç içerik çıkmadı",
+      "LOW_TEXT_LAYER": "Sayfanın metni okunamadı",
+      "UNDECODED_GLYPHS": "Sayfada çözülemeyen harf kaldı",
+      "NOT_MULTIPLE_CHOICE": "Sayfada kökü olmayan şık kümesi var"
+    },
+    "problemLocation": "Test {{test}}, Soru {{number}} · Sayfa {{page}}",
+    "actions": {
+      "approve": "Onayla",
+      "fix": "Düzelt",
+      "reject": "Reddet",
+      "approving": "Onaylanıyor...",
+      "fixing": "Düzeltiliyor...",
+      "rejecting": "Reddediliyor..."
+    },
+    "outcomes": {
+      "title": "Mevcut Kazanımlar",
+      "editTitle": "Kazanımları Düzenle",
+      "searchPlaceholder": "Kazanım ara (kod veya başlık)...",
+      "save": "Kazanımları Kaydet ve Yayına Al",
+      "cancel": "Vazgeç",
+      "none": "Kazanım bulunmuyor."
+    },
+    "openPage": "Sayfayı aç",
+    "pagination": {
+      "prev": "Önceki",
+      "next": "Sonraki"
+    },
+    "errors": {
+      "accessDenied": "İnceleme listesine erişim yetkiniz bulunmuyor."
+    }
   }
 }

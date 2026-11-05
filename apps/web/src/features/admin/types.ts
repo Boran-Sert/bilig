@@ -21,3 +21,12 @@ export interface ReprocessRequest {
   sourceId: number;
   answerKeySourceId?: number;
 }
+
+export type ReviewItemResponse = components["schemas"]["ReviewItemResponse"];
+export type ReviewProblem = components["schemas"]["ReviewProblem"];
+export type OutcomeLink = components["schemas"]["OutcomeLink"];
+export type ReviewOutcomeResponse = components["schemas"]["ReviewOutcomeResponse"];
+export type ReviewDecisionRequest = components["schemas"]["ReviewDecisionRequest"];
+export type ReviewDecision = ReviewDecisionRequest["decision"];
+export type ReviewTargetType = ReviewItemResponse["targetType"];
+export type ReviewListResponse = components["schemas"]["PageResponseReviewItemResponse"];
