@@ -2,6 +2,8 @@
  * Yanlış cevap anlatımı için SSE akışını yönetir ve alıntı bloklarını toplar.
  */
 import { useCallback, useRef, useState } from "react";
+import { getProblemMessage } from "../../lib/api/problem";
+import i18n from "../../lib/i18n";
 
 /** Çerezin değerini okur. */
 function getCookie(name: string): string | undefined {
@@ -80,7 +82,7 @@ export function useExplanationStream() {
         setState((previous) => ({
           ...previous,
           isStreaming: false,
-          error: "Anlatım akışı başlatılamadı.",
+          error: i18n.t("solve.explanationFailed", { ns: "test" }),
         }));
         return;
       }
@@ -88,6 +90,7 @@ export function useExplanationStream() {
       const reader = response.body.getReader();
       const decoder = new TextDecoder();
       let buffer = "";
+      let currentEvent = "message";
 
       while (true) {
         const { value, done } = await reader.read();
@@ -99,7 +102,6 @@ export function useExplanationStream() {
         const lines = buffer.split("\n");
         buffer = lines.pop() ?? "";
 
-        let currentEvent = "message";
         for (const line of lines) {
           const trimmed = line.trim();
           if (!trimmed) {
@@ -116,38 +118,40 @@ export function useExplanationStream() {
       }
 
       setState((previous) => ({ ...previous, isStreaming: false, isDone: true }));
-    } catch (error: unknown) {
+    } catch {
       if (controller.signal.aborted) {
         return;
       }
       setState((previous) => ({
         ...previous,
         isStreaming: false,
-        error: error instanceof Error ? error.message : "Bilinmeyen bir hata oluştu.",
+        error: i18n.t("solve.explanationFailed", { ns: "test" }),
       }));
     }
 
     /** SSE olayına göre durumu günceller. */
     function handleEvent(eventName: string, dataString: string) {
+      let parsed;
       try {
-        const parsed = JSON.parse(dataString);
-        if (eventName === "delta" && typeof parsed.text === "string") {
-          setState((previous) => ({ ...previous, text: previous.text + parsed.text }));
-        } else if (eventName === "citation" && typeof parsed.blockId === "number") {
-          setState((previous) => ({
-            ...previous,
-            citationBlockIds: previous.citationBlockIds.includes(parsed.blockId)
-              ? previous.citationBlockIds
-              : [...previous.citationBlockIds, parsed.blockId],
-          }));
-        } else if (eventName === "error") {
-          setState((previous) => ({
-            ...previous,
-            error: parsed.detail ?? parsed.title ?? "Hata oluştu.",
-          }));
-        }
+        parsed = JSON.parse(dataString);
       } catch {
-        // Geçersiz satırları yoksayar
+        setState((previous) => ({
+          ...previous,
+          error: i18n.t("solve.explanationFailed", { ns: "test" }),
+        }));
+        return;
+      }
+      if (eventName === "delta" && typeof parsed.text === "string") {
+        setState((previous) => ({ ...previous, text: previous.text + parsed.text }));
+      } else if (eventName === "citation" && typeof parsed.blockId === "number") {
+        setState((previous) => ({
+          ...previous,
+          citationBlockIds: previous.citationBlockIds.includes(parsed.blockId)
+            ? previous.citationBlockIds
+            : [...previous.citationBlockIds, parsed.blockId],
+        }));
+      } else if (eventName === "error") {
+        setState((previous) => ({ ...previous, error: getProblemMessage(parsed) }));
       }
     }
   }, []);
