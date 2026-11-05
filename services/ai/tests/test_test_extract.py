@@ -12,6 +12,7 @@ from psycopg.rows import TupleRow
 
 from app.ingest import pdf
 from app.ingest.pipeline import IngestContext
+from app.ingest.readers.answer_key import check_answer_key
 from app.ingest.readers.test import extract_tests
 from app.schemas.pdf import PageReport, QuestionReading
 from app.schemas.question import ParsedQuestion
@@ -233,3 +234,97 @@ async def test_weak_pages_and_dropped_option_sets_open_review(
             {"code": "NOT_MULTIPLE_CHOICE", "pageNo": 1, "pageId": page_id},
         ]
     }
+
+
+LINK_KEY_SOURCE = """
+WITH key_row AS (
+    INSERT INTO source_document (title, kind, sha256, file_path, uploaded_by)
+    SELECT 'CEVAP_ANAHTARI.pdf', 'ANSWER_KEY', repeat('e', 64), 'sources/1.pdf', uploaded_by
+    FROM source_document WHERE id = %(source_id)s
+    RETURNING id
+)
+UPDATE source_document SET answer_key_source_id = key_row.id
+FROM key_row
+WHERE source_document.id = %(source_id)s
+RETURNING key_row.id
+"""
+FOOTER = "E) Teşhis\r\nŞiir - 4\r\n14"
+
+
+def unanswered_test() -> list[ParsedQuestion]:
+    """Cevabı sayfada olmayan üç soruluk testi kurar."""
+    stems = ["Birinci soru metni", "İkinci soru metni", "Üçüncü soru metni"]
+    return [
+        build_question(number, stem=stem, correct_option=None)
+        for number, stem in enumerate(stems, start=1)
+    ]
+
+
+async def link_key(
+    db: Connection,
+    context: IngestContext,
+    monkeypatch: pytest.MonkeyPatch,
+    source_id: int,
+    text: str,
+) -> int:
+    """Teste ayrı cevap anahtarı kaynağı bağlar ve anahtarın metnini verir."""
+    row = await (await db.execute(LINK_KEY_SOURCE, {"source_id": source_id})).fetchone()
+    assert row is not None
+    context.storage.write(source_key(int(row[0])), b"%PDF")
+    monkeypatch.setattr(pdf, "read_text", lambda _content: text)
+    return int(row[0])
+
+
+@pytest.mark.asyncio
+async def test_linked_answer_key_fills_answers_and_closes_old_review(
+    db: Connection, tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    """Sonradan bağlanan anahtarın testteki bölümü sorulara yazılır, eski NO_ANSWER_KEY kapanır."""
+    tests = [unanswered_test()]
+    source_id, context = await prepare(db, tmp_path, monkeypatch, tests, page_text=FOOTER)
+    await extract_tests(source_id, context)
+    assert await (await db.execute(COUNT_REVIEWS, (source_id,))).fetchall() == [("NO_ANSWER_KEY",)]
+
+    key = "Test 13 1. \r\nB 2. \r\nD 3. \r\nC\r\nTest 14 1. \r\nE 2. A 3. \r\nB\r\n"
+    await link_key(db, context, monkeypatch, source_id, key)
+    await extract_tests(source_id, context)
+
+    links = await (await db.execute(READ_LINKS, (source_id,))).fetchall()
+    assert [(position, answer) for _, position, answer, _ in links] == [
+        (1, "E"),
+        (2, "A"),
+        (3, "B"),
+    ]
+    assert await (await db.execute(COUNT_REVIEWS, (source_id,))).fetchall() == []
+
+
+@pytest.mark.asyncio
+async def test_answer_key_with_extra_numbers_is_not_applied(
+    db: Connection, tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    """Anahtar bölümünde testte olmayan numara varsa anahtar uygulanmaz."""
+    source_id, context = await prepare(
+        db, tmp_path, monkeypatch, [unanswered_test()], page_text=FOOTER
+    )
+    await link_key(db, context, monkeypatch, source_id, "Test 14 1. E 2. A 3. B 4. C")
+
+    await extract_tests(source_id, context)
+
+    assert await (await db.execute(COUNT_QUESTIONS, (source_id,))).fetchone() == (0,)
+    assert await (await db.execute(COUNT_REVIEWS, (source_id,))).fetchall() == [("NO_ANSWER_KEY",)]
+
+
+@pytest.mark.asyncio
+async def test_answer_key_source_without_answers_opens_review(
+    db: Connection, tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    """Cevap çıkmayan anahtar dosyası incelemeye düşer; okunabilir hale gelince kayıt kapanır."""
+    source_id, context = await prepare(db, tmp_path, monkeypatch, [])
+
+    monkeypatch.setattr(pdf, "read_text", lambda _content: "CEVAP ANAHTARI\n12. Sınıf")
+    await check_answer_key(source_id, context)
+    assert await review_details(db, source_id) == {"VALIDATION_FAILED": [{"code": "NO_CONTENT"}]}
+
+    monkeypatch.setattr(pdf, "read_text", lambda _content: "Test 1 1. C 2. D")
+    await check_answer_key(source_id, context)
+    assert await (await db.execute(COUNT_REVIEWS, (source_id,))).fetchall() == []
