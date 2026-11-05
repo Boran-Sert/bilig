@@ -168,7 +168,7 @@ public class SessionService {
         answer.setSelectedOption(request.selectedOption());
         answer.setCorrect(correct);
         answer.setDurationMs(request.durationMs());
-        answer.setHintUsed(request.hintUsed());
+        answer.setHintUsed(Boolean.TRUE.equals(request.hintUsed()));
         StudentAnswer savedAnswer = studentAnswerRepository.save(answer);
         if (!correct) {
             jobQueue.enqueue(
