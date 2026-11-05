@@ -84,6 +84,7 @@ PROMPT_VERSION_PATTERN = r"\{# version: (\d+) #\}"
 PROMPT_BLOCKS = ("system", "user")
 REPOSITORY_DATA_DIR = SERVICE_ROOT.parent.parent / "data"
 CONTROL_SET_PATH = REPOSITORY_DATA_DIR / "kontrol_seti" / "sorular.jsonl"
+ERROR_TYPE_CONTROL_SET_PATH = REPOSITORY_DATA_DIR / "kontrol_seti" / "hata_turleri.jsonl"
 EVAL_OUTPUT_DIR = REPOSITORY_DATA_DIR / "eval"
 
 JOB_POLL_INTERVAL_SECONDS = 2.0
