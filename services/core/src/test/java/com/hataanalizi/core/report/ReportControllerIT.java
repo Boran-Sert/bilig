@@ -2,13 +2,13 @@ package com.hataanalizi.core.report;
 
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.springframework.security.test.web.servlet.request.SecurityMockMvcRequestPostProcessors.authentication;
-import static org.springframework.security.test.web.servlet.request.SecurityMockMvcRequestPostProcessors.csrf;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.post;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.jsonPath;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
 
 import com.hataanalizi.core.TestcontainersConfiguration;
 import com.hataanalizi.core.auth.AuthUser;
+import jakarta.servlet.http.Cookie;
 import java.util.List;
 import java.util.UUID;
 import org.junit.jupiter.api.Test;
@@ -31,6 +31,8 @@ import org.springframework.test.web.servlet.request.RequestPostProcessor;
 @Import(TestcontainersConfiguration.class)
 class ReportControllerIT {
 
+    private static final String CSRF_TOKEN = "report-test-csrf";
+
     private final JdbcTemplate jdbcTemplate;
     private final MockMvc mockMvc;
 
@@ -49,7 +51,8 @@ class ReportControllerIT {
 
         mockMvc.perform(post("/api/reports")
                         .with(student(userId))
-                        .with(csrf())
+                        .cookie(new Cookie("XSRF-TOKEN", CSRF_TOKEN))
+                        .header("X-XSRF-TOKEN", CSRF_TOKEN)
                         .contentType(MediaType.APPLICATION_JSON)
                         .content("{\"questionId\":" + questionId + ",\"note\":\"Yanlış cevap anahtarı\"}"))
                 .andExpect(status().isCreated());
@@ -65,7 +68,8 @@ class ReportControllerIT {
 
         mockMvc.perform(post("/api/reports")
                         .with(student(userId))
-                        .with(csrf())
+                        .cookie(new Cookie("XSRF-TOKEN", CSRF_TOKEN))
+                        .header("X-XSRF-TOKEN", CSRF_TOKEN)
                         .contentType(MediaType.APPLICATION_JSON)
                         .content("{\"messageId\":" + messageId + "}"))
                 .andExpect(status().isCreated());
@@ -81,7 +85,8 @@ class ReportControllerIT {
 
         mockMvc.perform(post("/api/reports")
                         .with(student(userId))
-                        .with(csrf())
+                        .cookie(new Cookie("XSRF-TOKEN", CSRF_TOKEN))
+                        .header("X-XSRF-TOKEN", CSRF_TOKEN)
                         .contentType(MediaType.APPLICATION_JSON)
                         .content("{\"questionId\":" + questionId + "}"))
                 .andExpect(status().isNotFound())
@@ -97,7 +102,8 @@ class ReportControllerIT {
 
         mockMvc.perform(post("/api/reports")
                         .with(student(otherUserId))
-                        .with(csrf())
+                        .cookie(new Cookie("XSRF-TOKEN", CSRF_TOKEN))
+                        .header("X-XSRF-TOKEN", CSRF_TOKEN)
                         .contentType(MediaType.APPLICATION_JSON)
                         .content("{\"messageId\":" + messageId + "}"))
                 .andExpect(status().isNotFound());
@@ -110,7 +116,8 @@ class ReportControllerIT {
     void rejectsBothTargets() throws Exception {
         mockMvc.perform(post("/api/reports")
                         .with(student(insertUser()))
-                        .with(csrf())
+                        .cookie(new Cookie("XSRF-TOKEN", CSRF_TOKEN))
+                        .header("X-XSRF-TOKEN", CSRF_TOKEN)
                         .contentType(MediaType.APPLICATION_JSON)
                         .content("{\"questionId\":1,\"messageId\":1}"))
                 .andExpect(status().isBadRequest());
@@ -121,7 +128,8 @@ class ReportControllerIT {
     void rejectsMissingTarget() throws Exception {
         mockMvc.perform(post("/api/reports")
                         .with(student(insertUser()))
-                        .with(csrf())
+                        .cookie(new Cookie("XSRF-TOKEN", CSRF_TOKEN))
+                        .header("X-XSRF-TOKEN", CSRF_TOKEN)
                         .contentType(MediaType.APPLICATION_JSON)
                         .content("{\"note\":\"Hatalı içerik\"}"))
                 .andExpect(status().isBadRequest());
