@@ -28,6 +28,7 @@ erDiagram
     learning_outcome ||--o{ curriculum_unit_outcome : ""
 
     curriculum |o--o{ source_document : "kaynakları"
+    source_document |o--o{ source_document : "cevap anahtarı"
     source_document ||--o{ source_page : "sayfaları"
     source_page ||--o{ content_block : "blokları"
     curriculum_unit |o--o{ content_block : "ünitesi"
@@ -35,7 +36,7 @@ erDiagram
     learning_outcome ||--o{ content_block_outcome : ""
 
     source_page |o--o{ question : "çıktığı sayfa"
-    curriculum_unit ||--o{ question : "ünitesi"
+    curriculum_unit |o--o{ question : "ünitesi"
     question ||--o{ question_outcome : ""
     learning_outcome ||--o{ question_outcome : ""
 
@@ -185,6 +186,7 @@ erDiagram
 | license_status | text | hayır | 'UNKNOWN' | CHECK IN ('MEB', 'PERMITTED', 'UNKNOWN') |
 | status | text | hayır | 'UPLOADED' | CHECK IN ('UPLOADED', 'PROCESSING', 'REVIEW', 'PUBLISHED', 'FAILED') |
 | uploaded_by | bigint | hayır | | FK → app_user(id) |
+| answer_key_source_id | bigint | evet | | FK → source_document(id) · testin cevaplarının okunacağı ayrı anahtar dosyası |
 | created_at | timestamptz | hayır | now() | |
 | updated_at | timestamptz | hayır | now() | |
 
@@ -196,6 +198,7 @@ erDiagram
 | source_document_id | bigint | hayır | | FK → source_document(id) ON DELETE CASCADE |
 | page_no | integer | hayır | | |
 | image_path | text | evet | | `/data/pages/{source_id}/{page_no}.png` |
+| entities_extracted_at | timestamptz | evet | | Bilgi katmanı adımı sayfayı ne zaman işledi; doluysa sayfa tekrar modele gitmez |
 | created_at | timestamptz | hayır | now() | |
 
 - `uq_source_page_source_document_id_page_no` UNIQUE (source_document_id, page_no)
@@ -241,7 +244,7 @@ Alıntı kartındaki "TDE 12 Ders Kitabı · s. 174" bilgisi saklanmaz; `source_
 |---|---|---|---|---|
 | id | bigint | hayır | identity | PK |
 | source_page_id | bigint | evet | | FK → source_page(id) · üretilen soruda boş |
-| curriculum_unit_id | bigint | hayır | | FK → curriculum_unit(id) |
+| curriculum_unit_id | bigint | evet | | FK → curriculum_unit(id) · ünitesi bulunamayan test sorusunda kazanımlardan doldurulur, bulunamazsa boş |
 | origin | text | hayır | | CHECK IN ('SOURCE', 'GENERATED') |
 | content | jsonb | hayır | | Kök, ortak parça ve şıklar (plan 13.6) |
 | correct_option | char(1) | hayır | | CHECK IN ('A', 'B', 'C', 'D', 'E') |
@@ -407,6 +410,19 @@ Sorunun kazanım kolonu yoktur; kazanımlar `question_outcome`'da.
 - `uq_student_answer_study_session_id_question_id` UNIQUE (study_session_id, question_id) · ilk cevaptan sonra cevap değiştirilemez
 - `idx_student_answer_question_id` (question_id)
 - Boş bırakılan sorunun satırı olmaz.
+
+### `answer_analysis` · Cevap hata türü analizi
+
+| Kolon | Tip | Boş | Varsayılan | Kısıt |
+|---|---|---|---|---|
+| id | bigint | hayır | identity | PK |
+| student_answer_id | bigint | hayır | | UNIQUE, FK → student_answer(id) ON DELETE CASCADE |
+| error_type | text | hayır | | CHECK IN ('KNOWLEDGE', 'MISCONCEPTION', 'ATTENTION', 'READING') |
+| needs_review | boolean | hayır | false | |
+| created_at | timestamptz | hayır | now() | |
+
+- AI analizi tamamlandığında oluşur; sınıflandırma dashboard uyumluluğu için
+  `student_answer.error_type` alanına da yazılır.
 
 ### `tutor_conversation` · Anlatım ve sohbet
 

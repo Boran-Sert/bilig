@@ -4,6 +4,7 @@ import static org.assertj.core.api.Assertions.assertThat;
 import static org.springframework.security.test.web.servlet.request.SecurityMockMvcRequestPostProcessors.testSecurityContext;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.multipart;
+import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.post;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.jsonPath;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
 
@@ -33,6 +34,7 @@ import org.springframework.test.context.TestPropertySource;
 import org.springframework.test.web.servlet.MockMvc;
 import org.springframework.test.web.servlet.MvcResult;
 import org.springframework.test.web.servlet.ResultActions;
+import org.springframework.test.web.servlet.request.MockHttpServletRequestBuilder;
 import org.springframework.test.web.servlet.request.MockMultipartHttpServletRequestBuilder;
 import org.springframework.transaction.annotation.Transactional;
 import org.springframework.util.unit.DataSize;
@@ -138,6 +140,34 @@ class SourceControllerIT {
                 .andExpect(jsonPath("$.page").value(0))
                 .andExpect(jsonPath("$.size").value(20))
                 .andExpect(jsonPath("$.total").value(1));
+    }
+
+    /** Yüklenen PDF'in kaynak ve inceleme listelerine kadar ilerlediğini doğrular. */
+    @Test
+    @WithAuthUser(role = "CONTENT_ADMIN", id = 1001)
+    void uploadsPdfAndListsItsIngestionReview() throws Exception {
+        MvcResult upload = uploadAsAdmin(pdfFile("tde12-ders-kitabi.pdf", "tiny.pdf"))
+                .andExpect(status().isAccepted())
+                .andReturn();
+        long sourceId = sourceIdFrom(upload);
+
+        mockMvc.perform(get("/api/admin/sources").with(testSecurityContext()))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.items[0].sourceId").value(sourceId))
+                .andExpect(jsonPath("$.items[0].fileName").value("tde12-ders-kitabi.pdf"));
+
+        jdbcTemplate.update("UPDATE source_document SET status = 'REVIEW' WHERE id = ?", sourceId);
+        jdbcTemplate.update("""
+                INSERT INTO review_item (reason, source_document_id, detail)
+                VALUES ('NO_ANSWER_KEY', ?, '{"problems":[{"code":"NO_ANSWER_KEY"}]}'::jsonb)
+                """, sourceId);
+
+        mockMvc.perform(get("/api/admin/review").with(testSecurityContext()))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.items[0].targetType").value("SOURCE"))
+                .andExpect(jsonPath("$.items[0].targetId").value(sourceId))
+                .andExpect(jsonPath("$.items[0].sourceTitle").value("tde12-ders-kitabi.pdf"))
+                .andExpect(jsonPath("$.items[0].problems[0].code").value("NO_ANSWER_KEY"));
     }
 
     /** Kaydedilmiş iş adımını ve hata metnini kaynak listesine taşır. */
@@ -270,7 +300,7 @@ class SourceControllerIT {
     @Test
     @WithAuthUser(role = "CONTENT_ADMIN", id = 1001)
     void rejectsMissingOrNonUploadableKind() throws Exception {
-        for (String kind : new String[] {null, "UNKNOWN", "PROGRAM", "ANSWER_KEY"}) {
+        for (String kind : new String[] {null, "UNKNOWN", "PROGRAM"}) {
             mockMvc.perform(uploadRequest(kind, pdfFile("dosya.pdf", "tiny.pdf"))
                             .with(testSecurityContext()))
                     .andExpect(status().isBadRequest())
@@ -279,6 +309,86 @@ class SourceControllerIT {
 
         assertThat(jdbcTemplate.queryForObject("SELECT count(*) FROM source_document", Long.class))
                 .isZero();
+    }
+
+    /** Test yüklenirken seçilen cevap anahtarı kaynağını teste bağlar. */
+    @Test
+    @WithAuthUser(role = "CONTENT_ADMIN", id = 1001)
+    void savesAnswerKeyLinkOnTestUpload() throws Exception {
+        long keyId = upload("ANSWER_KEY", pdfFile("cevap-anahtari.pdf", "tiny.pdf"));
+
+        MvcResult result = mockMvc.perform(uploadRequest("TEST", otherPdf("test-14.pdf"))
+                        .param("answerKeySourceId", Long.toString(keyId))
+                        .with(testSecurityContext()))
+                .andExpect(status().isAccepted())
+                .andReturn();
+
+        assertThat(answerKeyOf(sourceIdFrom(result))).isEqualTo(keyId);
+    }
+
+    /** Anahtar olmayan kaynağın ya da test olmayan dosyanın anahtar bağını reddeder. */
+    @Test
+    @WithAuthUser(role = "CONTENT_ADMIN", id = 1001)
+    void rejectsAnswerKeyLinkToNonKeySourceOrNonTest() throws Exception {
+        long textbookId = upload("TEXTBOOK", pdfFile("kitap.pdf", "tiny.pdf"));
+        long keyId = upload("ANSWER_KEY", otherPdf("cevap-anahtari.pdf"));
+
+        for (String[] request :
+                new String[][] {{"TEST", Long.toString(textbookId)}, {"TEXTBOOK", Long.toString(keyId)}}) {
+            mockMvc.perform(uploadRequest(request[0], otherPdf("yeni.pdf", "third"))
+                            .param("answerKeySourceId", request[1])
+                            .with(testSecurityContext()))
+                    .andExpect(status().isBadRequest())
+                    .andExpect(jsonPath("$.code").value("VALIDATION_FAILED"));
+        }
+    }
+
+    /** Biten testi sonradan bağlanan anahtarla yeniden kuyruğa koyar. */
+    @Test
+    @WithAuthUser(role = "CONTENT_ADMIN", id = 1001)
+    void reprocessLinksAnswerKeyAndQueuesNewJob() throws Exception {
+        long testId = upload("TEST", pdfFile("test-14.pdf", "tiny.pdf"));
+        long keyId = upload("ANSWER_KEY", otherPdf("cevap-anahtari.pdf"));
+        finishJobs(testId);
+        jdbcTemplate.update("UPDATE source_document SET status = 'REVIEW' WHERE id = ?", testId);
+
+        mockMvc.perform(reprocessRequest(testId).param("answerKeySourceId", Long.toString(keyId)))
+                .andExpect(status().isAccepted());
+        entityManager.flush();
+
+        assertThat(answerKeyOf(testId)).isEqualTo(keyId);
+        assertThat(jdbcTemplate.queryForObject("SELECT status FROM source_document WHERE id = ?", String.class, testId))
+                .isEqualTo("UPLOADED");
+        assertThat(jdbcTemplate.queryForObject(
+                        "SELECT count(*) FROM background_job WHERE payload->>'sourceId' = ?",
+                        Long.class,
+                        Long.toString(testId)))
+                .isEqualTo(2L);
+    }
+
+    /** Kuyrukta ya da çalışan işi olan kaynağı ikinci kez kuyruğa koymaz. */
+    @Test
+    @WithAuthUser(role = "CONTENT_ADMIN", id = 1001)
+    void rejectsReprocessWhileJobIsActive() throws Exception {
+        long sourceId = upload("TEXTBOOK", pdfFile("kitap.pdf", "tiny.pdf"));
+
+        mockMvc.perform(reprocessRequest(sourceId))
+                .andExpect(status().isConflict())
+                .andExpect(jsonPath("$.code").value("SOURCE_BUSY"));
+        mockMvc.perform(reprocessRequest(sourceId + 1000)).andExpect(status().isNotFound());
+    }
+
+    /** Kaynak listesini istenen türe göre süzer. */
+    @Test
+    @WithAuthUser(role = "CONTENT_ADMIN", id = 1001)
+    void filtersSourceListByKind() throws Exception {
+        upload("TEXTBOOK", pdfFile("kitap.pdf", "tiny.pdf"));
+        long keyId = upload("ANSWER_KEY", otherPdf("cevap-anahtari.pdf"));
+
+        mockMvc.perform(get("/api/admin/sources?kind=ANSWER_KEY").with(testSecurityContext()))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.total").value(1))
+                .andExpect(jsonPath("$.items[0].sourceId").value(keyId));
     }
 
     /** Girişsiz isteğin ortak kimlik doğrulama hatasıyla reddedildiğini doğrular. */
@@ -319,6 +429,48 @@ class SourceControllerIT {
             request.param("kind", kind);
         }
         return request.cookie(new Cookie("XSRF-TOKEN", csrfToken)).header("X-XSRF-TOKEN", csrfToken);
+    }
+
+    /** Dosyayı verilen türle yükler ve kaynak kimliğini döndürür. */
+    private long upload(String kind, MockMultipartFile file) throws Exception {
+        MvcResult result = mockMvc.perform(uploadRequest(kind, file).with(testSecurityContext()))
+                .andExpect(status().isAccepted())
+                .andReturn();
+        return sourceIdFrom(result);
+    }
+
+    /** Kaynağın bütün hazırlık işlerini bitmiş yapar. */
+    private void finishJobs(long sourceId) {
+        entityManager.flush();
+        entityManager.clear();
+        jdbcTemplate.update(
+                "UPDATE background_job SET status = 'DONE' WHERE payload->>'sourceId' = ?", Long.toString(sourceId));
+    }
+
+    /** Kaynağa bağlı cevap anahtarı kimliğini okur. */
+    private Long answerKeyOf(long sourceId) {
+        return jdbcTemplate.queryForObject(
+                "SELECT answer_key_source_id FROM source_document WHERE id = ?", Long.class, sourceId);
+    }
+
+    /** CSRF çerezi ve başlığıyla yeniden işleme isteği kurar. */
+    private MockHttpServletRequestBuilder reprocessRequest(long sourceId) {
+        String csrfToken = UUID.randomUUID().toString();
+        return post("/api/admin/sources/" + sourceId + "/reprocess")
+                .with(testSecurityContext())
+                .cookie(new Cookie("XSRF-TOKEN", csrfToken))
+                .header("X-XSRF-TOKEN", csrfToken);
+    }
+
+    /** tiny.pdf'ten farklı özetli küçük bir PDF girdisi üretir. */
+    private MockMultipartFile otherPdf(String fileName) {
+        return otherPdf(fileName, "second");
+    }
+
+    /** Verilen işaretle özeti farklı küçük bir PDF girdisi üretir. */
+    private MockMultipartFile otherPdf(String fileName, String marker) {
+        byte[] content = ("%PDF-1.4 " + marker + " test PDF").getBytes(StandardCharsets.US_ASCII);
+        return new MockMultipartFile("files", fileName, "application/pdf", content);
     }
 
     /** Yükleme yanıtındaki ilk kaynak kimliğini okur. */

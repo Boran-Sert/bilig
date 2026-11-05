@@ -3,28 +3,43 @@
 Cevap üç yerde bulunur: sorunun altında kendi satırında ("Cevap: A", "Doğru cevap: B"), testin
 sonundaki ya da ayrı dosyadaki anahtarda ("1-B 2-E", "1. C", "1) D") ve birden çok testin
 anahtarını taşıyan dosyada "Test 3" başlıklarının altında (ÖDSGM). Anahtar düzenli ifadeyle okunur
-ve soru numarasıyla eşlenir; ilk başlıktan önceki metin (kapak, başlık) bölümlere girmez. Aynı
-numaraya iki farklı cevap yazılmışsa anahtar güvenilmezdir: okuma ValueError verir ve kaynak
-incelemeye düşer. Anahtarla eşlerken cevabı bulunamayan, anahtarla sorunun altındaki cevabı
-çelişen ve anahtarda olup hiçbir soruya denk gelmeyen numaralar ayrıca döner; bunlar da
-incelemeye düşer (NO_ANSWER_KEY, VALIDATION_FAILED).
+ve soru numarasıyla eşlenir; ilk başlıktan önceki metin (kapak, başlık) bölümlere girmez. ÖDSGM
+anahtarında cevaplar başlıkla aynı satırda başlar ("Test 14 1. E 2. A"). Aynı numaraya iki
+farklı cevap yazılmışsa anahtar güvenilmezdir: okuma ValueError verir ve kaynak incelemeye
+düşer. Anahtarla eşlerken cevabı bulunamayan, anahtarla sorunun altındaki cevabı çelişen ve
+anahtarda olup hiçbir soruya denk gelmeyen numaralar ayrıca döner. Testin anahtardaki numarası
+ilk sayfanın altındaki ünite satırından sonra yazılır ("Şiir - 4" ve altında "14"); dosya adı
+bu numarayı vermez. Ayrı yüklenen anahtar dosyası (ANSWER_KEY) EXTRACT'te okunur ve hiç cevap
+çıkmazsa VALIDATION_FAILED (NO_CONTENT) ile incelemeye düşer; cevaplar saklanmaz, anahtar bağlı
+test işlenirken dosyadan yeniden okunur (readers/test.py).
 """
 
+import asyncio
 import re
 from collections.abc import Sequence
+from typing import TYPE_CHECKING
 
+import structlog
 from pydantic import BaseModel
 
 from app.constants import ANSWER_KEY_MIN_ENTRIES
+from app.db.queries.review import close_source_review, open_source_review
+from app.ingest import pdf
 from app.schemas.question import OPTION_LABELS, OptionLabel, ParsedQuestion
+from app.schemas.review import SourceProblem
+from app.storage import source_key
 from app.text.turkish import tr_lower
+
+if TYPE_CHECKING:
+    from app.ingest.pipeline import IngestContext
 
 _KEY_ENTRY = re.compile(r"(?<![\w.])(\d{1,3})\s*[.)\-–:]\s*([A-E])(?!\w)")
 _INLINE_ANSWER = re.compile(
     r"^[ \t]*(?:(?i:doğru)[ \t]+)?(?i:cevap|yanıt)[ \t]*:[ \t]*([A-E])[ \t]*\.?[ \t]*$",
     re.MULTILINE,
 )
-_TEST_HEADING = re.compile(r"^[ \t]*(?:Test|TEST)[ \t]+(\d{1,3})[ \t]*:?[ \t]*$", re.MULTILINE)
+_TEST_HEADING = re.compile(r"^[ \t]*(?:Test|TEST)[ \t]+(\d{1,3})\b[ \t]*:?", re.MULTILINE)
+_TEST_NUMBER = re.compile(r"-[ \t]*\d{1,2}[ \t\r]*\n[ \t]*(\d{1,3})[ \t\r]*$", re.MULTILINE)
 _KEY_HEADING = "cevap anahtarı"
 
 
@@ -54,6 +69,21 @@ def is_answer_key(text: str) -> bool:
         return True
     numbers = {int(match.group(1)) for match in _KEY_ENTRY.finditer(text)}
     return set(range(1, ANSWER_KEY_MIN_ENTRIES + 1)) <= numbers
+
+
+def find_test_number(page_text: str) -> int | None:
+    """İlk sayfanın altındaki "Şiir - 4" satırının ardından gelen test numarasını bulur."""
+    numbers = _TEST_NUMBER.findall(page_text)
+    return int(numbers[-1]) if numbers else None
+
+
+def key_for_test(key_text: str, test_number: int | None) -> dict[int, OptionLabel]:
+    """Anahtar dosyasından testin cevaplarını okur; "Test N" bölümü yoksa bütün metin anahtardır."""
+    sections = split_by_test(key_text)
+    if not sections:
+        return parse_answer_key(key_text)
+    section = sections.get(test_number) if test_number is not None else None
+    return parse_answer_key(section) if section is not None else {}
 
 
 def split_by_test(text: str) -> dict[int, str]:
@@ -94,6 +124,26 @@ def attach_answers(
     return AttachedAnswers(
         questions=answered, missing=missing, conflicting=conflicting, unused=unused
     )
+
+
+async def check_answer_key(source_id: int, context: "IngestContext") -> None:
+    """Anahtar dosyasını okur; cevap çıkmazsa incelemeye düşer, çıkarsa eski kayıt kapanır."""
+    content = await asyncio.to_thread(context.storage.read, source_key(source_id))
+    text = await asyncio.to_thread(pdf.read_text, content)
+    try:
+        sections = split_by_test(text) or {0: text}
+        entries = sum(len(parse_answer_key(section)) for section in sections.values())
+    except ValueError as error:
+        structlog.get_logger().warning(
+            "answer key unreadable", source_id=source_id, error=str(error)
+        )
+        entries = 0
+    async with context.connect() as connection:
+        if entries:
+            await close_source_review(connection, source_id, "VALIDATION_FAILED")
+        else:
+            problems = [SourceProblem(code="NO_CONTENT")]
+            await open_source_review(connection, source_id, "VALIDATION_FAILED", problems)
 
 
 def _as_label(letter: str) -> OptionLabel:

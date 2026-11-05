@@ -9,6 +9,7 @@ import { Button } from "../../../components/ui/button";
 import { getProblemMessage } from "../../../lib/api/problem";
 import { ROUTES } from "../../../lib/constants";
 import { useCompleteSession, useStartSession, useSubmitAnswer } from "../api";
+import ExplanationSection from "../components/ExplanationSection";
 import QuestionCard, { type QuestionAnswerState } from "../components/QuestionCard";
 
 /**
@@ -23,6 +24,7 @@ export default function SolvePage() {
   const completeSession = useCompleteSession();
   const [currentIndex, setCurrentIndex] = useState(0);
   const [answers, setAnswers] = useState<Record<number, QuestionAnswerState>>({});
+  const [isExplanationOpen, setIsExplanationOpen] = useState(false);
 
   useEffect(() => {
     if (testId) {
@@ -57,6 +59,9 @@ export default function SolvePage() {
             ...previous,
             [currentQuestion.id]: { selectedOption: option, response },
           }));
+          if (!response.isCorrect) {
+            setIsExplanationOpen(true);
+          }
         },
       },
     );
@@ -79,6 +84,7 @@ export default function SolvePage() {
   /** Verilen soruya geçer ve önceki cevap hatasını temizler. */
   function goToQuestion(index: number) {
     submitAnswer.reset();
+    setIsExplanationOpen(false);
     setCurrentIndex(index);
   }
 
@@ -110,7 +116,9 @@ export default function SolvePage() {
   });
 
   return (
-    <section className="mx-auto max-w-3xl space-y-6">
+    <section
+      className={`mx-auto ${isExplanationOpen ? "max-w-6xl" : "max-w-3xl"} space-y-6 transition-all duration-200`}
+    >
       <PageMeta title={questionLabel} description={t("solve.metaDescription")} />
       <div className="flex items-center justify-between border-b border-border pb-4">
         <Link to={ROUTES.tests} className="text-sm font-medium hover:underline">
@@ -131,39 +139,57 @@ export default function SolvePage() {
         </p>
       </div>
 
-      <QuestionCard
-        question={currentQuestion}
-        answer={answers[currentQuestion.id]}
-        onSelectOption={handleSelectOption}
-        isSubmitting={submitAnswer.isPending}
-      />
+      <div
+        className={
+          isExplanationOpen && sessionId
+            ? "grid grid-cols-1 items-start gap-8 lg:grid-cols-2"
+            : "space-y-6"
+        }
+      >
+        <div className="space-y-6">
+          <QuestionCard
+            question={currentQuestion}
+            answer={answers[currentQuestion.id]}
+            onSelectOption={handleSelectOption}
+            isSubmitting={submitAnswer.isPending}
+            isExplanationOpen={isExplanationOpen}
+            onToggleExplanation={() => setIsExplanationOpen((previous) => !previous)}
+          />
 
-      {submitAnswer.isPending && (
-        <p className="text-sm text-muted-foreground">{t("solve.submitting")}</p>
-      )}
-      {submitAnswer.isError && (
-        <p role="alert" className="rounded-md bg-destructive/10 p-3 text-sm text-destructive">
-          {getProblemMessage(submitAnswer.error)}
-        </p>
-      )}
+          {submitAnswer.isPending && (
+            <p className="text-sm text-muted-foreground">{t("solve.submitting")}</p>
+          )}
+          {submitAnswer.isError && (
+            <p role="alert" className="rounded-md bg-destructive/10 p-3 text-sm text-destructive">
+              {getProblemMessage(submitAnswer.error)}
+            </p>
+          )}
 
-      <div className="flex justify-end gap-2 border-t border-border pt-6">
-        <Button
-          variant="outline"
-          size="sm"
-          onClick={() => goToQuestion(currentIndex - 1)}
-          disabled={currentIndex === 0}
-        >
-          {t("solve.prev")}
-        </Button>
-        {currentIndex === questions.length - 1 ? (
-          <Button size="sm" onClick={handleCompleteTest} disabled={completeSession.isPending}>
-            {completeSession.isPending ? t("solve.finishing") : t("solve.finishTest")}
-          </Button>
-        ) : (
-          <Button variant="outline" size="sm" onClick={() => goToQuestion(currentIndex + 1)}>
-            {t("solve.next")}
-          </Button>
+          <div className="flex justify-end gap-2 border-t border-border pt-6">
+            <Button
+              variant="outline"
+              size="sm"
+              onClick={() => goToQuestion(currentIndex - 1)}
+              disabled={currentIndex === 0}
+            >
+              {t("solve.prev")}
+            </Button>
+            {currentIndex === questions.length - 1 ? (
+              <Button size="sm" onClick={handleCompleteTest} disabled={completeSession.isPending}>
+                {completeSession.isPending ? t("solve.finishing") : t("solve.finishTest")}
+              </Button>
+            ) : (
+              <Button variant="outline" size="sm" onClick={() => goToQuestion(currentIndex + 1)}>
+                {t("solve.next")}
+              </Button>
+            )}
+          </div>
+        </div>
+
+        {isExplanationOpen && sessionId && (
+          <div className="lg:sticky lg:top-6">
+            <ExplanationSection sessionId={sessionId} questionId={currentQuestion.id} />
+          </div>
         )}
       </div>
     </section>

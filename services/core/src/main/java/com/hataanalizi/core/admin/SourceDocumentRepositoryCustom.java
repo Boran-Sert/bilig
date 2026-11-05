@@ -9,7 +9,8 @@ public interface SourceDocumentRepositoryCustom {
      * SHA-256 daha önce kaydedilmemişse yeni kaynak ekler.
      * Kayıt eklenirse ID, duplicate ise boş Optional döndürür.
      */
-    Optional<Long> insertIfAbsent(String title, String sha256, String filePath, String kind, Long uploadedBy);
+    Optional<Long> insertIfAbsent(
+            String title, String sha256, String filePath, String kind, Long uploadedBy, Long answerKeySourceId);
 
     /** Kaynağın dosya yolunu günceller. */
     void updateFilePath(long sourceId, String filePath);

@@ -76,7 +76,7 @@ async def test_problems_open_one_review_per_reason_and_mark_source_review(db: Co
     tests = [[build_question(1, correct_option=None), build_question(2, labels=["A", "B"])]]
     problems = find_problems(tests)
     reading = QuestionReading(tests=tests, pages=[])
-    failed = failed_problems(reading, problems, unit_found=True)
+    failed = failed_problems(reading, problems)
 
     await report_problems(db, source_id, answer_problems(problems), failed)
     await report_problems(db, source_id, answer_problems(problems), failed)

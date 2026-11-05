@@ -5,8 +5,9 @@ from pathlib import Path
 import pytest
 from jinja2.exceptions import UndefinedError
 
-from app.constants import PROMPTS_DIR
-from app.llm.prompts import RenderedPrompt, render_prompt
+from app.constants import LLM_TASKS_PATH, PROMPTS_DIR, TOOL_PROMPTS_PATH
+from app.llm.prompts import RenderedPrompt, load_tool_prompts, render_prompt
+from app.llm.tasks import load_task_configs
 from app.schemas.tutor import ChatTurn, OutcomeInfo
 
 PROMPT = """{# version: 3 #}
@@ -92,9 +93,39 @@ def test_tutor_prompts_render_with_code_variables(name: str) -> None:
     assert "not sure" in prompt.system
 
 
+def test_chat_prompt_explains_tools_and_limit() -> None:
+    """Sohbet prompt'u üç tool'u ve en fazla üç çağrı kuralını anlatır, kaynak göstermeyi ister."""
+    prompt = render_prompt(PROMPTS_DIR, "chat.j2", TUTOR_VARIABLES["chat.j2"])
+
+    assert prompt.version >= 2
+    for name in ("search_notes", "open_note", "get_outcome"):
+        assert name in prompt.system
+    assert "at most three tool calls" in prompt.system
+    assert "cite" in prompt.system
+
+
 def test_hint_prompt_forbids_revealing_answer() -> None:
     """İpucu prompt'u doğru şıkkı ve metnini yazmayı yasaklar."""
     prompt = render_prompt(PROMPTS_DIR, "hint.j2", TUTOR_VARIABLES["hint.j2"])
 
     assert "Never reveal the correct answer" in prompt.system
     assert "do not reveal it" in prompt.user
+
+
+def test_tool_schemas_are_strict() -> None:
+    """Her tool şeması nesnedir, bütün alanları zorunludur ve fazladan alan kabul etmez."""
+    tools = load_tool_prompts(TOOL_PROMPTS_PATH).tools
+
+    for definition in tools.values():
+        schema = definition.input_schema
+        assert schema["type"] == "object"
+        assert schema["additionalProperties"] is False
+        assert schema["required"] == list(schema["properties"])
+
+
+def test_every_task_tool_is_defined() -> None:
+    """Görev ayarlarında adı geçen her tool'un açıklaması ve şeması vardır."""
+    tools = load_tool_prompts(TOOL_PROMPTS_PATH).tools
+
+    names = {name for config in load_task_configs(LLM_TASKS_PATH).values() for name in config.tools}
+    assert names <= set(tools)

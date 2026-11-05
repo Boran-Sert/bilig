@@ -7,6 +7,7 @@ import { ApiError } from "../../lib/api/problem";
 import type {
   AnswerRequest,
   AnswerResponse,
+  BlockResponse,
   ExamSummary,
   SessionCompletionResponse,
   SessionResponse,
@@ -18,8 +19,9 @@ export const solveKeys = {
   session: (testId: number) => ["solve", "session", testId] as const,
   /** Oturum sonucu sorgu anahtarını üretir. */
   result: (sessionId: number) => ["solve", "result", sessionId] as const,
+  /** Alıntı bloğu sorgu anahtarını üretir. */
+  block: (id: number) => ["solve", "block", id] as const,
 };
-
 /**
  * Tamamlanmış oturumun net ve kazanım özetini sunucudan getirir.
  */
@@ -133,6 +135,32 @@ export function useCompleteSession() {
     mutationFn: async (sessionId: number): Promise<SessionCompletionResponse> => {
       const { data, error, response } = await client.POST("/api/sessions/{id}/complete", {
         params: { path: { id: sessionId } },
+      });
+      const status = response.status;
+
+      if (error || !data) {
+        throw new ApiError(error, status);
+      }
+
+      return data;
+    },
+  });
+}
+
+/**
+ * Alıntı kartında gösterilecek içerik bloğunu getirir.
+ */
+export function useBlock(id: number | null) {
+  return useQuery<BlockResponse, ApiError>({
+    queryKey: id ? solveKeys.block(id) : ["solve", "block", "null"],
+    enabled: id !== null && id > 0,
+    /** Belirtilen bloğu GET /api/blocks/{id} ucundan okur. */
+    queryFn: async (): Promise<BlockResponse> => {
+      if (!id) {
+        throw new Error("Geçersiz blok kimliği.");
+      }
+      const { data, error, response } = await client.GET("/api/blocks/{id}", {
+        params: { path: { id } },
       });
       const status = response.status;
 

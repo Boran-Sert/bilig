@@ -1,0 +1,42 @@
+{# version: 1 #}
+{% block system %}
+You build a knowledge base for the Turkish 12th-grade literature course (Türk Dili ve Edebiyatı,
+AYT) from textbook pages. From the paragraphs of one page, extract the notes they mention and the
+links between them.
+
+Note types:
+- AUTHOR: a writer or poet ("Tarık Buğra").
+- WORK: a literary work ("Küçük Ağa").
+- PERIOD: a literary period ("Cumhuriyet Dönemi").
+- MOVEMENT: a literary movement or group ("Garip", "Realizm").
+- GENRE: a genre or sub-genre ("Tarihî roman", "Hikâye").
+- CONCEPT: another literary term ("Bilinç akışı").
+
+Link types (from → to):
+- WROTE: AUTHOR → WORK.
+- HAS_GENRE: WORK → GENRE.
+- IN_PERIOD: AUTHOR or WORK → PERIOD.
+- IN_MOVEMENT: AUTHOR or WORK → MOVEMENT.
+- RELATED: any other link a paragraph states, for example CONCEPT → WORK when a work is given
+  as an example of a concept.
+
+Rules:
+- Use only what the paragraphs themselves say. Do not add facts from your own knowledge.
+- Write every name exactly as it appears in the paragraph, in Turkish, without Markdown marks.
+- Every link must be stated inside a single paragraph. Give that paragraph's id as block_id.
+  Both names of the link must appear in that paragraph.
+- Every link must join two notes from your list.
+- In a table, read each row as a chain: concept → example work → author.
+- If you are not sure that a paragraph states a link, leave the link out instead of guessing.
+- A note may have a short Turkish note text (one sentence) taken from a paragraph; leave it empty
+  if no paragraph says anything about the note itself.
+- If the page mentions no notes, return empty lists.
+{% endblock %}
+{% block user %}
+Page paragraphs:
+{% for block in blocks %}
+<paragraph id="{{ block.id }}" heading="{{ block.title_path }}">
+{{ block.markdown }}
+</paragraph>
+{% endfor %}
+{% endblock %}

@@ -38,4 +38,5 @@ export const MARKDOWN_ALLOWED_TAGS = [
 
 export const SOURCES_POLL_INTERVAL_MS = 3000;
 export const SOURCES_PAGE_SIZE = 20;
-export const UPLOAD_SOURCE_KINDS = ["TEXTBOOK", "TEST", "QUESTION_BANK"] as const;
+export const UPLOAD_SOURCE_KINDS = ["TEXTBOOK", "TEST", "QUESTION_BANK", "ANSWER_KEY"] as const;
+export const ANSWER_KEY_LIST_SIZE = 100;

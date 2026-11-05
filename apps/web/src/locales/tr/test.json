@@ -27,7 +27,21 @@
     "finishing": "Tamamlanıyor...",
     "loading": "Soru yükleniyor...",
     "submitting": "Cevap kaydediliyor...",
-    "alreadyAnswered": "Bu soru zaten cevaplandı."
+    "alreadyAnswered": "Bu soru zaten cevaplandı.",
+    "openPage": "Sayfayı aç",
+    "close": "Kapat",
+    "textbookHeader": "DERS KİTABINDA",
+    "pageNumber": "s. {{page}}",
+    "pageImageAlt": "{{source}} - Sayfa {{page}} görüntüsü",
+    "styleLabel": "Tarz: Adım adım ▾",
+    "citationLoading": "Alıntı yükleniyor...",
+    "chatInputPlaceholder": "Anlamadığın yeri yaz…",
+    "send": "Gönder",
+    "anotherExample": "Başka örnekle anlat",
+    "anotherExamplePrompt": "Başka bir örnekle açıklar mısın?",
+    "dailyLimitReached": "Günlük mesaj limitine ulaşıldı.",
+    "sendFailed": "Mesaj gönderilemedi. Biraz sonra tekrar dene.",
+    "explanationFailed": "Anlatım alınamadı. Biraz sonra tekrar dene."
   },
   "result": {
     "title": "Test Sonucu",

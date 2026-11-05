@@ -2,8 +2,9 @@
 
 İstek ve cevap gövdeleri Java'yla camelCase konuşur. Akışın olayları tarayıcıya giden olaylarla
 aynı adı taşır: delta, citation, done, error. done boştur; mesajı Java kaydeder ve numarasını
-kendisi ekler. CitationSource Claude'a search_result olarak giden paragraftır; StreamText ve
-StreamCitation stream_task'in parçalarıdır, alıntı kaynağı sıra numarasıyla gelir.
+kendisi ekler. CitationSource Claude'a search_result olarak giden paragraf ya da nottur; block
+alıntılanınca kartı çizilecek yayındaki paragraftır. ToolOutput bir tool'un sonucudur. StreamText
+ve StreamCitation stream_task'in parçalarıdır; alıntı, alıntılanan kaynağın kendisiyle gelir.
 """
 
 from enum import StrEnum
@@ -11,6 +12,7 @@ from enum import StrEnum
 from pydantic import BaseModel, ConfigDict
 from pydantic.alias_generators import to_camel
 
+from app.constants import TUTOR_SOURCE_LABEL
 from app.schemas.question import OptionLabel, QuestionContent
 
 
@@ -88,13 +90,31 @@ class SourceBlock(BaseModel):
     title_path: str
     markdown: str
 
+    def citation_source(self) -> "CitationSource":
+        """Paragrafı kartı kendisi olan search_result kaynağına çevirir."""
+        return CitationSource(
+            source=TUTOR_SOURCE_LABEL.format(title=self.source_title, page=self.page_no),
+            title=self.title_path,
+            text=self.markdown,
+            block=self,
+        )
+
 
 class CitationSource(BaseModel):
-    """Claude'a search_result olarak giden paragraf."""
+    """Claude'a search_result olarak giden paragraf ya da not ve alıntı kartının paragrafı."""
 
     source: str
     title: str
     text: str
+    block: SourceBlock | None = None
+
+
+class ToolOutput(BaseModel):
+    """Tool'un modele dönen sonucu: alıntılanabilir kaynaklar ya da düz metin."""
+
+    text: str = ""
+    sources: list[CitationSource] = []
+    is_error: bool = False
 
 
 class StreamText(BaseModel):
@@ -104,9 +124,9 @@ class StreamText(BaseModel):
 
 
 class StreamCitation(BaseModel):
-    """Akışta gelen alıntı: kaynağın gönderilen listedeki sırası."""
+    """Akışta gelen alıntı: istekte gönderilen kaynaklardan alıntılanan."""
 
-    source_index: int
+    source: CitationSource
 
 
 class DeltaEvent(CamelModel):

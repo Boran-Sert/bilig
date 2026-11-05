@@ -175,6 +175,8 @@ Her kaynak bir kez işlenir ve aynı ortak formata dönüşür. Kaynaklar birbir
 
 Öğretim programı bu hattın özel bir kaynağıdır; kazanım ağacını kurar (A1). Diğer bütün kaynaklar aynı yoldan geçer.
 
+Hattın adımları sırayla REGISTERED (A2), EXTRACT (A3, A5, A6), ENTITIES (A7), OUTCOMES (A8) ve INDEX (A9). Kontroller (A6) EXTRACT'ın içinde çalışır. Her adım bitince işe kaydedilir; hata alan iş kaldığı adımdan sürer. Son adımdan sonra kaynak yayına girer ya da incelemede bekler (Yayına alma).
+
 ### A1Program katmanını kurma
 
 Girdi
@@ -200,11 +202,11 @@ Fatih çıktıyı tablo hâlinde kontrol eder. Ders başına bir kez.
 
 Nasıl
 
-Dosyanın parmak izi (sha256) alınır; aynı dosya ikinci kez işlenmez. İlk sayfanın metni ya da görüntüsünden Haiku türü ve sınıfı tahmin eder: ders kitabı, ÖDSGM testi, OGM materyali, soru bankası, cevap anahtarı, program. İzin durumu ve yayıncı kaydedilir.
+Dosyanın parmak izi (sha256) alınır; aynı dosya ikinci kez işlenmez. Türü dosyayı yükleyen seçer: ders kitabı, test, soru bankası ya da cevap anahtarı. Cevapları ayrı dosyada olan test yüklenirken o cevap anahtarı seçilir; anahtar sonradan gelirse kaynak listesinden bağlanır ve test yeniden işlenir. Yarıda kalan kaynak da aynı yerden yeniden işlenir. Program komutla yüklenir. İzin durumu ve yayıncı kaydedilir. REGISTERED adımı her sayfayı 150 dpi PNG olarak saklar; "Sayfayı aç" ve görüntü yolu bu görüntüyü kullanır.
 
 Sonuç
 
-Bir `source` kaydı ve kuyrukta bir iş.
+Bir `source` kaydı, sayfa kayıtları ve kuyrukta bir iş.
 
 ### A3Metin katmanı kontrolü
 
@@ -214,7 +216,7 @@ Ayrı bir adım değildir; PDF okuması (A5) sırasında çalışır. PDF motoru
 
 Örnek
 
-Masal sayfasında "Masal; genellikle" metni "0DVDO JHQHOOLNOH" diye çıkıyor: her harf 29 kod noktası kaymış, fontun karakter eşlemesi bozuk. Kayma sabitse kodla geri çevrilir ve sayfa metin yoluna döner; Türkçe harflerde (ş, ğ, ı) aynı kaymanın olup olmadığı henüz denenmedi. Soru bankası çıktısında hiç metin yok: görüntü yoluna düşer. Program, ÖDSGM testi ve MEB kitapları metin yolundan gider.
+Masal sayfasında "Masal; genellikle" metni "0DVDO JHQHOOLNOH" diye çıkıyor: her harf 29 kod noktası kaymış, fontun karakter eşlemesi bozuk. Kayma sabitse kodla geri çevrilir ve sayfa metin yoluna döner; Türkçe harflerde (ş, ğ, ı) aynı kaymanın olup olmadığı henüz denenmedi. Soru bankası çıktısında hiç metin yok: sayfa Tesseract'la okunur. Testlerde görüntü yolu henüz yok; metin yine zayıf kalırsa sayfa incelemeye düşer. Program, ÖDSGM testi ve MEB kitapları metin yolundan gider.
 
 ### A4Kaynak profili (kaldırıldı)
 
@@ -224,11 +226,11 @@ Yayınevine ya da seriye özel profil yoktur. Ölçüler (gövde boyutu, paragra
 
 Kitap
 
-Kitap motoru (`app.ingest.pdf.read_textbook`) kodla çalışır, LLM yok. Kenarda tekrarlayan satırlar, sayfa numarası ve logolar atılır; okuma sırası XY-cut ile bulunur, kutular bölünmez; paragraf eşiği belgeden öğrenilir. Başlıklar stil ve hizalamadan bulunur, düzey alır ve başlık yolu kurulur; kutudaki metin BILGI olur (ALINTI ve ETKINLIK ayrımı sonraki iş); italik `*...*` olarak korunur. Sütun ya da sayfa sonunda yarım kalan paragraf sonraki sütunda sürer.
+Kitap motoru (`app.ingest.pdf.read_textbook`) kodla çalışır, LLM yok. Kenarda tekrarlayan satırlar, sayfa numarası ve logolar atılır; okuma sırası XY-cut ile bulunur, kutular bölünmez; paragraf eşiği belgeden öğrenilir. Başlıklar stil ve hizalamadan bulunur, düzey alır ve başlık yolu kurulur. Kutudaki metin BILGI, diğer paragraflar METIN olur; ALINTI ve ETKINLIK üretilmez. Anlatım ve sohbet kitaptan alıntıyı bu blokların metniyle aynen yapar. İtalik `*...*` olarak korunur. Sütun ya da sayfa sonunda yarım kalan paragraf sonraki sütunda sürer.
 
 Görüntü
 
-Sayfa PNG'ye çevrilir. Haiku ortak formatı JSON şemasıyla üretir; kontrol geçmezse aynı sayfa Sonnet'e gider.
+Metin katmanı A3'ten sonra da zayıf kalan kitap sayfası (LOW_TEXT_LAYER) REGISTERED'da saklanan PNG'den okunur. Haiku (PAGE_EXTRACT) sayfayı JSON şemasıyla BASLIK, BILGI ve METIN bloklarına ayırır. Hiç metin dönmezse ya da model emin olmadığını söylerse aynı sayfa Sonnet'e (PAGE_EXTRACT_FALLBACK) gider. Okuma geçerse sayfanın motor blokları görüntüden okunanlarla değişir ve sayfa incelemeye düşmez. İkisi de geçemezse motorun okuması kalır, sayfa incelemeye düşer. Görüntüden okunan metin metin katmanıyla karşılaştırılmaz; bu sayfalarda katman zaten bozuk. Şimdilik sadece kitap sayfaları bu yoldan geçer (#142).
 
 Testler
 
@@ -236,7 +238,7 @@ Her zaman metin ve görüntü birlikte gider. Altı çizili "değildir", kelime 
 
 Cevap
 
-Sorunun altındaysa ("Cevap: A") ayrıştırmada alınır. Ayrı sayfa ya da dosyaysa ("1-B 2-E") düzenli ifadeyle okunup numarayla eşlenir. Yoksa Sonnet çözer, soru incelemeye düşer.
+Sorunun altındaysa ("Cevap: A") ayrıştırmada alınır. Ayrı sayfadaysa ("1-B 2-E") düzenli ifadeyle okunup numarayla eşlenir. Ayrı dosyadaysa (ÖDSGM: tek sayfada "Test 1 … Test 40") teste bağlanan anahtarın, testin numarasındaki bölümü alınır. Numara dosya adında değil, ilk sayfanın altında ünite satırından sonra yazar ("Şiir - 4" ve altında "14"). Anahtarda testte olmayan numara ya da sayfadakiyle çelişen cevap varsa anahtar uygulanmaz. Yoksa Sonnet çözer, soru incelemeye düşer.
 
 Kayıt
 
@@ -244,13 +246,11 @@ Her blok: tür, markdown metin, sayfa, konum, kaynak, güven. Sayfa görüntüs�
 
 ```
 {"source": "TDE 12 Ders Kitabı", "page": 174, "blocks": [
-  {"type": "bilgi", "title": "Roman Türleri ve Özellikleri", "term": "Tarihî Roman",
-   "definition": "Konusunu tarihten alan romanlardır...",
-   "examples": [{"eser": "Devlet Ana", "yazar": "Kemal Tahir"},
-                {"eser": "Küçük Ağa", "yazar": "Tarık Buğra"}]},
-  {"type": "etkinlik", "label": "Hatırlayalım", "text": "Ön bilgilerinizden..."},
-  {"type": "alinti", "title": "Üslûp (Fr. Style)", "text": "En kısa tanımıyla üslûp...",
-   "kaynak": "L. Sami Akalın, Edebiyat Terimleri Sözlüğü", "pages": [174, 175]}
+  {"type": "BASLIK", "markdown": "Roman Türleri ve Özellikleri"},
+  {"type": "BILGI", "title_path": "TDE 12 Ders Kitabı › Roman › Roman Türleri ve Özellikleri",
+   "markdown": "**Tarihî Roman:** Konusunu tarihten alan romanlardır... *Devlet Ana* (Kemal Tahir)"},
+  {"type": "METIN", "title_path": "TDE 12 Ders Kitabı › Roman › Üslûp",
+   "markdown": "En kısa tanımıyla üslûp...", "pages": [174, 175]}
 ]}
 ```
 
@@ -258,38 +258,42 @@ Her blok: tür, markdown metin, sayfa, konum, kaynak, güven. Sayfa görüntüs�
 
 Sorular
 
-Şık sayısı 5 mi, numaralar sıralı mı, cevap şıklardan biri mi, kök dolu mu.
+Şık sayısı 5 mi, şık harfleri sıralı mı, şıklar ve kök dolu mu, cevap şıklardan biri mi, numaralar sıralı mı. Cevabı bulunamayan soru da ayrılır.
 
-Metin
+Sayfa
 
-Metin katmanı varsa çıktı ona en az %90 benzemeli (rapidfuzz).
+Metin katmanı A3'ten sonra da zayıf mı (LOW_TEXT_LAYER), çözülemeyen harf kaldı mı (UNDECODED_GLYPHS). Kitapta zayıf sayfa önce görüntü yolundan okunur; okunursa sorun sayılmaz.
+
+Kaynak
+
+Hiç içerik çıktı mı (NO_CONTENT), kökünde soru olmayan şık kümesi var mı (NOT_MULTIPLE_CHOICE). Ünitenin bulunamaması sorun değildir: sorular yine yazılır, ünite kazanımlardan çıkarılır (A8).
 
 Sonuç
 
-Geçemeyen içerik inceleme listesine düşer. Hiçbir içerik kontrolsüz yayına girmez.
+Kontrolü geçemeyen soru yazılmaz. Kaynağın bütün sorunları tek inceleme kaydında toplanır: cevap anahtarı eksikleri NO_ANSWER_KEY, diğerleri VALIDATION_FAILED. Her sorun kodu, sayfası, testi ve soru numarasıyla kayıtlıdır (`review_item.detail`). Sorunu olan kaynak REVIEW durumunda kalır. Hiçbir içerik kontrolsüz yayına girmez.
 
 ### A7Bilgi katmanı
 
 Kural
 
-`*Eser* (Yazar)` ve `*Eser* [Yazar (okunuş)]` kalıpları eser ve yazar notu ile aralarında bağ üretir. Bilgi Köşesi tablosunun her satırı bir zincire dönüşür: kavram (Tarihî Roman) → örnek eser → yazar.
+`*Eser* (Yazar)` ve `*Eser* [Yazar (okunuş)]` kalıpları eser ve yazar notu ile aralarında bağ üretir. Parantezdeki tür açıklaması ("roman", "Tarihî roman") ve yıl yazar sayılmaz.
 
 Haiku
 
-Kalan düz metinden yazar, eser, dönem, akım ve kavramları bağlarıyla çıkarır. Her bağ hangi bloğa dayandığını göstermek zorunda; dayanağı olmayan atılır.
+Sayfanın BILGI, ALINTI ve METIN paragraflarını tek çağrıda okur; yazar, eser, dönem, akım, tür ve kavramları bağlarıyla çıkarır. Bilgi Köşesi tablosunun her satırı bir zincire dönüşür: kavram (Tarihî Roman) → örnek eser → yazar. Her bağ dayandığı paragrafın numarasını taşır: iki ucun adı da o paragrafta geçmeli, geçmeyen bağ atılır. Kalan bağ yayına girer; not sadece kalan bir bağın ucuysa yazılır. İşlenen sayfa işaretlenir (`source_page.entities_extracted_at`) ve bir daha modele gitmez. Paragraf başına çağrıya göre maliyet yaklaşık yarıya, süre üçte bire iner; bulunan bağlar aynı kalır (Giriş ünitesinde 10 sayfayla ölçüldü).
 
 Birleştirme
 
-Aynı kişinin farklı yazımları birleştirilir (Viktor Hügo = Victor Hugo): Türkçe küçük harf, aksan temizliği, benzerlik puanı. Emin olunamayanlar incelemeye düşer.
+Türkçe küçük harf, aksan ve noktalama temizliğinden sonra aynı kalan adlar tek nottur (TARIK BUĞRA = Tarık Buğra); her yazım nota eklenir. Aynı olmayan ama benzerlik puanı 80'i geçen adlar (Viktor Hügo, Victor Hugo) NAME_MERGE incelemesine düşer; karar verilene kadar iki not da yayındadır.
 
 ### A8Kazanım eşleştirme
 
 MEB soruları sık sık birden çok kazanımı aynı anda ölçer. Bu yüzden bir soru birden çok kazanıma bağlanabilir. Kazanımlar arasında sıra, ağırlık ya da "ana kazanım" yok; MEB'deki gibi soru bir kazanımı ya ölçer ya ölçmez.
 
-1. **Ünite:** Kaynakta yazıyorsa ("Hikâye - 5", kitabın ünite başlığı) oradan alınır; yazmıyorsa Haiku sınıfın ünite listesinden seçer.
-2. **Adaylar:** O ünitenin kazanımları vektör ve BM25 aramasıyla sıralanır; iki sonuç RRF ile birleştirilir. Sorularda ilk 8, paragraflarda ilk 5 aday alınır. Kelime araması soru köküyle birlikte şıklarda da yapılır; "mekân", "bakış açısı" gibi boyutlar çoğu zaman şıklarda geçer. Kazanım vektörü yoluyla birlikte hesaplanır: "12. sınıf › Roman › Metnin olay örgüsünü belirler".
+1. **Ünite:** Testte önce kaynak adından, o da yoksa ilk sayfanın "Hikâye - 5" biçimli başlığından bulunur; kitapta ünite başlığından alınır. Ünite sadece ipucudur: bulunamazsa ya da ünitenin bağlı kazanımı yoksa (Giriş, Söylev) adaylar bütün kazanımlardan aranır. Ünitesiz yazılan sorunun ünitesi, bağlanan kazanımların hepsi aynı üniteye aitse o ünite olur; farklı ünitelere aitse boş kalır.
+2. **Adaylar:** O ünitenin kazanımları vektör ve BM25 aramasıyla sıralanır; iki sonuç RRF ile birleştirilir. Sorularda ilk 16, paragraflarda ilk 5 aday alınır. Kelime araması soru köküyle birlikte şıklarda da yapılır; "mekân", "bakış açısı" gibi boyutlar çoğu zaman şıklarda geçer. Kazanım vektörü yoluyla birlikte hesaplanır: "12. sınıf › Roman › Metnin olay örgüsünü belirler".
 3. **Seçim:** Haiku her seferinde temiz bağlamla adaylar arasından sorunun ölçtüğü bütün kazanımları seçer, her biri için bir güven verir.
-4. **Kontrol (kod):** En az bir kazanım var ve kodlar aday listesinde. Herhangi bir kazanımın güveni düşükse soru incelemeye düşer. Güven sadece bu karar için; kayıtta kazanım ya vardır ya yoktur.
+4. **Kontrol (kod):** En az bir kazanım var ve kodlar aday listesinde. Herhangi bir kazanımın güveni orta ya da düşükse soru incelemeye düşer (LOW_CONFIDENCE) ve taslak kalır; düşmeyen içerik hemen yayına girer. Güven sadece bu karar için; kayıtta kazanım ya vardır ya yoktur.
 5. **Kaynakta kazanım yazıyorsa** (bazı test ve soru bankaları kazanım kodunu basar) o kazanımlar doğrudan bağlanır, model çalışmaz.
 6. **Paragraflar** da birden çok kazanıma bağlanabilir. Etkinlik blokları eşlenmez ve kaynak olarak gösterilmez.
 
@@ -332,6 +336,14 @@ Her paragraf, soru, kazanım ve not iki şekilde indekslenir:
 
 - **Vektör:** bge-m3 metni 1024 sayılık vektöre çevirir; pgvector'da HNSW index'iyle tutulur. Paragrafın başına başlık yolu eklenir: "TDE 12 Ders Kitabı › Roman › Roman Türleri". Tek başına anlamı eksik kalan bir paragraf da böylece doğru konuyla eşleşir.
 - **Kelime (BM25):** pg_textsearch aynı metni Türkçe kök bulmayla indeksler. Yazar adı, eser adı ve "bilinç akışı" gibi terimleri vektör aramasının kaçırdığı yerde yakalar.
+- **Adım:** INDEX, vektörü boş ve reddedilmemiş BILGI, ALINTI ve METIN bloklarıyla soruların vektörünü yazar; başlık blokları indekslenmez. Kazanım vektörü OUTCOMES'ta, aramadan önce yazılır. Vektörü boş bütün notların vektörü de INDEX'te yazılır; nota yazım eklenince vektör silinir ve yeniden hesaplanır. BM25 index'ini veritabanı kendisi günceller.
+
+### Yayına alma
+
+- Hat bitince en az bir yayındaki sorusu olan test yayına girer.
+- Kaynağın kendisinde, sorularında ya da bloklarında açık inceleme kaydı varsa kaynak REVIEW, yoksa PUBLISHED olur.
+- Onaylanan soru taslaktaki testini de yayına alır. Son açık kayıt kapanınca REVIEW'deki kaynak PUBLISHED olur.
+- Kaynak kaydı reddedilirse kaynağın taslak soru ve blokları atılır (REJECTED), kaynak FAILED olur.
 
 ### A10Soru havuzu
 
@@ -349,7 +361,7 @@ Her paragraf, soru, kazanım ve not iki şekilde indekslenir:
 
 ## İçerik ekibinin ekranı
 
-Geliştirici ve içerik ekibi sadece dosyayı bırakır. Tür, sınıf ve profil otomatik bulunur; geri kalan her şey arka planda çalışır. Sistem yalnızca emin olamadığında sorar.
+Geliştirici ve içerik ekibi dosyayı bırakır ve türünü seçer; geri kalan her şey arka planda çalışır. Sistem yalnızca emin olamadığında sorar.
 
 Ekran A · İçerik yükle · Çalışan prototip: dosya bırakabilirsin, adımlar simüle edilir ve dosya hiçbir yere gönderilmez
 
@@ -372,7 +384,7 @@ DosyaDurumSonuç
 
   Ders kitabı · 12. sınıf · metin yolu
 
-  Profil onayı bekliyor · 3/8
+  İnceleme bekliyor · 3 sayfa okunamadı
 
   İnceleme listesinde
 - ogm-sorular.pdf
@@ -395,7 +407,7 @@ Ekran B · İnceleme listesi
 **İnceleme listesi**5 kayıt
 
 - Düşük güvenli eşleşmeSoru bankası · Soru 2
-- Profil onayıtde12-ders-kitabi.pdf
+- Kontrol geçmeditde12-ders-kitabi.pdf · 3 sayfa
 - Cevap anahtarı yokKazanım Testi 7 · 9 soru
 - Yeni bağViktor Hügo = Victor Hugo
 - Öğrenci bildirimiÜretilen soru #4812
@@ -422,9 +434,8 @@ OnaylaKazanım ekle ya da çıkarAt
 
 | Konu | Otomatik | İnsana sorulur |
 | --- | --- | --- |
-| Tür ve sınıf | İlk sayfadan Haiku tahmin eder | Hiçbir türe uymuyorsa |
-| Profil | Stili tanınan profille eşleşirse seçilir | Yeni bir kitap ya da seri geldiğinde, bir kez |
-| Ayrıştırma | Kontrolleri geçen her şey | Kontrolü geçmeyen soru ya da sayfa |
+| Tür | – | Yüklerken her dosya için |
+| Ayrıştırma | Kontrolleri geçen her şey | Kontrolü geçmeyen soru ya da sayfa, hiç içerik çıkmayan kaynak; hepsi kaynak başına tek kayıtta |
 | Cevap anahtarı | Sorunun altında ya da ayrı sayfadaysa | Hiç bulunamazsa (model çözümü onaya gelir) |
 | Kazanım | Bütün kazanımların güveni yüksekse | Herhangi birinin güveni orta ya da düşükse |
 | Yazar ve eser bağları | Kuralla bulunanlar | Modelin bulduğu yeni bağlar ve isim birleştirmeleri |
@@ -436,8 +447,8 @@ OnaylaKazanım ekle ya da çıkarAt
 | --- | --- |
 | `POST /api/admin/sources` | Dosyaları alır (çok parçalı yükleme), kaynak kaydı açar, işi kuyruğa koyar. |
 | `GET /api/admin/sources` | Dosyaların durumunu ve adımlarını döner. Arayüz 3 saniyede bir sorar. |
-| `GET /api/admin/review` | İnceleme listesi; her kayıt kaynak sayfa görüntüsünün adresiyle gelir. |
-| `POST /api/admin/review/{id}` | Onayla, düzelt ya da at. Onaylanan iş kaldığı adımdan devam eder. |
+| `GET /api/admin/review` | İnceleme listesi: düşük güvenli soru ve paragraflar (LOW_CONFIDENCE) ile kaynak kayıtları (NO_ANSWER_KEY, VALIDATION_FAILED). Kaynak kaydı `targetType: SOURCE` ve sorun listesiyle (`problems`: kod, sayfa, test, soru numarası) gelir; sorunun sayfası varsa görüntüsü açılır. |
+| `POST /api/admin/review/{id}` | Soru ve paragrafta: onayla (yayına alır), düzelt (kazanımları değiştirip yayına alır) ya da at. Kaynak kaydında: onayla kaydı kapatır, at kaynağın taslak içeriğini atar ve kaynağı FAILED yapar, düzelt 400 döner. Son açık kayıt kapanınca kaynak PUBLISHED olur. |
 
 Bu ekran sadece `CONTENT_ADMIN` rolüne açıktır. Sürükle-bırak için react-dropzone kullanılır.
 
@@ -568,7 +579,7 @@ Boş bırakılan soru yanlış sayılmaz. Birden çok kazanımı olan sorudaki y
 
 1. Java oturumun öğrenciye ait olduğunu ve günlük kotanın dolmadığını kontrol eder, Python'u çağırır.
 2. Python bağlamı toplar: soru, öğrencinin şıkkı, doğru şık, sorunun bütün kazanımları ve MEB açıklamaları, öğrencinin başarısız kazanımları, anlatım tarzı.
-3. Kaynak arama: sorunun kazanımlarına bağlı bilgi ve alıntı bloklarında vektör ve BM25 aramaları ayrı yapılır, sonuçlar RRF ile birleştirilir (ilk 20). Reranker bu blokları soru ve doğru şıkka göre yeniden sıralar; en iyi 4 tanesi alınır. Etkinlikler hariç.
+3. Kaynak arama: sorunun kazanımlarına bağlı bilgi, alıntı ve metin bloklarında (BILGI, ALINTI, METIN) vektör ve BM25 aramaları ayrı yapılır, sonuçlar RRF ile birleştirilir (ilk 20). Reranker bu blokları soru ve doğru şıkka göre yeniden sıralar; en iyi 4 tanesi alınır. Etkinlikler hariç.
 4. Bloklar Sonnet'e alıntılanabilir kaynak olarak gider; her paragraf ayrı bir parça, başlığı "TDE 12 Ders Kitabı · s. 174" gibi. Sistem prompt'u önbellekte.
 5. Sonnet'in yazdığı metin Python → Java → tarayıcıya akar. Claude bir paragrafa dayandığında alıntı bilgisi de gelir; Python bunu kendi blok numaramıza çevirir.
 6. Tarayıcı alıntı kartını veritabanındaki orijinal paragrafla çizer; model alıntı metni uyduramaz. "Sayfayı aç" kayıtlı sayfa görüntüsünü getirir.
@@ -586,8 +597,8 @@ Her yapay zeka işi bir görev adıyla çağrılır; model ve prompt tek bir aya
 # services/ai/llm_tasks.yaml
 DOC_CLASSIFY:      { model: claude-haiku-5-5,  prompt: doc_classify.j2 }
 UNIT_DETECT:       { model: claude-haiku-5-5,  prompt: unit_detect.j2 }
-PAGE_EXTRACT:      { model: claude-haiku-5-5,  fallback: claude-sonnet-5-5, prompt: page_extract.j2 }
-PROFILE_PROPOSE:   { model: claude-sonnet-5-5, prompt: profile_propose.j2 }
+PAGE_EXTRACT:      { model: claude-haiku-5-5,  prompt: page_extract.j2 }
+PAGE_EXTRACT_FALLBACK: { model: claude-sonnet-5-5, prompt: page_extract.j2 }
 ENTITY_EXTRACT:    { model: claude-haiku-5-5,  prompt: entity_extract.j2 }
 OUTCOME_MATCH:     { model: claude-haiku-5-5,  prompt: outcome_match.j2 }
 ANSWER_SOLVE:      { model: claude-sonnet-5-5, prompt: answer_solve.j2 }
@@ -639,7 +650,7 @@ Tek PostgreSQL veritabanı, bilgi tabanının dört katmanı ve işletim tablola
 | `chat_session`, `chat_message`, `message_citation` | Sohbet, mesajlar ve her mesajın dayandığı bloklar. |
 | İşletim |  |
 | `job` | Hazırlık işleri: tür, durum, adım, deneme sayısı, hata. |
-| `review_item` | İnceleme listesi: neden, hedef kayıt, durum, karar veren. |
+| `review_item` | İnceleme listesi: neden, hedef kayıt, durum, karar veren, ayrıntı (`detail`: kaynak kaydının sorun listesi). |
 | `content_report` | Öğrenci bildirimleri. |
 | `llm_call_log` | Görev, model, prompt sürümü, token, maliyet, süre. |
 
@@ -1016,7 +1027,7 @@ error.FILE_NOT_PDF=Sadece PDF dosyası yüklenebilir.
 - **JSON çıktı** `client.messages.parse(..., output_format=PydanticModel)` ile alınır. Model çıktısından düzenli ifadeyle bilgi ayıklanmaz.
 - **Alıntı** gereken görevlerde kaynaklar `search_result` bloğu olarak verilir: `source` = `kb://block/{id}`, başlık = "TDE 12 Ders Kitabı · s. 174", her paragraf ayrı metin bloğu. Alıntı ile JSON çıktı aynı çağrıda kullanılmaz.
 - **Önbellek:** sistem prompt'u ve sabit bağlam `cache_control` ile işaretlenir.
-- **Tool'lar** `app/tutor/tools.py` içinde, sadece okuma yapar, sonuçları `search_result` bloğu olarak döner. Bir cevapta en fazla 3 çağrı.
+- **Tool'lar** `app/tutor/tools.py` içinde, sadece okuma yapar. `open_note` notu ve dayandığı paragrafları `search_result` bloğu olarak döner; `search_notes` ve `get_outcome` düz metin döner, model alıntılamak için notu açar. Döngüyü SDK'nın tool runner'ı çalıştırır; bir turda en fazla bir çağrı, bir cevapta en fazla 3 çağrı, sınır dolunca son istek tool'suz gider.
 - **Hata ve tekrar:** SDK'nın kendi tekrar mekanizması (`max_retries=3`) kullanılır; zaman aşımı görev ayarında.
 - **Kayıt:** her çağrı `llm_call_log`'a yazılır: görev, model, prompt sürümü, giriş/çıkış/önbellek token'ı, maliyet, süre, `request_id`.
 - **Kişisel veri** modele gitmez: öğrencinin adı, e-postası, okulu. Sadece sayısal kullanıcı numarası.

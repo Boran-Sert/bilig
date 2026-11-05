@@ -14,3 +14,4 @@ export type Outcome = components["schemas"]["Outcome"];
 export type ExamSummary = components["schemas"]["ExamSummaryResponse"];
 export type SessionCompletionResponse = components["schemas"]["SessionCompletionResponse"];
 export type SessionCompletionOutcome = components["schemas"]["SessionCompletionOutcome"];
+export type BlockResponse = components["schemas"]["BlockResponse"];

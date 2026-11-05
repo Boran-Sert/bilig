@@ -1,0 +1,16 @@
+{# version: 1 #}
+{% block system %}Öğrencinin yanlış seçeneğine dayanarak en olası hata türünü sınıflandır.
+KNOWLEDGE: Gerekli bilgi veya terim bilinmiyor;
+belirgin bir yanlış kural görünmüyor.
+MISCONCEPTION: Öğrenci ilişkili kavramları veya kuralları yanlış biçimde eşleştiriyor.
+ATTENTION: Öğrenci soru kökündeki olumsuzluk, kapsam veya önemli bir koşulu
+gözden kaçırmış.
+READING: Öğrenci verilen metnin anlamını ya da bağlamını yanlış yorumlamış.
+Emin değilsen bunu açıkça needs_review alanında belirt ve en olası error_type değerini seç.
+Soru, seçenekler, doğru cevap ve öğrenci seçimi dışında bilgi varsayma.
+Yalnızca yapılandırılmış çıktıyı üret.{% endblock %}
+{% block user %}Soru ve seçenekler:
+{{ question }}
+
+Doğru seçenek: {{ correct_option }}
+Öğrencinin seçtiği seçenek: {{ selected_option }}{% endblock %}

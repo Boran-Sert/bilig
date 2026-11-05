@@ -1,10 +1,12 @@
-"""Kaynağa bağlı inceleme kaydı açan sorgu (hazırlık hattı, #130, #269).
+"""Kaynağa bağlı inceleme kaydını açan ve kapatan sorgular (hazırlık hattı, #130, #269, #275).
 
 Cevap anahtarı bulunamayan ya da kontrolden geçemeyen test soruları yazılmaz; bunun yerine kaynak
 için bir inceleme kaydı açılır ve kaynak REVIEW durumuna geçer. Kaydın ayrıntısında (detail) her
 sorun sayfası, sayfanın kaydı, testi ve soru numarasıyla durur. Aynı nedenle açık kayıt varsa
 ikincisi açılmaz, ayrıntısı son okumayla değiştirilir; böylece adım tekrar çalışınca kopya
-oluşmaz. Tablolar core'un Flyway migration'larıyla kurulur.
+oluşmaz. Yeniden okumada o nedenden sorun kalmadıysa (anahtar sonradan bağlandı) açık kayıt
+silinir; kimsenin karar vermediği eski kayıt kaynağı incelemede tutmaz. Tablolar core'un Flyway
+migration'larıyla kurulur.
 """
 
 from collections.abc import Sequence
@@ -29,6 +31,11 @@ SELECT %(reason)s, %(source_id)s, %(detail)s
 WHERE NOT EXISTS (SELECT 1 FROM updated)
 """
 
+DELETE_SOURCE_REVIEW = """
+DELETE FROM review_item
+WHERE source_document_id = %(source_id)s AND reason = %(reason)s AND status = 'OPEN'
+"""
+
 SET_REVIEW_STATUS = """
 UPDATE source_document SET status = 'REVIEW', updated_at = now() WHERE id = %(source_id)s
 """
@@ -50,3 +57,10 @@ async def open_source_review(
     params = {"source_id": source_id, "reason": reason, "detail": Jsonb(detail)}
     await connection.execute(UPSERT_SOURCE_REVIEW, params)
     await connection.execute(SET_REVIEW_STATUS, {"source_id": source_id})
+
+
+async def close_source_review(
+    connection: AsyncConnection, source_id: int, reason: SourceReviewReason
+) -> None:
+    """Kaynağın bu nedenle açık kalmış inceleme kaydını siler."""
+    await connection.execute(DELETE_SOURCE_REVIEW, {"source_id": source_id, "reason": reason})

@@ -32,7 +32,7 @@ Connection = psycopg.AsyncConnection[TupleRow]
 
 DIMENSIONS = 1024
 MARKER = "zümrüdüankatest"
-CODES = ("A.2.3", "A.2.7", "A.2.8")
+CODES = ("Z.9.3", "Z.9.7", "Z.9.8")
 
 SEED = """
 WITH subject_row AS (
@@ -43,7 +43,7 @@ WITH subject_row AS (
     RETURNING id
 ), group_row AS (
     INSERT INTO learning_outcome_group (curriculum_id, code, name)
-    SELECT id, 'A.2', 'Öyküleyici' FROM curriculum_row
+    SELECT id, 'Z.9', 'Öyküleyici' FROM curriculum_row
     RETURNING id
 ), outcome_rows AS (
     INSERT INTO learning_outcome (learning_outcome_group_id, code, title, search_text)
@@ -65,8 +65,10 @@ WITH subject_row AS (
     SELECT min(id), 'Eşleşme Testi' FROM tenant
     RETURNING id
 ), document_row AS (
-    INSERT INTO source_document (title, sha256, file_path, uploaded_by)
-    SELECT 'ÖDSGM Roman Testi', repeat('e', 64), '/data/sources/0.pdf', id FROM user_row
+    INSERT INTO source_document (curriculum_id, title, sha256, file_path, uploaded_by)
+    SELECT curriculum_row.id, 'ÖDSGM Roman Testi', repeat('e', 64), '/data/sources/0.pdf',
+        user_row.id
+    FROM curriculum_row, user_row
     RETURNING id
 ), page_row AS (
     INSERT INTO source_page (source_document_id, page_no)
@@ -109,6 +111,24 @@ WHERE reason = 'LOW_CONFIDENCE' AND question_id = %(id)s
 """
 
 READ_QUESTION_STATUS = "SELECT status FROM question WHERE id = %(id)s"
+READ_QUESTION_UNIT = "SELECT curriculum_unit_id FROM question WHERE id = %(id)s"
+
+ADD_GRADE_11_UNIT = """
+INSERT INTO curriculum_unit (curriculum_id, grade, unit_no, title)
+SELECT curriculum.id, 11, 1, 'Roman'
+FROM curriculum WHERE curriculum.name = 'Eşleşme Programı'
+RETURNING id
+"""
+
+LINK_OUTCOME_TO_UNIT = """
+INSERT INTO curriculum_unit_outcome (curriculum_unit_id, learning_outcome_id)
+SELECT %(unit_id)s, learning_outcome.id
+FROM learning_outcome
+JOIN learning_outcome_group
+    ON learning_outcome_group.id = learning_outcome.learning_outcome_group_id
+JOIN curriculum ON curriculum.id = learning_outcome_group.curriculum_id
+WHERE curriculum.name = 'Eşleşme Programı' AND learning_outcome.code = %(code)s
+"""
 READ_BLOCK_STATUS = "SELECT status FROM content_block WHERE id = %(id)s"
 
 COUNT_EMBEDDED = """
@@ -194,7 +214,7 @@ async def fetch_value(connection: Connection, query: str, values: dict[str, obje
     return row[0]
 
 
-async def add_question(connection: Connection, seed: Seed, unit_id: int) -> int:
+async def add_question(connection: Connection, seed: Seed, unit_id: int | None) -> int:
     """İşaret kelimesini taşıyan bir soru yazar."""
     content = {
         "stem": [{"type": "paragraph", "md": f"{MARKER} romanında anlatıcı kimdir?"}],
@@ -233,14 +253,14 @@ def test_check_keeps_every_high_confidence_outcome() -> None:
     """Yüksek güvenli birden çok kazanım tutulur ve inceleme gerekmez."""
     match = OutcomeMatch(
         outcomes=[
-            MatchedOutcome(code="A.2.3", confidence=Confidence.HIGH),
-            MatchedOutcome(code="A.2.7", confidence=Confidence.HIGH),
+            MatchedOutcome(code="Z.9.3", confidence=Confidence.HIGH),
+            MatchedOutcome(code="Z.9.7", confidence=Confidence.HIGH),
         ]
     )
 
     choice = check_match(match, [candidate(code) for code in CODES])
 
-    assert [outcome.code for outcome in choice.outcomes] == ["A.2.3", "A.2.7"]
+    assert [outcome.code for outcome in choice.outcomes] == ["Z.9.3", "Z.9.7"]
     assert not choice.needs_review
 
 
@@ -249,14 +269,14 @@ def test_check_sends_medium_or_low_confidence_to_review(level: Confidence) -> No
     """Herhangi bir kazanımın güveni orta ya da düşükse kazanım tutulur, inceleme açılır."""
     match = OutcomeMatch(
         outcomes=[
-            MatchedOutcome(code="A.2.3", confidence=Confidence.HIGH),
-            MatchedOutcome(code="A.2.8", confidence=level),
+            MatchedOutcome(code="Z.9.3", confidence=Confidence.HIGH),
+            MatchedOutcome(code="Z.9.8", confidence=level),
         ]
     )
 
     choice = check_match(match, [candidate(code) for code in CODES])
 
-    assert [outcome.code for outcome in choice.outcomes] == ["A.2.3", "A.2.8"]
+    assert [outcome.code for outcome in choice.outcomes] == ["Z.9.3", "Z.9.8"]
     assert choice.needs_review
 
 
@@ -264,15 +284,15 @@ def test_check_drops_codes_outside_candidates_and_duplicates() -> None:
     """Aday listesinde olmayan kod atılır, tekrar eden kod bir kez sayılır, inceleme açılır."""
     match = OutcomeMatch(
         outcomes=[
-            MatchedOutcome(code="A.2.3", confidence=Confidence.HIGH),
-            MatchedOutcome(code="A.2.3", confidence=Confidence.HIGH),
+            MatchedOutcome(code="Z.9.3", confidence=Confidence.HIGH),
+            MatchedOutcome(code="Z.9.3", confidence=Confidence.HIGH),
             MatchedOutcome(code="A.1.5", confidence=Confidence.HIGH),
         ]
     )
 
     choice = check_match(match, [candidate(code) for code in CODES])
 
-    assert [outcome.code for outcome in choice.outcomes] == ["A.2.3"]
+    assert [outcome.code for outcome in choice.outcomes] == ["Z.9.3"]
     assert choice.needs_review
 
 
@@ -289,13 +309,13 @@ async def test_question_is_linked_to_several_outcomes_once(
     connection: Connection, seed: Seed, monkeypatch: pytest.MonkeyPatch
 ) -> None:
     """Soru birden çok kazanıma bağlanıp yayına alınır; ikinci çalışmada kopya bağ olmaz."""
-    fake = use_picks(monkeypatch, ("A.2.7", Confidence.HIGH), ("A.2.8", Confidence.HIGH))
+    fake = use_picks(monkeypatch, ("Z.9.7", Confidence.HIGH), ("Z.9.8", Confidence.HIGH))
     question_id = await add_question(connection, seed, seed.unit_id)
 
     await match_source_outcomes(connection, seed.document_id)
     await match_source_outcomes(connection, seed.document_id)
 
-    assert await read_links(connection, question_id) == [("A.2.7", "MODEL"), ("A.2.8", "MODEL")]
+    assert await read_links(connection, question_id) == [("Z.9.7", "MODEL"), ("Z.9.8", "MODEL")]
     assert await fetch_value(connection, COUNT_REVIEWS, {"id": question_id}) == 0
     assert await fetch_value(connection, READ_QUESTION_STATUS, {"id": question_id}) == "PUBLISHED"
     assert len(fake.calls) == 1
@@ -308,13 +328,13 @@ async def test_low_confidence_result_goes_to_review_once(
     connection: Connection, seed: Seed, monkeypatch: pytest.MonkeyPatch
 ) -> None:
     """Düşük güvenli sonuç bağlanır, taslak kalır ve inceleme listesine bir kez düşer."""
-    fake = use_picks(monkeypatch, ("A.2.3", Confidence.LOW))
+    fake = use_picks(monkeypatch, ("Z.9.3", Confidence.LOW))
     question_id = await add_question(connection, seed, seed.unit_id)
 
     await match_source_outcomes(connection, seed.document_id)
     await match_source_outcomes(connection, seed.document_id)
 
-    assert await read_links(connection, question_id) == [("A.2.3", "MODEL")]
+    assert await read_links(connection, question_id) == [("Z.9.3", "MODEL")]
     assert await fetch_value(connection, COUNT_REVIEWS, {"id": question_id}) == 1
     assert await fetch_value(connection, READ_QUESTION_STATUS, {"id": question_id}) == "DRAFT"
     assert len(fake.calls) == 1
@@ -341,7 +361,7 @@ async def test_missing_outcome_vectors_are_computed_first(
     connection: Connection, seed: Seed, monkeypatch: pytest.MonkeyPatch
 ) -> None:
     """Vektörü olmayan kazanımların vektörü model çağrılmadan önce yazılmış olur."""
-    fake = use_picks(monkeypatch, ("A.2.3", Confidence.HIGH))
+    fake = use_picks(monkeypatch, ("Z.9.3", Confidence.HIGH))
     embedded_at_call: list[int] = []
 
     async def count_then_pick(
@@ -365,7 +385,7 @@ async def test_unit_without_outcomes_searches_all_outcomes(
     connection: Connection, seed: Seed, monkeypatch: pytest.MonkeyPatch
 ) -> None:
     """Kazanıma bağlı olmayan ünitenin sorusunda adaylar bütün kazanımlardan gelir."""
-    fake = use_picks(monkeypatch, ("A.2.3", Confidence.HIGH))
+    fake = use_picks(monkeypatch, ("Z.9.3", Confidence.HIGH))
     await add_question(connection, seed, seed.intro_unit_id)
 
     await match_source_outcomes(connection, seed.document_id)
@@ -374,11 +394,68 @@ async def test_unit_without_outcomes_searches_all_outcomes(
 
 
 @pytest.mark.asyncio
+async def test_unitless_question_gets_the_single_unit_of_its_outcomes(
+    connection: Connection, seed: Seed, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    """Ünitesiz soru, bağlanan kazanımların hepsi aynı ünitedeyse o üniteyi alır."""
+    use_picks(monkeypatch, ("Z.9.3", Confidence.HIGH), ("Z.9.7", Confidence.HIGH))
+    question_id = await add_question(connection, seed, None)
+
+    await match_source_outcomes(connection, seed.document_id)
+
+    assert await fetch_value(connection, READ_QUESTION_UNIT, {"id": question_id}) == seed.unit_id
+
+
+@pytest.mark.asyncio
+async def test_unitless_question_stays_without_unit_when_outcomes_span_units(
+    connection: Connection, seed: Seed, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    """Bağlanan kazanımlar farklı ünitelerdeyse soru ünitesiz kalır; ünite uydurulmaz."""
+    await connection.execute(LINK_OUTCOME_TO_UNIT, {"unit_id": seed.intro_unit_id, "code": "Z.9.8"})
+    use_picks(monkeypatch, ("Z.9.3", Confidence.HIGH), ("Z.9.8", Confidence.HIGH))
+    question_id = await add_question(connection, seed, None)
+
+    await match_source_outcomes(connection, seed.document_id)
+
+    assert await read_links(connection, question_id) == [("Z.9.3", "MODEL"), ("Z.9.8", "MODEL")]
+    assert await fetch_value(connection, READ_QUESTION_UNIT, {"id": question_id}) is None
+
+
+@pytest.mark.asyncio
+async def test_unit_of_other_grade_does_not_block_filling(
+    connection: Connection, seed: Seed, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    """Kazanım başka sınıfın ünitesine de bağlıysa o ünite sayılmaz; kaynağın sınıfı esastır."""
+    grade_11_unit = await fetch_value(connection, ADD_GRADE_11_UNIT, {})
+    await connection.execute(LINK_OUTCOME_TO_UNIT, {"unit_id": grade_11_unit, "code": "Z.9.3"})
+    use_picks(monkeypatch, ("Z.9.3", Confidence.HIGH))
+    question_id = await add_question(connection, seed, None)
+
+    await match_source_outcomes(connection, seed.document_id)
+
+    assert await fetch_value(connection, READ_QUESTION_UNIT, {"id": question_id}) == seed.unit_id
+
+
+@pytest.mark.asyncio
+async def test_unitless_question_sent_to_review_keeps_no_unit(
+    connection: Connection, seed: Seed, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    """İncelemeye düşen sorunun ünitesi yazılmaz; karar insana kalır."""
+    use_picks(monkeypatch, ("Z.9.3", Confidence.MEDIUM))
+    question_id = await add_question(connection, seed, None)
+
+    await match_source_outcomes(connection, seed.document_id)
+
+    assert await read_links(connection, question_id) == [("Z.9.3", "MODEL")]
+    assert await fetch_value(connection, READ_QUESTION_UNIT, {"id": question_id}) is None
+
+
+@pytest.mark.asyncio
 async def test_paragraphs_are_matched_but_activities_are_not(
     connection: Connection, seed: Seed, monkeypatch: pytest.MonkeyPatch
 ) -> None:
     """Bilgi bloğu bağlanıp yayına alınır, etkinlik bloğu modele hiç gitmez."""
-    fake = use_picks(monkeypatch, ("A.2.7", Confidence.HIGH))
+    fake = use_picks(monkeypatch, ("Z.9.7", Confidence.HIGH))
     info_id = await add_block(connection, seed, "BILGI", 0)
     activity_id = await add_block(connection, seed, "ETKINLIK", 1)
 
