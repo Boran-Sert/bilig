@@ -5,9 +5,10 @@ run_ingest, INGEST_SOURCE işini last_completed_step'ten sonraki adımdan başla
 kaldığı adımdan devam eder. Adım listesi bir sözlüktür (STEPS): yeni adım bir satırla eklenir,
 sözlükte olmayan adım atlanır ve kaydedilmez. EXTRACT kaynağı türünün okuyucusuyla okur (kitap ya
 da test); program ve cevap anahtarı komutla yüklendiği için atlanır, türü bilinmeyen kaynak hata
-verir. OUTCOMES içeriği kazanımlara bağlar (outcomes.py), INDEX vektörleri yazar (index.py);
-VALIDATE ve ENTITIES henüz yoktur. Kaynak başlarken PROCESSING olur; FAILED yalnızca
-son denemede yazılır, tekrar denenecek iş listede hatalı görünmez. Bütün adımlar bitince en az bir
+verir. ENTITIES notları ve bağları çıkarır (entities.py), OUTCOMES içeriği kazanımlara bağlar
+(outcomes.py), INDEX vektörleri yazar (index.py); VALIDATE henüz yoktur. Kaynak başlarken
+PROCESSING olur; FAILED yalnızca son denemede yazılır, tekrar denenecek iş listede hatalı
+görünmez. Bütün adımlar bitince en az bir
 yayındaki sorusu olan testler yayına girer; kaynak açık inceleme kaydı varsa REVIEW, yoksa
 PUBLISHED olur. İş başka çalışana geçtiyse bu son yazma yapılmaz. Hata her zaman yeniden
 fırlatılır, hata metnini çalışan kaydeder.
@@ -33,6 +34,7 @@ from app.db.queries.source import (
     save_source_pages,
 )
 from app.ingest import pdf
+from app.ingest.entities import extract_source_entities
 from app.ingest.index import index_source
 from app.ingest.outcomes import match_source_outcomes
 from app.ingest.readers.test import extract_tests
@@ -89,6 +91,12 @@ async def extract_source(source_id: int, context: IngestContext) -> None:
         raise ValueError(f"Source {source_id} kind is UNKNOWN; set its kind before EXTRACT")
 
 
+async def extract_entities(source_id: int, context: IngestContext) -> None:
+    """Kaynağın paragraflarından notları ve aralarındaki bağları çıkarır."""
+    async with context.connect() as connection:
+        await extract_source_entities(connection, source_id)
+
+
 async def match_source(source_id: int, context: IngestContext) -> None:
     """Kaynağın sorularını ve paragraflarını ölçtükleri kazanımlara bağlar."""
     async with context.connect() as connection:
@@ -98,6 +106,7 @@ async def match_source(source_id: int, context: IngestContext) -> None:
 STEPS: dict[IngestStep, StepFunction] = {
     IngestStep.REGISTERED: register_source,
     IngestStep.EXTRACT: extract_source,
+    IngestStep.ENTITIES: extract_entities,
     IngestStep.OUTCOMES: match_source,
     IngestStep.INDEX: index_source,
 }

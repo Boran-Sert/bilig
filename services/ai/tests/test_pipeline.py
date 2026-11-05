@@ -237,11 +237,30 @@ async def test_outcomes_step_matches_source(
     assert calls == [7]
 
 
+@pytest.mark.asyncio
+async def test_entities_step_extracts_source(
+    db: Connection, tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    """ENTITIES adımı kaynağın paragraflarını bilgi katmanı çıkarımına verir."""
+    calls: list[int] = []
+
+    async def record(connection: Connection, source_id: int) -> None:
+        """Çıkarımı yapılan kaynağın numarasını kaydeder."""
+        calls.append(source_id)
+
+    monkeypatch.setattr(pipeline, "extract_source_entities", record)
+
+    await pipeline.extract_entities(7, make_context(db, tmp_path))
+
+    assert calls == [7]
+
+
 def test_outcomes_and_index_steps_are_registered() -> None:
-    """REGISTERED, EXTRACT, OUTCOMES ve INDEX kayıtlıdır; VALIDATE ve ENTITIES atlanır."""
+    """REGISTERED, EXTRACT, ENTITIES, OUTCOMES ve INDEX kayıtlıdır; VALIDATE atlanır."""
     assert STEPS == {
         IngestStep.REGISTERED: pipeline.register_source,
         IngestStep.EXTRACT: pipeline.extract_source,
+        IngestStep.ENTITIES: pipeline.extract_entities,
         IngestStep.OUTCOMES: pipeline.match_source,
         IngestStep.INDEX: pipeline.index_source,
     }

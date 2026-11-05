@@ -11,6 +11,7 @@ import pytest_asyncio
 from pgvector.psycopg import register_vector_async
 from psycopg.types.json import Jsonb
 
+from app.db.queries.index import fetch_nodes_without_embedding, save_node_embeddings
 from app.ingest import index
 from app.ingest.index import index_source
 from app.schemas.question import Block, QuestionContent, QuestionOption
@@ -48,6 +49,21 @@ SELECT %s, id, 'SOURCE', %s, 'A', repeat('c', 64) FROM unit_row
 RETURNING id
 """
 
+INSERT_NODE = """
+INSERT INTO knowledge_node (node_type, name, status, search_text)
+VALUES ('AUTHOR', %s, 'PUBLISHED', %s)
+RETURNING id
+"""
+
+READ_NODE_EMBEDDED = "SELECT embedding IS NOT NULL FROM knowledge_node WHERE id = %s"
+
+FILL_FOREIGN_NODES = """
+UPDATE knowledge_node SET embedding = array_fill(0::real, ARRAY[1024])::vector
+WHERE embedding IS NULL
+"""
+
+CHANGE_NODE_TEXT = "UPDATE knowledge_node SET search_text = %s WHERE id = %s"
+
 READ_EMBEDDED = """
 SELECT id FROM content_block WHERE source_page_id = %(page_id)s AND embedding IS NOT NULL
 UNION ALL
@@ -80,8 +96,9 @@ class FakeEmbedding:
 
 @pytest_asyncio.fixture
 async def connection(db: Connection) -> Connection:
-    """Test bağlantısına vector tipini tanıtır."""
+    """Vector tipini tanıtır; veritabanındaki vektörsüz notları test için doldurur."""
     await register_vector_async(db)
+    await db.execute(FILL_FOREIGN_NODES)
     return db
 
 
@@ -130,6 +147,43 @@ async def test_index_writes_vectors_of_blocks_and_questions(
     assert embedding.texts == ["BILGI 0", "METIN 1", QUESTION.to_text()]
     cursor = await connection.execute(READ_EMBEDDED, {"page_id": page_id})
     assert [row[0] for row in await cursor.fetchall()] == sorted([*blocks, question_id])
+
+
+@pytest.mark.asyncio
+async def test_index_writes_vectors_of_notes_once(
+    connection: Connection, tmp_path: Path, embedding: FakeEmbedding
+) -> None:
+    """Vektörü olmayan not arama metninden vektöre çevrilir; ikinci çalışmada modele gitmez."""
+    source_id = await make_source(connection)
+    cursor = await connection.execute(INSERT_NODE, ("Zümrüt Yazar", "Zümrüt Yazar Zumrut Yazar"))
+    row = await cursor.fetchone()
+    assert row is not None
+    context = make_context(connection, tmp_path)
+
+    await index_source(source_id, context)
+    await index_source(source_id, context)
+
+    assert embedding.texts == ["Zümrüt Yazar Zumrut Yazar"]
+    cursor = await connection.execute(READ_NODE_EMBEDDED, (row[0],))
+    assert await cursor.fetchone() == (True,)
+
+
+@pytest.mark.asyncio
+async def test_node_vector_is_not_written_when_text_changed_meanwhile(
+    connection: Connection,
+) -> None:
+    """Okunduktan sonra metni değişen notun vektörü yazılmaz; not sonraki INDEX'e kalır."""
+    cursor = await connection.execute(INSERT_NODE, ("Zümrüt Yazar", "Zümrüt Yazar"))
+    row = await cursor.fetchone()
+    assert row is not None
+    nodes = await fetch_nodes_without_embedding(connection)
+    await connection.execute(CHANGE_NODE_TEXT, ("Zümrüt Yazar Zümrüt Yazarı", row[0]))
+
+    vectors = [(node_id, [1.0] + [0.0] * (DIMENSIONS - 1)) for node_id, _ in nodes]
+    await save_node_embeddings(connection, nodes, vectors)
+
+    cursor = await connection.execute(READ_NODE_EMBEDDED, (row[0],))
+    assert await cursor.fetchone() == (False,)
 
 
 @pytest.mark.asyncio

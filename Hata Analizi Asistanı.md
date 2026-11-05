@@ -175,7 +175,7 @@ Her kaynak bir kez işlenir ve aynı ortak formata dönüşür. Kaynaklar birbir
 
 Öğretim programı bu hattın özel bir kaynağıdır; kazanım ağacını kurar (A1). Diğer bütün kaynaklar aynı yoldan geçer.
 
-Hattın adımları sırayla REGISTERED (A2), EXTRACT (A3, A5, A6), OUTCOMES (A8) ve INDEX (A9). Kontroller (A6) EXTRACT'ın içinde çalışır. Bilgi katmanı (A7) henüz hatta adım değil (#139). Her adım bitince işe kaydedilir; hata alan iş kaldığı adımdan sürer. Son adımdan sonra kaynak yayına girer ya da incelemede bekler (Yayına alma).
+Hattın adımları sırayla REGISTERED (A2), EXTRACT (A3, A5, A6), ENTITIES (A7), OUTCOMES (A8) ve INDEX (A9). Kontroller (A6) EXTRACT'ın içinde çalışır. Her adım bitince işe kaydedilir; hata alan iş kaldığı adımdan sürer. Son adımdan sonra kaynak yayına girer ya da incelemede bekler (Yayına alma).
 
 ### A1Program katmanını kurma
 
@@ -276,15 +276,15 @@ Kontrolü geçemeyen soru yazılmaz. Kaynağın bütün sorunları tek inceleme 
 
 Kural
 
-`*Eser* (Yazar)` ve `*Eser* [Yazar (okunuş)]` kalıpları eser ve yazar notu ile aralarında bağ üretir. Bilgi Köşesi tablosunun her satırı bir zincire dönüşür: kavram (Tarihî Roman) → örnek eser → yazar.
+`*Eser* (Yazar)` ve `*Eser* [Yazar (okunuş)]` kalıpları eser ve yazar notu ile aralarında bağ üretir. Parantezdeki tür açıklaması ("roman", "Tarihî roman") ve yıl yazar sayılmaz.
 
 Haiku
 
-Kalan düz metinden yazar, eser, dönem, akım ve kavramları bağlarıyla çıkarır. Her bağ hangi bloğa dayandığını göstermek zorunda; dayanağı olmayan atılır.
+Sayfanın BILGI, ALINTI ve METIN paragraflarını tek çağrıda okur; yazar, eser, dönem, akım, tür ve kavramları bağlarıyla çıkarır. Bilgi Köşesi tablosunun her satırı bir zincire dönüşür: kavram (Tarihî Roman) → örnek eser → yazar. Her bağ dayandığı paragrafın numarasını taşır: iki ucun adı da o paragrafta geçmeli, geçmeyen bağ atılır. Kalan bağ yayına girer; not sadece kalan bir bağın ucuysa yazılır. İşlenen sayfa işaretlenir (`source_page.entities_extracted_at`) ve bir daha modele gitmez. Paragraf başına çağrıya göre maliyet yaklaşık yarıya, süre üçte bire iner; bulunan bağlar aynı kalır (Giriş ünitesinde 10 sayfayla ölçüldü).
 
 Birleştirme
 
-Aynı kişinin farklı yazımları birleştirilir (Viktor Hügo = Victor Hugo): Türkçe küçük harf, aksan temizliği, benzerlik puanı. Emin olunamayanlar incelemeye düşer.
+Türkçe küçük harf, aksan ve noktalama temizliğinden sonra aynı kalan adlar tek nottur (TARIK BUĞRA = Tarık Buğra); her yazım nota eklenir. Aynı olmayan ama benzerlik puanı 80'i geçen adlar (Viktor Hügo, Victor Hugo) NAME_MERGE incelemesine düşer; karar verilene kadar iki not da yayındadır.
 
 ### A8Kazanım eşleştirme
 
@@ -336,7 +336,7 @@ Her paragraf, soru, kazanım ve not iki şekilde indekslenir:
 
 - **Vektör:** bge-m3 metni 1024 sayılık vektöre çevirir; pgvector'da HNSW index'iyle tutulur. Paragrafın başına başlık yolu eklenir: "TDE 12 Ders Kitabı › Roman › Roman Türleri". Tek başına anlamı eksik kalan bir paragraf da böylece doğru konuyla eşleşir.
 - **Kelime (BM25):** pg_textsearch aynı metni Türkçe kök bulmayla indeksler. Yazar adı, eser adı ve "bilinç akışı" gibi terimleri vektör aramasının kaçırdığı yerde yakalar.
-- **Adım:** INDEX, vektörü boş ve reddedilmemiş BILGI, ALINTI ve METIN bloklarıyla soruların vektörünü yazar; başlık blokları indekslenmez. Kazanım vektörü OUTCOMES'ta, aramadan önce yazılır. Not vektörü bilgi katmanıyla gelir (#139). BM25 index'ini veritabanı kendisi günceller.
+- **Adım:** INDEX, vektörü boş ve reddedilmemiş BILGI, ALINTI ve METIN bloklarıyla soruların vektörünü yazar; başlık blokları indekslenmez. Kazanım vektörü OUTCOMES'ta, aramadan önce yazılır. Vektörü boş bütün notların vektörü de INDEX'te yazılır; nota yazım eklenince vektör silinir ve yeniden hesaplanır. BM25 index'ini veritabanı kendisi günceller.
 
 ### Yayına alma
 
