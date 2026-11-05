@@ -142,6 +142,34 @@ class SourceControllerIT {
                 .andExpect(jsonPath("$.total").value(1));
     }
 
+    /** Yüklenen PDF'in kaynak ve inceleme listelerine kadar ilerlediğini doğrular. */
+    @Test
+    @WithAuthUser(role = "CONTENT_ADMIN", id = 1001)
+    void uploadsPdfAndListsItsIngestionReview() throws Exception {
+        MvcResult upload = uploadAsAdmin(pdfFile("tde12-ders-kitabi.pdf", "tiny.pdf"))
+                .andExpect(status().isAccepted())
+                .andReturn();
+        long sourceId = sourceIdFrom(upload);
+
+        mockMvc.perform(get("/api/admin/sources").with(testSecurityContext()))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.items[0].sourceId").value(sourceId))
+                .andExpect(jsonPath("$.items[0].fileName").value("tde12-ders-kitabi.pdf"));
+
+        jdbcTemplate.update("UPDATE source_document SET status = 'REVIEW' WHERE id = ?", sourceId);
+        jdbcTemplate.update("""
+                INSERT INTO review_item (reason, source_document_id, detail)
+                VALUES ('NO_ANSWER_KEY', ?, '{"problems":[{"code":"NO_ANSWER_KEY"}]}'::jsonb)
+                """, sourceId);
+
+        mockMvc.perform(get("/api/admin/review").with(testSecurityContext()))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.items[0].targetType").value("SOURCE"))
+                .andExpect(jsonPath("$.items[0].targetId").value(sourceId))
+                .andExpect(jsonPath("$.items[0].sourceTitle").value("tde12-ders-kitabi.pdf"))
+                .andExpect(jsonPath("$.items[0].problems[0].code").value("NO_ANSWER_KEY"));
+    }
+
     /** Kaydedilmiş iş adımını ve hata metnini kaynak listesine taşır. */
     @Test
     @WithAuthUser(role = "CONTENT_ADMIN", id = 1001)
