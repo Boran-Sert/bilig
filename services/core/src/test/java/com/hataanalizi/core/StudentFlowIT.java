@@ -8,6 +8,7 @@ import static com.hataanalizi.core.StudentFlowTestData.QUESTION_COUNT;
 import static com.hataanalizi.core.StudentFlowTestData.UNIT_TITLE;
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.mockito.Mockito.when;
+import static org.springframework.security.test.web.servlet.request.SecurityMockMvcRequestPostProcessors.csrf;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.post;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.put;
@@ -16,7 +17,6 @@ import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.
 
 import com.hataanalizi.core.StudentFlowTestData.FlowExam;
 import com.hataanalizi.core.tutor.AiClient;
-import jakarta.servlet.http.Cookie;
 import java.util.UUID;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
@@ -35,7 +35,7 @@ import tools.jackson.databind.JsonNode;
 import tools.jackson.databind.ObjectMapper;
 
 /**
- * Öğrencinin kayıttan panele kadar demo akışını gerçek oturum çerezi ve CSRF ile PostgreSQL
+ * Öğrencinin kayıttan panele kadar demo akışını gerçek kayıt ve sunucu oturumuyla PostgreSQL
  * üzerinde baştan sona çalıştırır: test listesi, oturum, ipucu, cevap, devam, bitirme ve panel.
  */
 @ActiveProfiles("test")
@@ -249,14 +249,12 @@ class StudentFlowIT {
                 student);
     }
 
-    /** İsteği CSRF çerezi, başlığı ve varsa sunucu oturumuyla gönderir. */
+    /**
+     * İsteği geçerli CSRF token'ı ve varsa sunucu oturumuyla gönderir. Bağlamı paylaşan testler
+     * csrf() ile çerez deposunu değiştirdiği için gerçek çerez beklenmez.
+     */
     private ResultActions perform(MockHttpServletRequestBuilder request, MockHttpSession session) throws Exception {
-        Cookie token = mockMvc.perform(get("/api/auth/public"))
-                .andReturn()
-                .getResponse()
-                .getCookie("XSRF-TOKEN");
-        assertThat(token).isNotNull();
-        request.cookie(token).header("X-XSRF-TOKEN", token.getValue());
+        request.with(csrf());
         return mockMvc.perform(session == null ? request : request.session(session));
     }
 
