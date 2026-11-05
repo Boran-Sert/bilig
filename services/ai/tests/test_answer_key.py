@@ -10,7 +10,9 @@ from app.ingest.readers.answer_key import (
     AttachedAnswers,
     attach_answers,
     find_inline_answer,
+    find_test_number,
     is_answer_key,
+    key_for_test,
     parse_answer_key,
     split_by_test,
 )
@@ -195,3 +197,52 @@ def test_answer_split_across_lines_is_read() -> None:
 def test_split_by_test_accepts_heading_with_colon() -> None:
     """İki noktalı "TEST 3:" başlığı da bölüm açar."""
     assert split_by_test("TEST 3:\n1. A") == {3: "\n1. A"}
+
+
+ODSGM_KEY = (
+    "CEVAP ANAHTARI\r\n12. Sınıf\r\nTest 13 1. \r\nB 2. \r\nD\r\nTest 14 1. \r\nE 2. A 3. \r\nB\r\n"
+)
+
+
+def test_split_by_test_reads_answers_on_the_heading_line() -> None:
+    """ÖDSGM anahtarında cevaplar başlıkla aynı satırda başlasa da bölümlere ayrılır."""
+    sections = split_by_test(ODSGM_KEY)
+
+    assert {number: parse_answer_key(text) for number, text in sections.items()} == {
+        13: {1: "B", 2: "D"},
+        14: {1: "E", 2: "A", 3: "B"},
+    }
+
+
+@pytest.mark.parametrize(
+    ("page_text", "expected"),
+    [
+        ("E) Teşhis\r\nŞiir - 4\r\n14", 14),
+        ("E) Ferit Edgü\nHikâye - 7\n9\n", 9),
+        ("1923 - 1950\n12", None),
+        ("12. Sınıf\nTürk Dili ve Edebiyatı", None),
+    ],
+    ids=["poem", "story", "years", "no-footer"],
+)
+def test_find_test_number_reads_number_under_unit_line(
+    page_text: str, expected: int | None
+) -> None:
+    """Test numarası ünite satırının altındaki sayıdır; yıl aralığı numara sayılmaz."""
+    assert find_test_number(page_text) == expected
+
+
+@pytest.mark.parametrize(
+    ("key_text", "test_number", "expected"),
+    [
+        (ODSGM_KEY, 14, {1: "E", 2: "A", 3: "B"}),
+        (ODSGM_KEY, 15, {}),
+        (ODSGM_KEY, None, {}),
+        ("1-B 2-E", None, {1: "B", 2: "E"}),
+    ],
+    ids=["section", "missing-section", "unknown-number", "single-test-key"],
+)
+def test_key_for_test_takes_the_section_of_the_test(
+    key_text: str, test_number: int | None, expected: dict[int, str]
+) -> None:
+    """Bölümlü anahtardan testin bölümü alınır; bölümsüz anahtarın tamamı tek testin anahtarıdır."""
+    assert key_for_test(key_text, test_number) == expected

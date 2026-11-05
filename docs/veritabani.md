@@ -28,6 +28,7 @@ erDiagram
     learning_outcome ||--o{ curriculum_unit_outcome : ""
 
     curriculum |o--o{ source_document : "kaynakları"
+    source_document |o--o{ source_document : "cevap anahtarı"
     source_document ||--o{ source_page : "sayfaları"
     source_page ||--o{ content_block : "blokları"
     curriculum_unit |o--o{ content_block : "ünitesi"
@@ -185,6 +186,7 @@ erDiagram
 | license_status | text | hayır | 'UNKNOWN' | CHECK IN ('MEB', 'PERMITTED', 'UNKNOWN') |
 | status | text | hayır | 'UPLOADED' | CHECK IN ('UPLOADED', 'PROCESSING', 'REVIEW', 'PUBLISHED', 'FAILED') |
 | uploaded_by | bigint | hayır | | FK → app_user(id) |
+| answer_key_source_id | bigint | evet | | FK → source_document(id) · testin cevaplarının okunacağı ayrı anahtar dosyası |
 | created_at | timestamptz | hayır | now() | |
 | updated_at | timestamptz | hayır | now() | |
 

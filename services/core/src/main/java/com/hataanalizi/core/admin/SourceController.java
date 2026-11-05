@@ -10,6 +10,7 @@ import org.springframework.http.MediaType;
 import org.springframework.http.ResponseEntity;
 import org.springframework.security.core.annotation.AuthenticationPrincipal;
 import org.springframework.web.bind.annotation.GetMapping;
+import org.springframework.web.bind.annotation.PathVariable;
 import org.springframework.web.bind.annotation.PostMapping;
 import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RequestParam;
@@ -33,16 +34,26 @@ public class SourceController {
     public ResponseEntity<UploadResponse> upload(
             @RequestParam("files") List<MultipartFile> files,
             @RequestParam("kind") SourceKind kind,
+            @RequestParam(required = false) Long answerKeySourceId,
             @AuthenticationPrincipal AuthUser authUser) {
-        UploadResponse response = sourceService.upload(files, kind, authUser.id());
+        UploadResponse response = sourceService.upload(files, kind, answerKeySourceId, authUser.id());
         return ResponseEntity.accepted().body(response);
     }
 
-    /** Kaynakların yükleme ve hazırlık adımlarını sayfalı döner. */
+    /** Kaynakların yükleme ve hazırlık adımlarını sayfalı, istenirse türüne göre süzülmüş döner. */
     @GetMapping
     public PageResponse<SourceListItem> listSources(
             @RequestParam(defaultValue = "0") int page,
-            @RequestParam(defaultValue = AppConstants.DEFAULT_SOURCE_PAGE_SIZE) int size) {
-        return sourceService.listSources(page, size);
+            @RequestParam(defaultValue = AppConstants.DEFAULT_SOURCE_PAGE_SIZE) int size,
+            @RequestParam(required = false) SourceKind kind) {
+        return sourceService.listSources(page, size, kind);
+    }
+
+    /** Kaynağı baştan işlemek için kuyruğa koyar; verilirse önce cevap anahtarını bağlar. */
+    @PostMapping("/{id}/reprocess")
+    public ResponseEntity<Void> reprocess(
+            @PathVariable long id, @RequestParam(required = false) Long answerKeySourceId) {
+        sourceService.reprocess(id, answerKeySourceId);
+        return ResponseEntity.accepted().build();
     }
 }
