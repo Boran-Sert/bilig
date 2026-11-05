@@ -48,7 +48,8 @@ public final class AppConstants {
     // kaynak
     public static final String DEFAULT_SOURCE_PAGE_SIZE = "20";
     public static final int MAX_SOURCE_PAGE_SIZE = 100;
-    public static final List<String> UPLOADABLE_SOURCE_KINDS = List.of("TEXTBOOK", "TEST", "QUESTION_BANK");
+    public static final List<String> UPLOADABLE_SOURCE_KINDS =
+            List.of("TEXTBOOK", "TEST", "QUESTION_BANK", "ANSWER_KEY");
 
     // iş
 

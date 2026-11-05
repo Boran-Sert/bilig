@@ -46,4 +46,7 @@ public class SourceDocument {
 
     @Column(name = "uploaded_by", nullable = false)
     private Long uploadedBy;
+
+    @Column(name = "answer_key_source_id")
+    private Long answerKeySourceId;
 }
