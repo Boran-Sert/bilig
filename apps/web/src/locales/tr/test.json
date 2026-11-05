@@ -35,8 +35,13 @@
     "pageImageAlt": "{{source}} - Sayfa {{page}} görüntüsü",
     "styleLabel": "Tarz: Adım adım ▾",
     "citationLoading": "Alıntı yükleniyor...",
-    "explanationFailed": "Anlatım alınamadı. Biraz sonra tekrar dene.",
-    "explanationLoading": "Anlatım hazırlanıyor..."
+    "chatInputPlaceholder": "Anlamadığın yeri yaz…",
+    "send": "Gönder",
+    "anotherExample": "Başka örnekle anlat",
+    "anotherExamplePrompt": "Başka bir örnekle açıklar mısın?",
+    "dailyLimitReached": "Günlük mesaj limitine ulaşıldı.",
+    "sendFailed": "Mesaj gönderilemedi. Biraz sonra tekrar dene.",
+    "explanationFailed": "Anlatım alınamadı. Biraz sonra tekrar dene."
   },
   "result": {
     "title": "Test Sonucu",

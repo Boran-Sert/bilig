@@ -1,11 +1,11 @@
 /**
- * Yanlış cevabın akışla gelen anlatımını ve kaynak alıntı kartlarını gösterir.
+ * Yanlış cevabın akışla gelen anlatımını ve karşılıklı sohbet ekranını sunar.
  */
-import { useEffect } from "react";
+import { useEffect, useRef } from "react";
 import { useTranslation } from "react-i18next";
-import Markdown from "../../../components/Markdown";
-import { useExplanationStream } from "../useExplanationStream";
-import CitationCard from "./CitationCard";
+import { useTutorChat } from "../useTutorChat";
+import ChatInputBar from "./ChatInputBar";
+import ChatMessageBubble from "./ChatMessageBubble";
 
 interface ExplanationSectionProps {
   sessionId: number;
@@ -13,37 +13,37 @@ interface ExplanationSectionProps {
 }
 
 /**
- * Anlatım akışını başlatır, canlı metni ve alıntı kartlarını çizer.
+ * Anlatım akışını başlatır, sohbet mesajlarını ve girdi alanını çizer.
  */
 export default function ExplanationSection({ sessionId, questionId }: ExplanationSectionProps) {
   const { t } = useTranslation("test");
-  const { text, citationBlockIds, isStreaming, isDone, error, startExplanation } =
-    useExplanationStream();
+  const { messages, isStreaming, error, isLimitReached, startExplanation, sendMessage } =
+    useTutorChat();
+
+  const messagesEndRef = useRef<HTMLDivElement>(null);
 
   useEffect(() => {
     startExplanation(sessionId, questionId);
   }, [sessionId, questionId, startExplanation]);
 
+  useEffect(() => {
+    messagesEndRef.current?.scrollIntoView({ behavior: "smooth" });
+  }, [messages]);
+
   return (
     <aside
       aria-label={t("solve.whyWrong")}
-      className="space-y-4 rounded-xl border border-border bg-card p-5 shadow-xs"
+      className="flex flex-col space-y-4 rounded-xl border border-border bg-card p-5 shadow-xs"
     >
       <div className="flex items-center justify-between border-b border-border pb-3">
         <h2 className="text-base font-semibold tracking-tight">{t("solve.whyWrong")}</h2>
         <span className="text-xs font-medium text-muted-foreground">{t("solve.styleLabel")}</span>
       </div>
 
-      <div className="space-y-4 text-sm leading-relaxed text-foreground">
-        {text ? (
-          <div className="rounded-lg bg-muted/40 p-4 leading-relaxed">
-            <Markdown content={text} />
-          </div>
-        ) : isStreaming ? (
-          <p className="text-xs text-muted-foreground animate-pulse">
-            {t("solve.explanationLoading")}
-          </p>
-        ) : null}
+      <div className="max-h-[550px] space-y-3.5 overflow-y-auto pr-1">
+        {messages.map((message) => (
+          <ChatMessageBubble key={message.id} message={message} />
+        ))}
 
         {error && (
           <p role="alert" className="rounded-md bg-destructive/10 p-3 text-xs text-destructive">
@@ -51,18 +51,14 @@ export default function ExplanationSection({ sessionId, questionId }: Explanatio
           </p>
         )}
 
-        {citationBlockIds.length > 0 && (
-          <div className="space-y-3 pt-2">
-            {citationBlockIds.map((blockId) => (
-              <CitationCard key={blockId} blockId={blockId} />
-            ))}
-          </div>
-        )}
-
-        {isStreaming && !isDone && text && (
-          <span className="inline-block h-2 w-2 rounded-full bg-primary animate-ping" />
-        )}
+        <div ref={messagesEndRef} />
       </div>
+
+      <ChatInputBar
+        onSendMessage={sendMessage}
+        isStreaming={isStreaming}
+        isLimitReached={isLimitReached}
+      />
     </aside>
   );
 }
