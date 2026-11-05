@@ -1,5 +1,6 @@
 # Claude görevlerinin ayarları (plan Bölüm 10). Her görev: model, prompts/tde altındaki prompt
-# dosyası, en fazla çıktı token'ı ve saniye cinsinden zaman aşımı. Görev adı app/llm/tasks.py'deki
+# dosyası, en fazla çıktı token'ı ve saniye cinsinden zaman aşımı; tool kullanan görevde tool adları
+# (prompts/tde/tools.yaml) ve bir cevaptaki en fazla tool çağrısı. Görev adı app/llm/tasks.py'deki
 # LlmTask'ta da bulunur; modelin fiyatı llm_pricing.yaml'da olmalıdır.
 DOC_CLASSIFY:
   model: claude-haiku-5-5
@@ -56,6 +57,8 @@ CHAT:
   prompt: chat.j2
   max_tokens: 16000
   timeout_seconds: 120
+  tools: [search_notes, open_note, get_outcome]
+  max_tool_calls: 3
 QUESTION_GENERATE:
   model: claude-sonnet-5-5
   prompt: question_generate.j2

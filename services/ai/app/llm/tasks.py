@@ -1,8 +1,9 @@
 """Claude görevlerinin adları ve llm_tasks.yaml'daki görev ayarları.
 
 Her görevin modeli, prompt dosyası, en fazla çıktı token'ı ve zaman aşımı llm_tasks.yaml'dadır;
-kodda model adı yazılmaz. Yeni görev için LlmTask'a bir üye, llm_tasks.yaml'a bir kayıt ve
-prompts/tde altına prompt dosyası eklenir. Ayar dosyası süreç başına bir kez okunur.
+kodda model adı yazılmaz. Tool kullanan görevde tool adları ve bir cevaptaki en fazla tool çağrısı
+da oradadır; diğer görevlerde ikisi de boştur. Yeni görev için LlmTask'a bir üye, llm_tasks.yaml'a
+bir kayıt ve prompts/tde altına prompt dosyası eklenir. Ayar dosyası süreç başına bir kez okunur.
 """
 
 from enum import StrEnum
@@ -34,7 +35,7 @@ class LlmTask(StrEnum):
 
 
 class TaskConfig(BaseModel):
-    """Bir görevin modeli, prompt dosyası, çıktı sınırı ve zaman aşımı."""
+    """Bir görevin modeli, prompt dosyası, çıktı sınırı, zaman aşımı ve tool'ları."""
 
     model_config = ConfigDict(extra="forbid", frozen=True)
 
@@ -42,6 +43,8 @@ class TaskConfig(BaseModel):
     prompt: str
     max_tokens: int
     timeout_seconds: float
+    tools: tuple[str, ...] = ()
+    max_tool_calls: int = 0
 
 
 _TASK_CONFIGS = TypeAdapter(dict[LlmTask, TaskConfig])
