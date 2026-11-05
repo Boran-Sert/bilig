@@ -1,5 +1,5 @@
 /**
- * Sohbet girdi alanını, "Başka örnekle anlat" düğmesini ve günlük mesaj sayacını sunar.
+ * Sohbet girdi alanını ve "Başka örnekle anlat" düğmesini sunar.
  */
 import { useState } from "react";
 import type { FormEvent } from "react";
@@ -9,19 +9,15 @@ import { Button } from "../../../components/ui/button";
 interface ChatInputBarProps {
   onSendMessage: (text: string) => void;
   isStreaming: boolean;
-  dailyUsedCount: number;
-  dailyLimit: number;
   isLimitReached: boolean;
 }
 
 /**
- * Öğrencinin soru sormasını ve limit bilgisini izlemesini sağlar.
+ * Öğrencinin soru sormasını sağlar; limit dolunca girdiyi kilitler.
  */
 export default function ChatInputBar({
   onSendMessage,
   isStreaming,
-  dailyUsedCount,
-  dailyLimit,
   isLimitReached,
 }: ChatInputBarProps) {
   const { t } = useTranslation("test");
@@ -80,13 +76,6 @@ export default function ChatInputBar({
           >
             {t("solve.anotherExample")}
           </Button>
-
-          <span>
-            {t("solve.dailyMessageCount", {
-              used: dailyUsedCount,
-              total: dailyLimit,
-            })}
-          </span>
         </div>
       </form>
     </div>

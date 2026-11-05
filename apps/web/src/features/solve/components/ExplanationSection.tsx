@@ -17,16 +17,8 @@ interface ExplanationSectionProps {
  */
 export default function ExplanationSection({ sessionId, questionId }: ExplanationSectionProps) {
   const { t } = useTranslation("test");
-  const {
-    messages,
-    isStreaming,
-    error,
-    dailyUsedCount,
-    dailyLimit,
-    isLimitReached,
-    startExplanation,
-    sendMessage,
-  } = useTutorChat();
+  const { messages, isStreaming, error, isLimitReached, startExplanation, sendMessage } =
+    useTutorChat();
 
   const messagesEndRef = useRef<HTMLDivElement>(null);
 
@@ -65,8 +57,6 @@ export default function ExplanationSection({ sessionId, questionId }: Explanatio
       <ChatInputBar
         onSendMessage={sendMessage}
         isStreaming={isStreaming}
-        dailyUsedCount={dailyUsedCount}
-        dailyLimit={dailyLimit}
         isLimitReached={isLimitReached}
       />
     </aside>

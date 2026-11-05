@@ -52,22 +52,19 @@ describe("ExplanationSection", () => {
       conversationId: 99,
       isStreaming: false,
       error: null,
-      dailyUsedCount: 12,
-      dailyLimit: 30,
       isLimitReached: false,
       startExplanation: startExplanationMock,
       sendMessage: sendMessageMock,
     });
   });
 
-  test("başlığı, mesajları, alıntıları ve günlük limiti gösterir", () => {
+  test("başlığı, mesajları ve alıntıları gösterir", () => {
     render(<ExplanationSection sessionId={1} questionId={5} />);
 
     expect(screen.getByRole("heading", { name: "Neden yanlış?" })).toBeInTheDocument();
     expect(screen.getByText("Eylül psikolojik bir romandır.")).toBeInTheDocument();
     expect(screen.getByText("Devlet Ana da öyle mi?")).toBeInTheDocument();
     expect(screen.getByTestId("citation-12")).toBeInTheDocument();
-    expect(screen.getByText("Bugün 12 / 30 mesaj")).toBeInTheDocument();
     expect(startExplanationMock).toHaveBeenCalledWith(1, 5);
   });
 
@@ -77,8 +74,6 @@ describe("ExplanationSection", () => {
       conversationId: null,
       isStreaming: false,
       error: "Anlatım akışı başarısız oldu.",
-      dailyUsedCount: 0,
-      dailyLimit: 30,
       isLimitReached: false,
       startExplanation: startExplanationMock,
       sendMessage: sendMessageMock,

@@ -2,7 +2,8 @@
  * Yanlış cevap anlatımı ve karşılıklı sohbet akışını SSE ile yönetir.
  */
 import { useCallback, useRef, useState } from "react";
-import { DAILY_CHAT_LIMIT } from "../../lib/constants";
+import { getProblemMessage } from "../../lib/api/problem";
+import i18n from "../../lib/i18n";
 
 /** Çerezin değerini okur. */
 function getCookie(name: string): string | undefined {
@@ -19,36 +20,15 @@ export interface ChatMessage {
   isStreaming?: boolean;
 }
 
-/** Bugünün mesaj sayacını yerel depolamadan okur. */
-function getStoredDailyCount(): number {
-  try {
-    const today = new Date().toISOString().slice(0, 10);
-    const value = localStorage.getItem(`tutor_chat_count_${today}`);
-    return value ? parseInt(value, 10) || 0 : 0;
-  } catch {
-    return 0;
-  }
-}
-
-/** Bugünün mesaj sayacını yerel depolamaya yazar. */
-function setStoredDailyCount(count: number) {
-  try {
-    const today = new Date().toISOString().slice(0, 10);
-    localStorage.setItem(`tutor_chat_count_${today}`, String(count));
-  } catch {
-    // Hata yoksayılır
-  }
-}
-
 /**
- * Anlatım ve sohbet SSE akışını dinler; mesajları ve limiti yönetir.
+ * Anlatım ve sohbet SSE akışını dinler; mesajları ve sunucunun bildirdiği limiti yönetir.
  */
 export function useTutorChat() {
   const [messages, setMessages] = useState<ChatMessage[]>([]);
   const [conversationId, setConversationId] = useState<number | null>(null);
   const [isStreaming, setIsStreaming] = useState(false);
   const [error, setError] = useState<string | null>(null);
-  const [dailyUsedCount, setDailyUsedCount] = useState<number>(getStoredDailyCount);
+  const [isLimitReached, setIsLimitReached] = useState(false);
 
   const abortControllerRef = useRef<AbortController | null>(null);
 
@@ -65,6 +45,7 @@ export function useTutorChat() {
 
     const decoder = new TextDecoder();
     let buffer = "";
+    let currentEvent = "message";
 
     while (true) {
       const { value, done } = await reader.read();
@@ -76,7 +57,6 @@ export function useTutorChat() {
       const lines = buffer.split("\n");
       buffer = lines.pop() ?? "";
 
-      let currentEvent = "message";
       for (const line of lines) {
         const trimmed = line.trim();
         if (!trimmed) {
@@ -100,33 +80,44 @@ export function useTutorChat() {
     assistantId: string,
     onDone?: (convId?: number) => void,
   ) {
+    let parsed;
     try {
-      const parsed = JSON.parse(data);
-      if (event === "delta" && typeof parsed.text === "string") {
-        setMessages((previous) =>
-          previous.map((msg) =>
-            msg.id === assistantId ? { ...msg, text: msg.text + parsed.text } : msg,
-          ),
-        );
-      } else if (event === "citation" && typeof parsed.blockId === "number") {
-        setMessages((previous) =>
-          previous.map((msg) =>
-            msg.id === assistantId && !msg.citationBlockIds.includes(parsed.blockId)
-              ? { ...msg, citationBlockIds: [...msg.citationBlockIds, parsed.blockId] }
-              : msg,
-          ),
-        );
-      } else if (event === "done") {
-        setMessages((previous) =>
-          previous.map((msg) => (msg.id === assistantId ? { ...msg, isStreaming: false } : msg)),
-        );
-        onDone?.(parsed.conversationId);
-      } else if (event === "error") {
-        setError(parsed.detail ?? parsed.title ?? "Hata oluştu.");
-      }
+      parsed = JSON.parse(data);
     } catch {
-      // Hatalı JSON yoksayılır
+      setError(i18n.t("solve.explanationFailed", { ns: "test" }));
+      return;
     }
+    if (event === "delta" && typeof parsed.text === "string") {
+      setMessages((previous) =>
+        previous.map((msg) =>
+          msg.id === assistantId ? { ...msg, text: msg.text + parsed.text } : msg,
+        ),
+      );
+    } else if (event === "citation" && typeof parsed.blockId === "number") {
+      setMessages((previous) =>
+        previous.map((msg) =>
+          msg.id === assistantId && !msg.citationBlockIds.includes(parsed.blockId)
+            ? { ...msg, citationBlockIds: [...msg.citationBlockIds, parsed.blockId] }
+            : msg,
+        ),
+      );
+    } else if (event === "done") {
+      setMessages((previous) =>
+        previous.map((msg) => (msg.id === assistantId ? { ...msg, isStreaming: false } : msg)),
+      );
+      onDone?.(parsed.conversationId);
+    } else if (event === "error") {
+      setIsLimitReached(parsed.code === "DAILY_LIMIT_REACHED");
+      setError(getProblemMessage(parsed));
+    }
+  }
+
+  /** Asistan mesajının bekleme göstergesini kapatır. */
+  function stopStreaming(assistantId: string) {
+    setIsStreaming(false);
+    setMessages((previous) =>
+      previous.map((msg) => (msg.id === assistantId ? { ...msg, isStreaming: false } : msg)),
+    );
   }
 
   /** İlk yanlış cevap anlatımını başlatır. */
@@ -158,8 +149,7 @@ export function useTutorChat() {
       });
 
       if (!response.ok) {
-        setError("Anlatım akışı başlatılamadı.");
-        setIsStreaming(false);
+        setError(i18n.t("solve.explanationFailed", { ns: "test" }));
         return;
       }
 
@@ -168,12 +158,14 @@ export function useTutorChat() {
           setConversationId(newConvId);
         }
       });
-    } catch (err) {
+    } catch {
       if (!controller.signal.aborted) {
-        setError(err instanceof Error ? err.message : "Bağlantı hatası.");
+        setError(i18n.t("solve.explanationFailed", { ns: "test" }));
       }
     } finally {
-      setIsStreaming(false);
+      if (!controller.signal.aborted) {
+        stopStreaming(explanationId);
+      }
     }
   }, []);
 
@@ -181,7 +173,7 @@ export function useTutorChat() {
   const sendMessage = useCallback(
     async (text: string) => {
       const trimmedText = text.trim();
-      if (!trimmedText || !conversationId || isStreaming || dailyUsedCount >= DAILY_CHAT_LIMIT) {
+      if (!trimmedText || !conversationId || isStreaming || isLimitReached) {
         return;
       }
 
@@ -200,9 +192,6 @@ export function useTutorChat() {
         },
       ]);
 
-      const newDailyCount = dailyUsedCount + 1;
-      setDailyUsedCount(newDailyCount);
-      setStoredDailyCount(newDailyCount);
       setIsStreaming(true);
       setError(null);
 
@@ -219,21 +208,22 @@ export function useTutorChat() {
         });
 
         if (!response.ok) {
+          const limitReached = response.status === 429;
+          setIsLimitReached(limitReached);
           setError(
-            response.status === 429 ? "Günlük mesaj limitine ulaşıldı." : "Mesaj gönderilemedi.",
+            i18n.t(limitReached ? "solve.dailyLimitReached" : "solve.sendFailed", { ns: "test" }),
           );
-          setIsStreaming(false);
           return;
         }
 
         await consumeSseStream(response, assistantMessageId);
-      } catch (err) {
-        setError(err instanceof Error ? err.message : "Bağlantı hatası.");
+      } catch {
+        setError(i18n.t("solve.sendFailed", { ns: "test" }));
       } finally {
-        setIsStreaming(false);
+        stopStreaming(assistantMessageId);
       }
     },
-    [conversationId, isStreaming, dailyUsedCount],
+    [conversationId, isStreaming, isLimitReached],
   );
 
   return {
@@ -241,9 +231,7 @@ export function useTutorChat() {
     conversationId,
     isStreaming,
     error,
-    dailyUsedCount,
-    dailyLimit: DAILY_CHAT_LIMIT,
-    isLimitReached: dailyUsedCount >= DAILY_CHAT_LIMIT,
+    isLimitReached,
     startExplanation,
     sendMessage,
   };
