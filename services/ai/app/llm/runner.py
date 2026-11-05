@@ -8,16 +8,21 @@ kullanılamasa bile token, maliyet ve süresiyle llm_call_log'a yazılır. user_
 gider; Claude'a kullanıcıya ait bilgi gönderilmez. stream_task alıntılı serbest metin görevleri
 içindir: kaynaklar search_result bloğu olarak gider, metin ve alıntılar geldikçe verilir, çağrı
 akış bitince kaydedilir. Akış yarıda koparsa token bilgisi gelmediği için kayıt yazılmaz.
-Görüntü (PNG) verilirse mesaja metnin önünde eklenir. Tool henüz yoktur.
+Görüntü (PNG) verilirse mesaja metnin önünde eklenir. Görevin tool'ları varsa (sohbet) stream_task
+SDK'nın tool runner'ıyla (beta) çalışır: tanımlar prompts/tde/tools.yaml'dan gelir, her cevap
+turu ayrı kaydedilir, bir turda en fazla bir tool çağrılır ve çağrı sınırı dolunca son istek
+tool_choice none ile gider. Alıntı sırası, istekte gönderilen bütün search_result'ların (önce ilk
+kaynaklar, sonra tool sonuçları) birikmiş listesine göredir.
 """
 
 import base64
 import time
-from collections.abc import AsyncIterator, Mapping, Sequence
+from collections.abc import AsyncIterator, Awaitable, Callable, Coroutine, Mapping, Sequence
 from functools import lru_cache
 from typing import overload
 
-from anthropic import AsyncAnthropic
+from anthropic import AsyncAnthropic, beta_async_tool
+from anthropic.lib.tools import BetaAsyncFunctionTool, ToolError
 from anthropic.types import (
     ImageBlockParam,
     MessageParam,
@@ -25,15 +30,20 @@ from anthropic.types import (
     TextBlockParam,
     Usage,
 )
+from anthropic.types.beta import BetaSearchResultBlockParam, BetaUsage
+from anthropic.types.beta.message_create_params import ParseMessageCreateParamsBase
 from pydantic import BaseModel
 
 from app.constants import IMAGE_MEDIA_TYPE, LLM_MAX_RETRIES, MILLISECONDS_PER_SECOND, PROMPTS_DIR
 from app.db.pool import get_pool
 from app.db.queries.llm_call_log import LlmCall, save_llm_call
 from app.llm.pricing import calculate_cost, get_prices
-from app.llm.prompts import render_prompt
+from app.llm.prompts import get_tool_prompts, render_prompt
 from app.llm.tasks import LlmTask, get_task_configs
-from app.schemas.tutor import CitationSource, StreamCitation, StreamText
+from app.schemas.tutor import CitationSource, StreamCitation, StreamText, ToolOutput
+
+type ToolExecutor = Callable[[str, Mapping[str, object]], Awaitable[ToolOutput]]
+type ToolFunction = Callable[..., Coroutine[None, None, list[BetaSearchResultBlockParam] | str]]
 
 
 @lru_cache(maxsize=1)
@@ -126,20 +136,18 @@ async def stream_task(
     sources: list[CitationSource],
     *,
     user_id: int | None = None,
+    execute_tool: ToolExecutor | None = None,
 ) -> AsyncIterator[StreamText | StreamCitation]:
-    """Görevi kaynaklarla akış olarak çalıştırır; metni ve alıntıları geldikçe verir."""
+    """Görevi kaynaklarla akış olarak çalıştırır; görevin tool'u varsa tool döngüsüyle çalışır."""
     config = get_task_configs()[task]
+    if config.tools:
+        if execute_tool is None:
+            raise ValueError(f"{task} uses tools but got no tool executor")
+        async for part in _stream_with_tools(task, variables, sources, execute_tool, user_id):
+            yield part
+        return
     prompt = render_prompt(PROMPTS_DIR, config.prompt, variables)
-    content: list[SearchResultBlockParam | TextBlockParam] = [
-        {
-            "type": "search_result",
-            "source": source.source,
-            "title": source.title,
-            "content": [{"type": "text", "text": source.text}],
-            "citations": {"enabled": True},
-        }
-        for source in sources
-    ]
+    content: list[SearchResultBlockParam | TextBlockParam] = [*search_results(sources)]
     content.append({"type": "text", "text": prompt.user})
     started = time.perf_counter()
     async with get_client().messages.stream(
@@ -153,7 +161,7 @@ async def stream_task(
             if event.type == "text":
                 yield StreamText(text=event.text)
             elif event.type == "citation" and event.citation.type == "search_result_location":
-                yield StreamCitation(source_index=event.citation.search_result_index)
+                yield StreamCitation(source=sources[event.citation.search_result_index])
         message = await stream.get_final_message()
         duration_ms = round((time.perf_counter() - started) * MILLISECONDS_PER_SECOND)
         await _save_call(
@@ -167,11 +175,104 @@ async def stream_task(
         )
 
 
+async def _stream_with_tools(
+    task: LlmTask,
+    variables: Mapping[str, object],
+    sources: list[CitationSource],
+    execute_tool: ToolExecutor,
+    user_id: int | None,
+) -> AsyncIterator[StreamText | StreamCitation]:
+    """Görevi SDK'nın tool döngüsüyle çalıştırır; çağrı sınırı dolunca son cevabı tool'suz ister."""
+    config = get_task_configs()[task]
+    prompt = render_prompt(PROMPTS_DIR, config.prompt, variables)
+    sent = list(sources)
+    content: list[SearchResultBlockParam | TextBlockParam] = [*search_results(sources)]
+    content.append({"type": "text", "text": prompt.user})
+    runner = get_client().beta.messages.tool_runner(
+        model=config.model,
+        max_tokens=config.max_tokens,
+        system=[{"type": "text", "text": prompt.system, "cache_control": {"type": "ephemeral"}}],
+        messages=[{"role": "user", "content": content}],
+        tools=[_runnable_tool(name, execute_tool, sent) for name in config.tools],
+        tool_choice={"type": "auto", "disable_parallel_tool_use": True},
+        max_iterations=config.max_tool_calls + 1,
+        stream=True,
+        thread=False,
+        timeout=config.timeout_seconds,
+    )
+    tool_calls = 0
+    async for stream in runner:
+        started = time.perf_counter()
+        async for event in stream:
+            if event.type == "text":
+                yield StreamText(text=event.text)
+            elif event.type == "citation" and event.citation.type == "search_result_location":
+                yield StreamCitation(source=sent[event.citation.search_result_index])
+        message = await stream.get_final_message()
+        duration_ms = round((time.perf_counter() - started) * MILLISECONDS_PER_SECOND)
+        await _save_call(
+            task,
+            config.model,
+            prompt.version,
+            message.usage,
+            stream.request_id,
+            duration_ms,
+            user_id,
+        )
+        tool_calls += sum(block.type == "tool_use" for block in message.content)
+        if tool_calls >= config.max_tool_calls:
+            runner.set_messages_params(_without_tool_use)
+
+
+def _runnable_tool(
+    name: str, execute_tool: ToolExecutor, sent: list[CitationSource]
+) -> BetaAsyncFunctionTool[ToolFunction]:
+    """Tool'u tools.yaml'daki tanımıyla SDK'nın çalıştıracağı tool'a çevirir."""
+    definition = get_tool_prompts().tools[name]
+
+    async def call(**tool_input: object) -> list[BetaSearchResultBlockParam] | str:
+        """Tool'u çalıştırır; kaynaklarını alıntı listesine ekler, hatayı hata sonucu yapar."""
+        output = await execute_tool(name, tool_input)
+        if output.is_error:
+            raise ToolError(output.text)
+        sent.extend(output.sources)
+        return search_results(output.sources) if output.sources else output.text
+
+    return beta_async_tool(
+        call,
+        name=name,
+        description=definition.description,
+        input_schema=definition.input_schema,
+        strict=True,
+    )
+
+
+def _without_tool_use(
+    params: ParseMessageCreateParamsBase[None],
+) -> ParseMessageCreateParamsBase[None]:
+    """Sonraki isteğin tool çağırmadan cevap vermesini ister."""
+    return {**params, "tool_choice": {"type": "none"}}
+
+
+def search_results(sources: list[CitationSource]) -> list[SearchResultBlockParam]:
+    """Kaynakları alıntısı açık search_result bloklarına çevirir."""
+    return [
+        {
+            "type": "search_result",
+            "source": source.source,
+            "title": source.title,
+            "content": [{"type": "text", "text": source.text}],
+            "citations": {"enabled": True},
+        }
+        for source in sources
+    ]
+
+
 async def _save_call(
     task: LlmTask,
     model: str,
     prompt_version: int,
-    usage: Usage,
+    usage: Usage | BetaUsage,
     request_id: str | None,
     duration_ms: int,
     user_id: int | None,

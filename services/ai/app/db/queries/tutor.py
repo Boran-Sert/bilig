@@ -23,6 +23,10 @@ WHERE question_outcome.question_id = %(id)s
 ORDER BY learning_outcome.code
 """
 
+SELECT_OUTCOMES_BY_CODE = """
+SELECT id, code, title, meb_explanation FROM learning_outcome WHERE code = %(code)s ORDER BY id
+"""
+
 SELECT_EXPLAIN_STYLE = """
 SELECT explain_style FROM app_user WHERE id = %(id)s
 """
@@ -63,6 +67,15 @@ async def fetch_question(connection: AsyncConnection, question_id: int) -> Tutor
         correct_option=row[1].strip(),
         outcomes=outcomes,
     )
+
+
+async def fetch_outcomes_by_code(connection: AsyncConnection, code: str) -> list[OutcomeInfo]:
+    """Koduyla eşleşen kazanımları döner; kod birden çok programda geçebilir."""
+    cursor = await connection.execute(SELECT_OUTCOMES_BY_CODE, {"code": code})
+    return [
+        OutcomeInfo(id=row[0], code=row[1], title=row[2], meb_explanation=row[3])
+        for row in await cursor.fetchall()
+    ]
 
 
 async def fetch_explain_style(connection: AsyncConnection, user_id: int) -> ExplainStyle | None:

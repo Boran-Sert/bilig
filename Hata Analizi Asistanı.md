@@ -1027,7 +1027,7 @@ error.FILE_NOT_PDF=Sadece PDF dosyası yüklenebilir.
 - **JSON çıktı** `client.messages.parse(..., output_format=PydanticModel)` ile alınır. Model çıktısından düzenli ifadeyle bilgi ayıklanmaz.
 - **Alıntı** gereken görevlerde kaynaklar `search_result` bloğu olarak verilir: `source` = `kb://block/{id}`, başlık = "TDE 12 Ders Kitabı · s. 174", her paragraf ayrı metin bloğu. Alıntı ile JSON çıktı aynı çağrıda kullanılmaz.
 - **Önbellek:** sistem prompt'u ve sabit bağlam `cache_control` ile işaretlenir.
-- **Tool'lar** `app/tutor/tools.py` içinde, sadece okuma yapar, sonuçları `search_result` bloğu olarak döner. Bir cevapta en fazla 3 çağrı.
+- **Tool'lar** `app/tutor/tools.py` içinde, sadece okuma yapar. `open_note` notu ve dayandığı paragrafları `search_result` bloğu olarak döner; `search_notes` ve `get_outcome` düz metin döner, model alıntılamak için notu açar. Döngüyü SDK'nın tool runner'ı çalıştırır; bir turda en fazla bir çağrı, bir cevapta en fazla 3 çağrı, sınır dolunca son istek tool'suz gider.
 - **Hata ve tekrar:** SDK'nın kendi tekrar mekanizması (`max_retries=3`) kullanılır; zaman aşımı görev ayarında.
 - **Kayıt:** her çağrı `llm_call_log`'a yazılır: görev, model, prompt sürümü, giriş/çıkış/önbellek token'ı, maliyet, süre, `request_id`.
 - **Kişisel veri** modele gitmez: öğrencinin adı, e-postası, okulu. Sadece sayısal kullanıcı numarası.
