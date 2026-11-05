@@ -3,7 +3,8 @@
 Java öğrencinin mesajını kaydettikten sonra sohbetin numarasıyla çağırır; geçmiş tutor_message'dan
 okunur ve son mesaj öğrencinin sorusudur. Sohbet bir soru için açıldıysa kaynak araması o sorunun
 kazanımlarında, açılmadıysa bütün yayındaki paragraflarda yapılır. Sohbet öğrencinin değilse boş
-döner; son mesaj öğrenciden değilse hata verir. Okuma tool'ları (#141) henüz yoktur.
+döner; son mesaj öğrenciden değilse hata verir. Model cevap verirken okuma tool'larını
+(app/tutor/tools.py) en fazla llm_tasks.yaml'daki sınır kadar çağırabilir.
 """
 
 from psycopg import AsyncConnection
