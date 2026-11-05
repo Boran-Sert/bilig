@@ -9,5 +9,3 @@ export type DashboardActiveSession = components["schemas"]["DashboardActiveSessi
 export type DashboardFailedOutcome = components["schemas"]["DashboardFailedOutcome"];
 export type DashboardUnitAccuracy = components["schemas"]["DashboardUnitAccuracy"];
 export type DashboardErrorTypeCount = components["schemas"]["DashboardErrorTypeCount"];
-
-export type ErrorTypeKey = "KNOWLEDGE" | "MISCONCEPTION" | "ATTENTION" | "READING";

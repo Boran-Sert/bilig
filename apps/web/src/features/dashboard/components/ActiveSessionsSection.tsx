@@ -2,8 +2,9 @@
  * Öğrencinin yarım bıraktığı aktif test oturumlarını listeler ve devam bağlantısı sunar.
  */
 import { useTranslation } from "react-i18next";
-import { Link } from "react-router";
+import { generatePath, Link } from "react-router";
 import { buttonVariants } from "../../../components/ui/button";
+import { ROUTES } from "../../../lib/constants";
 import { cn } from "../../../lib/utils";
 import type { DashboardActiveSession } from "../types";
 
@@ -40,7 +41,7 @@ export default function ActiveSessionsSection({ sessions }: ActiveSessionsSectio
                 </p>
               </div>
               <Link
-                to={`/tests/${session.examId}/solve`}
+                to={generatePath(ROUTES.solve, { testId: String(session.examId) })}
                 className={cn(buttonVariants({ size: "sm" }), "w-full sm:w-auto")}
               >
                 {t("activeSessions.resume")}
