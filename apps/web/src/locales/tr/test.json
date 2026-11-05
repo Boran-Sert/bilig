@@ -27,7 +27,16 @@
     "finishing": "Tamamlanıyor...",
     "loading": "Soru yükleniyor...",
     "submitting": "Cevap kaydediliyor...",
-    "alreadyAnswered": "Bu soru zaten cevaplandı."
+    "alreadyAnswered": "Bu soru zaten cevaplandı.",
+    "openPage": "Sayfayı aç",
+    "close": "Kapat",
+    "textbookHeader": "DERS KİTABINDA",
+    "pageNumber": "s. {{page}}",
+    "pageImageAlt": "{{source}} - Sayfa {{page}} görüntüsü",
+    "styleLabel": "Tarz: Adım adım ▾",
+    "citationLoading": "Alıntı yükleniyor...",
+    "explanationFailed": "Anlatım alınamadı. Biraz sonra tekrar dene.",
+    "explanationLoading": "Anlatım hazırlanıyor..."
   },
   "result": {
     "title": "Test Sonucu",

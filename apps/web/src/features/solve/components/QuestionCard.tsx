@@ -4,6 +4,7 @@
 import { useTranslation } from "react-i18next";
 import Markdown from "../../../components/Markdown";
 import type { OptionStatus } from "../../../components/OptionBubble";
+import { Button } from "../../../components/ui/button";
 import type { AnswerResponse, SessionQuestion } from "../types";
 import AnswerOption from "./AnswerOption";
 
@@ -17,6 +18,8 @@ interface QuestionCardProps {
   answer?: QuestionAnswerState;
   onSelectOption: (option: string) => void;
   isSubmitting: boolean;
+  isExplanationOpen?: boolean;
+  onToggleExplanation?: () => void;
 }
 
 /** Şıkkın durumunu sunucunun cevap sonucuna göre belirler. */
@@ -40,11 +43,14 @@ export default function QuestionCard({
   answer,
   onSelectOption,
   isSubmitting,
+  isExplanationOpen,
+  onToggleExplanation,
 }: QuestionCardProps) {
   const { t } = useTranslation("test");
   const selectedOption = answer?.selectedOption ?? question.selectedOption;
   const isAnswered = selectedOption !== null;
   const outcomes = answer?.response.outcomes ?? [];
+  const isWrongAnswer = answer?.response ? !answer.response.isCorrect : isAnswered;
 
   return (
     <div className="space-y-6">
@@ -81,6 +87,37 @@ export default function QuestionCard({
         <div className="rounded-md bg-muted/40 p-3 text-xs text-muted-foreground">
           <span className="font-semibold text-foreground">{t("solve.outcomesLabel")} </span>
           {outcomes.map((outcome) => `${outcome.code} ${outcome.title}`).join(" · ")}
+        </div>
+      )}
+
+      {isAnswered && (
+        <div className="space-y-3 border-t border-border/60 pt-4">
+          <div className="flex flex-wrap items-center gap-2">
+            <Button variant="outline" size="sm" disabled>
+              {t("solve.hint")}
+            </Button>
+            <Button
+              variant={isExplanationOpen ? "default" : "outline"}
+              size="sm"
+              onClick={onToggleExplanation}
+              disabled={!isWrongAnswer}
+            >
+              {t("solve.whyWrong")}
+            </Button>
+            <Button variant="outline" size="sm" disabled>
+              {t("solve.similar")}
+            </Button>
+          </div>
+
+          <div>
+            <button
+              type="button"
+              className="text-xs text-muted-foreground hover:underline"
+              disabled
+            >
+              {t("solve.report")}
+            </button>
+          </div>
         </div>
       )}
     </div>

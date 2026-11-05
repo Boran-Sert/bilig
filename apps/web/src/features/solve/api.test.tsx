@@ -8,6 +8,7 @@ import type { ReactNode } from "react";
 import { afterEach, beforeEach, describe, expect, test, vi } from "vitest";
 import { ApiError } from "../../lib/api/problem";
 import {
+  useBlock,
   useCompleteSession,
   useSessionResult,
   useStartSession,
@@ -164,5 +165,27 @@ describe("solve api", () => {
     await waitFor(() => expect(result.current.isError).toBe(true));
     expect(result.current.error).toBeInstanceOf(ApiError);
     expect(result.current.error?.status).toBe(404);
+  });
+
+  test("useBlock belirtilen bloğu başarıyla çeker", async () => {
+    const mockBlock = {
+      id: 50,
+      markdown: "Roman türü hakkında bilgi",
+      sourceTitle: "TDE 12 Ders Kitabı",
+      pageNo: 175,
+      pageId: 12,
+    };
+    getMock.mockResolvedValue({ data: mockBlock, response: { status: 200 } });
+
+    const { result } = renderHook(() => useBlock(50), {
+      wrapper: createWrapper(queryClient),
+    });
+
+    await waitFor(() => expect(result.current.isSuccess).toBe(true));
+    expect(getMock).toHaveBeenCalledWith("/api/blocks/{id}", {
+      params: { path: { id: 50 } },
+    });
+    expect(result.current.data?.sourceTitle).toBe("TDE 12 Ders Kitabı");
+    expect(result.current.data?.pageNo).toBe(175);
   });
 });
