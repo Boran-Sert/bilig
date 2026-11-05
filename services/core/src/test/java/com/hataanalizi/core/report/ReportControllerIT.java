@@ -4,6 +4,7 @@ import static org.assertj.core.api.Assertions.assertThat;
 import static org.springframework.security.test.web.servlet.request.SecurityMockMvcRequestPostProcessors.authentication;
 import static org.springframework.security.test.web.servlet.request.SecurityMockMvcRequestPostProcessors.csrf;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.post;
+import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.jsonPath;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
 
 import com.hataanalizi.core.TestcontainersConfiguration;
@@ -44,7 +45,7 @@ class ReportControllerIT {
     @Test
     void reportsQuestion() throws Exception {
         Long userId = insertUser();
-        Long questionId = insertQuestion();
+        Long questionId = insertQuestion("PUBLISHED");
 
         mockMvc.perform(post("/api/reports")
                         .with(student(userId))
@@ -70,6 +71,21 @@ class ReportControllerIT {
                 .andExpect(status().isCreated());
 
         assertReport(userId, null, messageId, null);
+    }
+
+    /** Yayında olmayan soruyu bildirmeyi reddeder. */
+    @Test
+    void rejectsUnpublishedQuestion() throws Exception {
+        Long userId = insertUser();
+        Long questionId = insertQuestion("DRAFT");
+
+        mockMvc.perform(post("/api/reports")
+                        .with(student(userId))
+                        .with(csrf())
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("{\"questionId\":" + questionId + "}"))
+                .andExpect(status().isNotFound())
+                .andExpect(jsonPath("$.code").value("QUESTION_NOT_FOUND"));
     }
 
     /** Başka bir öğrencinin anlatımını bildirmeyi reddeder. */
@@ -144,8 +160,8 @@ class ReportControllerIT {
                 """, Long.class, identifier + "@example.test", identifier);
     }
 
-    /** Bildirilebilir, yayındaki bir soru oluşturur. */
-    private Long insertQuestion() {
+    /** Verilen durumda bir soru oluşturur. */
+    private Long insertQuestion(String status) {
         String identifier = UUID.randomUUID().toString();
         Long subjectId = jdbcTemplate.queryForObject(
                 "INSERT INTO subject (code, name) VALUES (?, ?) RETURNING id", Long.class, identifier, identifier);
@@ -163,12 +179,13 @@ class ReportControllerIT {
                 """
                 INSERT INTO question (
                     curriculum_unit_id, origin, content, correct_option, content_hash, status
-                ) VALUES (?, 'SOURCE', '{"stem":[],"options":[]}'::jsonb, 'A', ?, 'PUBLISHED')
+                ) VALUES (?, 'SOURCE', '{"stem":[],"options":[]}'::jsonb, 'A', ?, ?)
                 RETURNING id
                 """,
                 Long.class,
                 unitId,
-                identifier.replace("-", "") + UUID.randomUUID().toString().replace("-", ""));
+                identifier.replace("-", "") + UUID.randomUUID().toString().replace("-", ""),
+                status);
     }
 
     /** Öğrenciye ait asistan mesajı oluşturur. */

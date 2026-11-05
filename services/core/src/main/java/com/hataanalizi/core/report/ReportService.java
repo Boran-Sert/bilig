@@ -1,6 +1,7 @@
 package com.hataanalizi.core.report;
 
 import com.hataanalizi.core.common.ApiException;
+import com.hataanalizi.core.common.AppConstants;
 import com.hataanalizi.core.common.ErrorCode;
 import jakarta.persistence.EntityManager;
 import org.springframework.jdbc.core.JdbcTemplate;
@@ -37,10 +38,13 @@ public class ReportService {
         entityManager.persist(report);
     }
 
-    /** Bildirilecek sorunun varlığını sorgular. */
+    /** Bildirilecek sorunun yayında olup olmadığını sorgular. */
     private boolean questionExists(Long questionId) {
         Boolean exists = jdbcTemplate.queryForObject(
-                "SELECT EXISTS (SELECT 1 FROM question WHERE id = ?)", Boolean.class, questionId);
+                "SELECT EXISTS (SELECT 1 FROM question WHERE id = ? AND status = ?)",
+                Boolean.class,
+                questionId,
+                AppConstants.QUESTION_STATUS_PUBLISHED);
         return Boolean.TRUE.equals(exists);
     }
 
