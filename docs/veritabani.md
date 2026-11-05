@@ -28,6 +28,7 @@ erDiagram
     learning_outcome ||--o{ curriculum_unit_outcome : ""
 
     curriculum |o--o{ source_document : "kaynakları"
+    source_document |o--o{ source_document : "cevap anahtarı"
     source_document ||--o{ source_page : "sayfaları"
     source_page ||--o{ content_block : "blokları"
     curriculum_unit |o--o{ content_block : "ünitesi"
@@ -35,7 +36,7 @@ erDiagram
     learning_outcome ||--o{ content_block_outcome : ""
 
     source_page |o--o{ question : "çıktığı sayfa"
-    curriculum_unit ||--o{ question : "ünitesi"
+    curriculum_unit |o--o{ question : "ünitesi"
     question ||--o{ question_outcome : ""
     learning_outcome ||--o{ question_outcome : ""
 
@@ -185,6 +186,7 @@ erDiagram
 | license_status | text | hayır | 'UNKNOWN' | CHECK IN ('MEB', 'PERMITTED', 'UNKNOWN') |
 | status | text | hayır | 'UPLOADED' | CHECK IN ('UPLOADED', 'PROCESSING', 'REVIEW', 'PUBLISHED', 'FAILED') |
 | uploaded_by | bigint | hayır | | FK → app_user(id) |
+| answer_key_source_id | bigint | evet | | FK → source_document(id) · testin cevaplarının okunacağı ayrı anahtar dosyası |
 | created_at | timestamptz | hayır | now() | |
 | updated_at | timestamptz | hayır | now() | |
 
@@ -242,7 +244,7 @@ Alıntı kartındaki "TDE 12 Ders Kitabı · s. 174" bilgisi saklanmaz; `source_
 |---|---|---|---|---|
 | id | bigint | hayır | identity | PK |
 | source_page_id | bigint | evet | | FK → source_page(id) · üretilen soruda boş |
-| curriculum_unit_id | bigint | hayır | | FK → curriculum_unit(id) |
+| curriculum_unit_id | bigint | evet | | FK → curriculum_unit(id) · ünitesi bulunamayan test sorusunda kazanımlardan doldurulur, bulunamazsa boş |
 | origin | text | hayır | | CHECK IN ('SOURCE', 'GENERATED') |
 | content | jsonb | hayır | | Kök, ortak parça ve şıklar (plan 13.6) |
 | correct_option | char(1) | hayır | | CHECK IN ('A', 'B', 'C', 'D', 'E') |

@@ -188,12 +188,18 @@ async def test_source_is_failed_when_last_attempt_is_abandoned(db: Connection) -
 @pytest.mark.asyncio
 @pytest.mark.parametrize(
     ("kind", "expected"),
-    [("TEXTBOOK", "textbook"), ("TEST", "tests"), ("QUESTION_BANK", "tests"), ("PROGRAM", None)],
+    [
+        ("TEXTBOOK", "textbook"),
+        ("TEST", "tests"),
+        ("QUESTION_BANK", "tests"),
+        ("ANSWER_KEY", "answer_key"),
+        ("PROGRAM", None),
+    ],
 )
 async def test_extract_reads_source_with_reader_of_its_kind(
     db: Connection, tmp_path: Path, monkeypatch: pytest.MonkeyPatch, kind: str, expected: str | None
 ) -> None:
-    """EXTRACT kaynağı türünün okuyucusuyla okur; program ve cevap anahtarı burada okunmaz."""
+    """EXTRACT kaynağı türünün okuyucusuyla okur; program burada okunmaz."""
     source_id = await make_source(db)
     await db.execute("UPDATE source_document SET kind = %s WHERE id = %s", (kind, source_id))
     calls: list[str] = []
@@ -204,6 +210,7 @@ async def test_extract_reads_source_with_reader_of_its_kind(
 
     monkeypatch.setattr(pipeline, "extract_textbook", lambda *_: record("textbook"))
     monkeypatch.setattr(pipeline, "extract_tests", lambda *_: record("tests"))
+    monkeypatch.setattr(pipeline, "check_answer_key", lambda *_: record("answer_key"))
 
     await pipeline.extract_source(source_id, make_context(db, tmp_path))
 

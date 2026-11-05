@@ -3,8 +3,8 @@
 run_ingest, INGEST_SOURCE işini last_completed_step'ten sonraki adımdan başlatıp adımları sırayla
 çalıştırır; her adımın çıktısı yazıldıktan sonra adım işe kaydedilir, böylece hata alan iş
 kaldığı adımdan devam eder. Adım listesi bir sözlüktür (STEPS): yeni adım bir satırla eklenir,
-sözlükte olmayan adım atlanır ve kaydedilmez. EXTRACT kaynağı türünün okuyucusuyla okur (kitap ya
-da test); program ve cevap anahtarı komutla yüklendiği için atlanır, türü bilinmeyen kaynak hata
+sözlükte olmayan adım atlanır ve kaydedilmez. EXTRACT kaynağı türünün okuyucusuyla okur (kitap,
+test ya da cevap anahtarı); program komutla yüklendiği için atlanır, türü bilinmeyen kaynak hata
 verir. ENTITIES notları ve bağları çıkarır (entities.py), OUTCOMES içeriği kazanımlara bağlar
 (outcomes.py), INDEX vektörleri yazar (index.py); VALIDATE henüz yoktur. Kaynak başlarken
 PROCESSING olur; FAILED yalnızca son denemede yazılır, tekrar denenecek iş listede hatalı
@@ -37,6 +37,7 @@ from app.ingest import pdf
 from app.ingest.entities import extract_source_entities
 from app.ingest.index import index_source
 from app.ingest.outcomes import match_source_outcomes
+from app.ingest.readers.answer_key import check_answer_key
 from app.ingest.readers.test import extract_tests
 from app.ingest.readers.textbook import extract_textbook
 from app.ingest.steps import IngestStep, remaining_steps
@@ -87,6 +88,8 @@ async def extract_source(source_id: int, context: IngestContext) -> None:
         await extract_textbook(source_id, context)
     elif kind in TEST_SOURCE_KINDS:
         await extract_tests(source_id, context)
+    elif kind == "ANSWER_KEY":
+        await check_answer_key(source_id, context)
     elif kind == "UNKNOWN":
         raise ValueError(f"Source {source_id} kind is UNKNOWN; set its kind before EXTRACT")
 

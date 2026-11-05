@@ -2,9 +2,9 @@
 
 Her sorun bir kod ve varsa sayfası, testi ve soru numarasıdır. Soru kontrollerinin kodları
 validators.ValidationProblem'dakilerle aynıdır; öbürleri kaynağın okumasından gelir: cevap
-anahtarı bulunamayan soru, ünitesi bulunamayan test, hiç içerik çıkmayan kaynak, metin katmanı
-bozuk kalan ya da harfi çözülemeyen sayfa ve kökünde soru olmadığı için atılan şık kümesi. JSON'da
-alanlar camelCase yazılır; core inceleme ucunda olduğu gibi döner.
+anahtarı bulunamayan soru, hiç içerik çıkmayan kaynak, metin katmanı bozuk kalan ya da harfi
+çözülemeyen sayfa ve kökünde soru olmadığı için atılan şık kümesi. JSON'da alanlar camelCase
+yazılır; core inceleme ucunda olduğu gibi döner.
 """
 
 from typing import Literal
@@ -20,7 +20,6 @@ ProblemCode = Literal[
     "EMPTY_STEM",
     "ANSWER_NOT_OPTION",
     "NUMBER_SEQUENCE",
-    "UNIT_NOT_FOUND",
     "NO_CONTENT",
     "LOW_TEXT_LAYER",
     "UNDECODED_GLYPHS",

@@ -9,7 +9,7 @@ import { Label } from "../../../components/ui/label";
 import { getProblemMessage } from "../../../lib/api/problem";
 import { UPLOAD_SOURCE_KINDS } from "../../../lib/constants";
 import { useMe } from "../../auth/api";
-import { useSources, useUploadSources } from "../api";
+import { useAnswerKeys, useReprocessSource, useSources, useUploadSources } from "../api";
 import SourceDropzone from "../components/SourceDropzone";
 import SourceList from "../components/SourceList";
 import UploadResultList from "../components/UploadResultList";
@@ -21,11 +21,16 @@ import type { SourceKind } from "../types";
 export default function SourcesPage() {
   const { t } = useTranslation("admin");
   const { data: user, isPending: isUserPending } = useMe();
-  const sourcesQuery = useSources(user?.canManageContent === true);
+  const canManage = user?.canManageContent === true;
+  const sourcesQuery = useSources(canManage);
+  const answerKeysQuery = useAnswerKeys(canManage);
   const uploadMutation = useUploadSources();
+  const reprocessMutation = useReprocessSource();
   const [rejectedNames, setRejectedNames] = useState<string[]>([]);
   const [kind, setKind] = useState<SourceKind | "">("");
+  const [answerKeyId, setAnswerKeyId] = useState<number | "">("");
   const [kindMissing, setKindMissing] = useState(false);
+  const answerKeys = answerKeysQuery.data ?? [];
 
   /** PDF'leri seçilen türle yükler, PDF olmayanları adıyla bildirir; tür yoksa yüklemez. */
   function handleDrop(acceptedFiles: File[], rejectedFiles: FileRejection[]) {
@@ -33,7 +38,8 @@ export default function SourcesPage() {
     setKindMissing(acceptedFiles.length > 0 && kind === "");
 
     if (acceptedFiles.length > 0 && kind !== "") {
-      uploadMutation.mutate({ files: acceptedFiles, kind });
+      const answerKeySourceId = kind === "TEST" && answerKeyId !== "" ? answerKeyId : undefined;
+      uploadMutation.mutate({ files: acceptedFiles, kind, answerKeySourceId });
     }
   }
 
@@ -61,6 +67,7 @@ export default function SourcesPage() {
           value={kind}
           onChange={(event) => {
             setKind(event.target.value as SourceKind);
+            setAnswerKeyId("");
             setKindMissing(false);
           }}
           className="h-8 w-full rounded-lg border border-input bg-transparent px-2.5 text-sm outline-none focus-visible:border-ring focus-visible:ring-3 focus-visible:ring-ring/50"
@@ -75,6 +82,27 @@ export default function SourcesPage() {
           ))}
         </select>
       </div>
+
+      {kind === "TEST" && answerKeys.length > 0 && (
+        <div className="max-w-xs space-y-2">
+          <Label htmlFor="answer-key">{t("sources.answerKeyLabel")}</Label>
+          <select
+            id="answer-key"
+            value={answerKeyId}
+            onChange={(event) =>
+              setAnswerKeyId(event.target.value === "" ? "" : Number(event.target.value))
+            }
+            className="h-8 w-full rounded-lg border border-input bg-transparent px-2.5 text-sm outline-none focus-visible:border-ring focus-visible:ring-3 focus-visible:ring-ring/50"
+          >
+            <option value="">{t("sources.answerKeyNone")}</option>
+            {answerKeys.map((answerKey) => (
+              <option key={answerKey.sourceId} value={answerKey.sourceId}>
+                {answerKey.fileName}
+              </option>
+            ))}
+          </select>
+        </div>
+      )}
 
       {kindMissing && (
         <p role="alert" className="rounded-md bg-destructive/10 p-3 text-sm text-destructive">
@@ -106,7 +134,21 @@ export default function SourcesPage() {
           {getProblemMessage(sourcesQuery.error)}
         </p>
       )}
-      {sourcesQuery.isSuccess && <SourceList items={sourcesQuery.data.items} />}
+      {reprocessMutation.isError && (
+        <p role="alert" className="rounded-md bg-destructive/10 p-3 text-sm text-destructive">
+          {getProblemMessage(reprocessMutation.error)}
+        </p>
+      )}
+      {sourcesQuery.isSuccess && (
+        <SourceList
+          items={sourcesQuery.data.items}
+          answerKeys={answerKeys}
+          isReprocessing={reprocessMutation.isPending}
+          onReprocess={(sourceId, answerKeySourceId) =>
+            reprocessMutation.mutate({ sourceId, answerKeySourceId })
+          }
+        />
+      )}
     </section>
   );
 }

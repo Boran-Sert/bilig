@@ -10,12 +10,14 @@ import "../../../lib/i18n";
 import { ApiError } from "../../../lib/api/problem";
 import SourcesPage from "./SourcesPage";
 
-const { useMeMock, useUploadSourcesMock, useSourcesMock, mutateMock } = vi.hoisted(() => ({
-  useMeMock: vi.fn(),
-  useUploadSourcesMock: vi.fn(),
-  useSourcesMock: vi.fn(),
-  mutateMock: vi.fn(),
-}));
+const { useMeMock, useUploadSourcesMock, useSourcesMock, useAnswerKeysMock, mutateMock } =
+  vi.hoisted(() => ({
+    useMeMock: vi.fn(),
+    useUploadSourcesMock: vi.fn(),
+    useSourcesMock: vi.fn(),
+    useAnswerKeysMock: vi.fn(),
+    mutateMock: vi.fn(),
+  }));
 
 vi.mock("../../auth/api", () => ({
   useMe: useMeMock,
@@ -24,6 +26,9 @@ vi.mock("../../auth/api", () => ({
 vi.mock("../api", () => ({
   useUploadSources: useUploadSourcesMock,
   useSources: useSourcesMock,
+  useAnswerKeys: useAnswerKeysMock,
+  /** Yeniden işleme hook'unu boşta taklit eder. */
+  useReprocessSource: () => ({ mutate: vi.fn(), isPending: false, isError: false, error: null }),
 }));
 
 const contentManager = {
@@ -77,6 +82,7 @@ afterEach(cleanup);
 describe("SourcesPage", () => {
   beforeEach(() => {
     mutateMock.mockReset();
+    useAnswerKeysMock.mockReturnValue({ data: [] });
     useMeMock.mockReturnValue({ data: contentManager, isPending: false });
     useSourcesMock.mockReturnValue({
       data: { items: [], page: 0, size: 20, total: 0 },
@@ -157,6 +163,22 @@ describe("SourcesPage", () => {
 
     await waitFor(() => expect(mutateMock).toHaveBeenCalledTimes(1));
     expect(mutateMock).toHaveBeenCalledWith({ files: [firstPdf, secondPdf], kind: "TEST" });
+  });
+
+  test("teste seçilen cevap anahtarını yüklemeyle gönderir", async () => {
+    useAnswerKeysMock.mockReturnValue({
+      data: [{ sourceId: 7, fileName: "CEVAP_ANAHTARI.pdf", kind: "ANSWER_KEY" }],
+    });
+    const pdf = createFile("14.pdf", "application/pdf");
+    renderSourcesPage();
+    selectKind("TEST");
+    fireEvent.change(screen.getByLabelText("Cevap anahtarı"), { target: { value: "7" } });
+
+    dropFiles([pdf]);
+
+    await waitFor(() =>
+      expect(mutateMock).toHaveBeenCalledWith({ files: [pdf], kind: "TEST", answerKeySourceId: 7 }),
+    );
   });
 
   test("tür seçilmeden bırakılan PDF'i yüklemez ve tür seçmeyi ister", async () => {

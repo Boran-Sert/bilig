@@ -22,6 +22,10 @@ SELECT_SOURCE_TITLE = "SELECT title FROM source_document WHERE id = %(source_id)
 
 SELECT_SOURCE_KIND = "SELECT kind FROM source_document WHERE id = %(source_id)s"
 
+SELECT_ANSWER_KEY_SOURCE = """
+SELECT answer_key_source_id FROM source_document WHERE id = %(source_id)s
+"""
+
 SET_SOURCE_STATUS = """
 UPDATE source_document
 SET status = %(status)s, updated_at = now()
@@ -94,6 +98,13 @@ async def fetch_source_kind(connection: AsyncConnection, source_id: int) -> str:
     if row is None:
         raise LookupError(f"Source {source_id} not found")
     return str(row[0])
+
+
+async def fetch_answer_key_source_id(connection: AsyncConnection, source_id: int) -> int | None:
+    """Teste bağlı cevap anahtarı kaynağının kimliğini verir; bağlı anahtar yoksa boş döner."""
+    cursor = await connection.execute(SELECT_ANSWER_KEY_SOURCE, {"source_id": source_id})
+    row = await cursor.fetchone()
+    return int(row[0]) if row is not None and row[0] is not None else None
 
 
 async def mark_processing(connection: AsyncConnection, source_id: int) -> None:
