@@ -8,7 +8,13 @@ import type { ReactNode } from "react";
 import { afterEach, beforeEach, describe, expect, test, vi } from "vitest";
 import { ApiError } from "../../lib/api/problem";
 import { SOURCES_POLL_INTERVAL_MS } from "../../lib/constants";
-import { adminKeys, hasProcessingSources, useSources, useUploadSources } from "./api";
+import {
+  adminKeys,
+  hasProcessingSources,
+  useReprocessSource,
+  useSources,
+  useUploadSources,
+} from "./api";
 import type { SourceListItem } from "./types";
 
 const { getMock, postMock } = vi.hoisted(() => ({
@@ -196,5 +202,45 @@ describe("admin api - useUploadSources", () => {
     expect(result.current.error).toBeInstanceOf(ApiError);
     expect(result.current.error?.status).toBe(400);
     expect(result.current.error?.message).toBe("FILE_NOT_PDF");
+  });
+});
+
+describe("admin api - useReprocessSource", () => {
+  let queryClient: QueryClient;
+
+  beforeEach(() => {
+    postMock.mockReset();
+    queryClient = new QueryClient({ defaultOptions: { mutations: { retry: false } } });
+  });
+
+  test("kaynağı anahtarıyla yeniden işlemeye gönderir ve listeyi yeniler", async () => {
+    postMock.mockResolvedValue({ response: { status: 202, ok: true } });
+    const invalidateSpy = vi.spyOn(queryClient, "invalidateQueries");
+    const { result } = renderHook(() => useReprocessSource(), {
+      wrapper: createWrapper(queryClient),
+    });
+
+    result.current.mutate({ sourceId: 104, answerKeySourceId: 7 });
+
+    await waitFor(() => expect(result.current.isSuccess).toBe(true));
+    expect(postMock).toHaveBeenCalledWith("/api/admin/sources/{id}/reprocess", {
+      params: { path: { id: 104 }, query: { answerKeySourceId: 7 } },
+    });
+    expect(invalidateSpy).toHaveBeenCalledWith({ queryKey: adminKeys.sources });
+  });
+
+  test("kaynak işlenirken gelen SOURCE_BUSY hatasını ApiError olarak verir", async () => {
+    postMock.mockResolvedValue({
+      error: { code: "SOURCE_BUSY" },
+      response: { status: 409, ok: false },
+    });
+    const { result } = renderHook(() => useReprocessSource(), {
+      wrapper: createWrapper(queryClient),
+    });
+
+    result.current.mutate({ sourceId: 104 });
+
+    await waitFor(() => expect(result.current.isError).toBe(true));
+    expect(result.current.error?.message).toBe("SOURCE_BUSY");
   });
 });

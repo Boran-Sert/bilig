@@ -2,17 +2,26 @@
  * Kaynak dosyalarının durumunu ve hazırlık adımlarındaki ilerlemesini tablo olarak gösterir.
  */
 import { useTranslation } from "react-i18next";
+import { Button } from "../../../components/ui/button";
 import type { SourceListItem } from "../types";
 import StepProgress from "./StepProgress";
 
 interface SourceListProps {
   items: SourceListItem[];
+  answerKeys: SourceListItem[];
+  isReprocessing: boolean;
+  onReprocess: (sourceId: number, answerKeySourceId?: number) => void;
 }
 
 /**
- * Kaynak dosyalarının ilerleme durumunu ve hata metnini listeler.
+ * Kaynak dosyalarının ilerleme durumunu, hata metnini ve yeniden işleme düğmelerini listeler.
  */
-export default function SourceList({ items }: SourceListProps) {
+export default function SourceList({
+  items,
+  answerKeys,
+  isReprocessing,
+  onReprocess,
+}: SourceListProps) {
   const { t } = useTranslation("admin");
 
   if (items.length === 0) {
@@ -34,6 +43,7 @@ export default function SourceList({ items }: SourceListProps) {
           const isFailed = item.status === "FAILED";
           const isReview = item.status === "REVIEW";
           const isPublished = item.status === "PUBLISHED";
+          const isWorking = item.status === "UPLOADED" || item.status === "PROCESSING";
           const stepName = item.lastCompletedStep
             ? t(`sources.steps.${item.lastCompletedStep}`, { defaultValue: item.lastCompletedStep })
             : t(`sources.status.${item.status}`);
@@ -63,7 +73,7 @@ export default function SourceList({ items }: SourceListProps) {
                 </p>
               </div>
 
-              <div className="col-span-3 flex justify-end">
+              <div className="col-span-3 flex flex-col items-end gap-2">
                 {isPublished && (
                   <span className="inline-flex rounded-full bg-emerald-500/10 px-2.5 py-0.5 text-xs font-medium text-emerald-600 dark:text-emerald-400">
                     {t("sources.status.PUBLISHED")}
@@ -83,6 +93,34 @@ export default function SourceList({ items }: SourceListProps) {
                   <span className="inline-flex rounded-full bg-primary/10 px-2.5 py-0.5 text-xs font-medium text-primary">
                     {t(`sources.status.${item.status}`)}
                   </span>
+                )}
+                {!isWorking && item.kind === "TEST" && answerKeys.length > 0 && (
+                  <select
+                    aria-label={t("sources.linkAnswerKey")}
+                    value=""
+                    disabled={isReprocessing}
+                    onChange={(event) => onReprocess(item.sourceId, Number(event.target.value))}
+                    className="h-7 max-w-full rounded-md border border-input bg-transparent px-2 text-xs"
+                  >
+                    <option value="" disabled>
+                      {t("sources.linkAnswerKey")}
+                    </option>
+                    {answerKeys.map((answerKey) => (
+                      <option key={answerKey.sourceId} value={answerKey.sourceId}>
+                        {answerKey.fileName}
+                      </option>
+                    ))}
+                  </select>
+                )}
+                {!isWorking && (
+                  <Button
+                    variant="outline"
+                    size="sm"
+                    disabled={isReprocessing}
+                    onClick={() => onReprocess(item.sourceId)}
+                  >
+                    {t("sources.reprocess")}
+                  </Button>
                 )}
               </div>
             </div>
