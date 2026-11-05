@@ -1,0 +1,39 @@
+{
+  "title": "Öğrenci Paneli",
+  "metaDescription": "AYT Türk Dili ve Edebiyatı ilerlemeniz, çözülen sorular ve başarısız kazanımlar.",
+  "greeting": "Merhaba {{name}}",
+  "gradeAndCurriculum": "{{grade}}. sınıf · AYT Türk Dili ve Edebiyatı",
+  "loading": "Öğrenci paneli yükleniyor...",
+  "empty": "Henüz test çözülmedi. İlk testini çözerek ilerlemeni görebilirsin.",
+  "summary": {
+    "solvedQuestions": "çözülen soru",
+    "accuracy": "doğruluk",
+    "latestNet": "son deneme neti · {{count}} soruda",
+    "noNetYet": "Henüz deneme tamamlanmadı"
+  },
+  "activeSessions": {
+    "title": "Devam eden testler",
+    "resume": "Devam et",
+    "empty": "Devam eden testiniz bulunmuyor.",
+    "progress": "{{current}} / {{total}} soru"
+  },
+  "failedOutcomes": {
+    "title": "Başarısız kazanımlar",
+    "practice": "Pratik yap",
+    "empty": "Başarısız kazanımınız bulunmuyor.",
+    "testWrong": "{{test}} testinde {{count}} yanlış",
+    "totalWrong": "toplam {{count}} yanlış"
+  },
+  "unitAccuracy": {
+    "title": "Tür bazlı başarı",
+    "empty": "Henüz tür başarısı verisi yok."
+  },
+  "errorTypes": {
+    "title": "Yanlışlarında öne çıkan",
+    "empty": "Henüz hata türü analizi bulunmuyor.",
+    "KNOWLEDGE": "Bilgi eksikliği",
+    "MISCONCEPTION": "Kavram yanılgısı",
+    "ATTENTION": "Dikkat",
+    "READING": "Okuma"
+  }
+}
