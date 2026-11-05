@@ -5,6 +5,7 @@ import { useState } from "react";
 import { useTranslation } from "react-i18next";
 import PageMeta from "../../../components/PageMeta";
 import { Button } from "../../../components/ui/button";
+import { getProblemMessage } from "../../../lib/api/problem";
 import { SOURCES_PAGE_SIZE } from "../../../lib/constants";
 import { useMe } from "../../auth/api";
 import { useDecideReview, useReviews } from "../api";
@@ -60,7 +61,18 @@ export default function ReviewPage() {
         <p className="py-8 text-center text-sm text-muted-foreground">{t("sources.loadingList")}</p>
       )}
 
-      {!reviewsQuery.isPending && items.length === 0 && (
+      {reviewsQuery.isError && (
+        <p role="alert" className="rounded-md bg-destructive/10 p-3 text-sm text-destructive">
+          {getProblemMessage(reviewsQuery.error)}
+        </p>
+      )}
+      {decideMutation.isError && (
+        <p role="alert" className="rounded-md bg-destructive/10 p-3 text-sm text-destructive">
+          {getProblemMessage(decideMutation.error)}
+        </p>
+      )}
+
+      {!reviewsQuery.isPending && !reviewsQuery.isError && items.length === 0 && (
         <p className="rounded-lg border border-dashed py-12 text-center text-sm text-muted-foreground">
           {t("review.empty")}
         </p>

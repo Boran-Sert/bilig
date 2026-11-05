@@ -101,7 +101,7 @@ export default function OutcomeSelectorDialog({
           <Button variant="outline" size="sm" onClick={onClose}>
             {t("review.outcomes.cancel")}
           </Button>
-          <Button size="sm" onClick={() => onSave(selectedIds)}>
+          <Button size="sm" disabled={selectedIds.length === 0} onClick={() => onSave(selectedIds)}>
             {t("review.outcomes.save")}
           </Button>
         </div>

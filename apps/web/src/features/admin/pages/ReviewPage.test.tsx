@@ -106,4 +106,26 @@ describe("ReviewPage", () => {
       request: { decision: "APPROVE" },
     });
   });
+
+  test("karar kaydedilemezse sunucunun hatasını gösterir", () => {
+    useMeMock.mockReturnValue({
+      data: { id: 1, canManageContent: true },
+      isPending: false,
+    });
+    useReviewsMock.mockReturnValue({
+      data: { items: [], total: 0, page: 0, size: 20 },
+      isPending: false,
+      isError: false,
+    });
+    useDecideReviewMock.mockReturnValue({
+      mutate: mutateMock,
+      isPending: false,
+      isError: true,
+      error: { detail: "Kayıt zaten karara bağlandı." },
+    });
+
+    render(<ReviewPage />);
+
+    expect(screen.getByRole("alert")).toHaveTextContent("Kayıt zaten karara bağlandı.");
+  });
 });
