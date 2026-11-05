@@ -14,7 +14,7 @@ from app.api import tutor as api
 from app.llm.tasks import LlmTask
 from app.main import app
 from app.schemas.tutor import CitationSource, SourceBlock, StreamCitation, StreamText
-from app.tutor import stream
+from app.tutor import stream, tools
 from app.tutor.chat import NoUserMessageError
 from app.tutor.stream import PreparedStream
 
@@ -69,14 +69,15 @@ def use_stream(monkeypatch: pytest.MonkeyPatch, *, fail: bool = False) -> list[o
         sources: list[CitationSource],
         *,
         user_id: int | None = None,
+        execute_tool: object = None,
     ) -> AsyncIterator[StreamText | StreamCitation]:
         """Hazır parçaları verir; istenirse arada hata verir."""
         calls.append(sources)
         yield StreamText(text="Küçük Ağa ")
         if fail:
             raise RuntimeError("stream broke")
-        yield StreamCitation(source_index=1)
-        yield StreamCitation(source_index=1)
+        yield StreamCitation(source=sources[1])
+        yield StreamCitation(source=sources[1])
         yield StreamText(text="tarihî romandır.")
 
     monkeypatch.setattr(stream, "stream_task", fake_stream)
@@ -142,8 +143,12 @@ def test_explanation_streams_delta_citation_and_done(
     )
     assert calls == [
         [
-            CitationSource(source="TDE 12 · s. 174", title="Roman", text="Tarihî."),
-            CitationSource(source="TDE 12 · s. 175", title="Roman", text="Tahlil."),
+            CitationSource(
+                source="TDE 12 · s. 174", title="Roman", text="Tarihî.", block=SOURCES[0]
+            ),
+            CitationSource(
+                source="TDE 12 · s. 175", title="Roman", text="Tahlil.", block=SOURCES[1]
+            ),
         ]
     ]
 
@@ -197,3 +202,40 @@ def test_chat_without_new_message_is_409(
     monkeypatch.setattr(api, "prepare_chat", fake_prepare)
 
     assert client.post("/internal/chat", json=CHAT, headers=TOKEN).status_code == 409
+
+
+def test_tool_citations_draw_card_from_paragraph(
+    client: TestClient, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    """Tool'dan gelen paragraf kendi kartıyla, not dayanağıyla gider; dayanaksız not kart çizmez."""
+    evidence = SourceBlock(
+        block_id=201, source_title="TDE 12", page_no=88, title_path="Roman", markdown="Kanıt."
+    )
+    note = CitationSource(source="kb://note/7", title="Tarık Buğra", text="Not.", block=evidence)
+    lonely = CitationSource(source="kb://note/8", title="Kavram", text="Not.")
+    executors: list[object] = []
+
+    async def fake_stream(
+        task: LlmTask,
+        variables: Mapping[str, object],
+        sources: list[CitationSource],
+        *,
+        user_id: int | None = None,
+        execute_tool: object = None,
+    ) -> AsyncIterator[StreamText | StreamCitation]:
+        """Paragraf, iki not ve tekrar eden dayanak alıntısı verir."""
+        executors.append(execute_tool)
+        for source in [SOURCES[0].citation_source(), lonely, note, evidence.citation_source()]:
+            yield StreamCitation(source=source)
+
+    use_prepared(monkeypatch, PREPARED.model_copy(update={"task": LlmTask.CHAT}))
+    monkeypatch.setattr(stream, "stream_task", fake_stream)
+
+    response = client.post("/internal/chat", json=CHAT, headers=TOKEN)
+
+    assert response.text == (
+        'event: citation\ndata: {"blockId":101,"sourceTitle":"TDE 12","page":174}\n\n'
+        'event: citation\ndata: {"blockId":201,"sourceTitle":"TDE 12","page":88}\n\n'
+        "event: done\ndata: {}\n\n"
+    )
+    assert executors == [tools.execute_tool]

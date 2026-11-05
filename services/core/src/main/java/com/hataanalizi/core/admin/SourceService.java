@@ -8,9 +8,11 @@ import com.hataanalizi.core.common.AppConstants;
 import com.hataanalizi.core.common.ErrorCode;
 import com.hataanalizi.core.common.PageResponse;
 import com.hataanalizi.core.job.JobQueue;
+import com.hataanalizi.core.job.JobStatus;
 import com.hataanalizi.core.job.JobType;
 import com.hataanalizi.core.storage.FileStorage;
 import jakarta.persistence.EntityManager;
+import jakarta.persistence.LockModeType;
 import jakarta.persistence.PersistenceContext;
 import java.io.IOException;
 import java.io.InputStream;
@@ -43,10 +45,14 @@ public class SourceService {
                    source.created_at,
                    job.last_completed_step,
                    job.last_error
-            FROM (SELECT count(*) AS total FROM source_document) totals
+            FROM (
+                SELECT count(*) AS total FROM source_document
+                WHERE CAST(:kind AS text) IS NULL OR kind = CAST(:kind AS text)
+            ) totals
             LEFT JOIN (
                 SELECT id, title, kind, status, created_at
                 FROM source_document
+                WHERE CAST(:kind AS text) IS NULL OR kind = CAST(:kind AS text)
                 ORDER BY created_at DESC, id DESC
                 LIMIT :size OFFSET :offset
             ) source ON true
@@ -59,6 +65,15 @@ public class SourceService {
                 LIMIT 1
             ) job ON true
             ORDER BY source.created_at DESC, source.id DESC
+            """;
+    private static final String ACTIVE_JOB_QUERY = """
+            SELECT EXISTS (
+                SELECT 1
+                FROM background_job
+                WHERE job_type = :jobType
+                  AND payload->>'sourceId' = CAST(:sourceId AS text)
+                  AND status IN (:activeStatuses)
+            )
             """;
     private static final Logger log = LoggerFactory.getLogger(SourceService.class);
     private static final byte[] PDF_SIGNATURE = "%PDF".getBytes(StandardCharsets.US_ASCII);
@@ -89,7 +104,7 @@ public class SourceService {
 
     /** Dosyaları önce doğrular, sonra kaynakları tek transaction içinde kaydeder. */
     @Transactional
-    public UploadResponse upload(List<MultipartFile> files, SourceKind kind, Long uploadedBy) {
+    public UploadResponse upload(List<MultipartFile> files, SourceKind kind, Long answerKeySourceId, Long uploadedBy) {
         if (files == null
                 || files.isEmpty()
                 || uploadedBy == null
@@ -97,17 +112,56 @@ public class SourceService {
                 || !AppConstants.UPLOADABLE_SOURCE_KINDS.contains(kind.name())) {
             throw new ApiException(ErrorCode.VALIDATION_FAILED);
         }
+        validateAnswerKey(kind, answerKeySourceId);
 
         List<ValidatedFile> validatedFiles = validateFiles(files);
 
         List<String> filesToCleanup = new ArrayList<>();
         registerRollbackCleanup(filesToCleanup);
-        return persistFiles(validatedFiles, kind, uploadedBy, filesToCleanup);
+        return persistFiles(validatedFiles, kind, answerKeySourceId, uploadedBy, filesToCleanup);
+    }
+
+    /** Kaynağı yeniden kuyruğa koyar; anahtar verilirse önce teste bağlar, süren işi bekletir. */
+    @Transactional
+    public void reprocess(long sourceId, Long answerKeySourceId) {
+        SourceDocument source = entityManager.find(SourceDocument.class, sourceId, LockModeType.PESSIMISTIC_WRITE);
+        if (source == null) {
+            throw new ApiException(ErrorCode.NOT_FOUND);
+        }
+        if (answerKeySourceId != null) {
+            validateAnswerKey(source.getKind(), answerKeySourceId);
+            source.setAnswerKeySourceId(answerKeySourceId);
+        }
+        Boolean busy = (Boolean) entityManager
+                .createNativeQuery(ACTIVE_JOB_QUERY)
+                .setParameter("jobType", JobType.INGEST_SOURCE.name())
+                .setParameter("sourceId", sourceId)
+                .setParameter("activeStatuses", List.of(JobStatus.QUEUED.name(), JobStatus.RUNNING.name()))
+                .getSingleResult();
+        if (Boolean.TRUE.equals(busy)) {
+            throw new ApiException(ErrorCode.SOURCE_BUSY);
+        }
+        source.setStatus(SourceStatus.UPLOADED);
+        enqueueIngestJob(sourceId);
+    }
+
+    /** Anahtar sadece teste bağlanır ve bağlanan kaynak cevap anahtarı olmalıdır. */
+    private void validateAnswerKey(SourceKind kind, Long answerKeySourceId) {
+        if (answerKeySourceId == null) {
+            return;
+        }
+        boolean isAnswerKey = sourceDocumentRepository
+                .findById(answerKeySourceId)
+                .filter(source -> source.getKind() == SourceKind.ANSWER_KEY)
+                .isPresent();
+        if (kind != SourceKind.TEST || !isAnswerKey) {
+            throw new ApiException(ErrorCode.VALIDATION_FAILED);
+        }
     }
 
     /** Kaynakları ve en güncel hazırlık işlerini tek sorguyla sayfalı döner. */
     @Transactional(readOnly = true)
-    public PageResponse<SourceListItem> listSources(int page, int size) {
+    public PageResponse<SourceListItem> listSources(int page, int size, SourceKind kind) {
         if (page < 0 || size < 1 || size > AppConstants.MAX_SOURCE_PAGE_SIZE) {
             throw new ApiException(ErrorCode.VALIDATION_FAILED);
         }
@@ -115,6 +169,7 @@ public class SourceService {
         List<?> rows = entityManager
                 .createNativeQuery(SOURCE_LIST_QUERY)
                 .setParameter("jobType", JobType.INGEST_SOURCE.name())
+                .setParameter("kind", kind == null ? null : kind.name())
                 .setParameter("size", size)
                 .setParameter("offset", (long) page * size)
                 .getResultList();
@@ -215,7 +270,11 @@ public class SourceService {
 
     /** Yeni dosyaları yazar, işlerini sıraya koyar ve yinelenen kimlikleri döndürür. */
     private UploadResponse persistFiles(
-            List<ValidatedFile> files, SourceKind kind, Long uploadedBy, List<String> filesToCleanup) {
+            List<ValidatedFile> files,
+            SourceKind kind,
+            Long answerKeySourceId,
+            Long uploadedBy,
+            List<String> filesToCleanup) {
         Map<String, Long> knownSourceIds = new HashMap<>();
         List<UploadedFile> uploadedFiles = new ArrayList<>(files.size());
         for (ValidatedFile file : files) {
@@ -232,7 +291,7 @@ public class SourceService {
                 continue;
             }
             Optional<Long> insertedId = sourceDocumentRepository.insertIfAbsent(
-                    file.fileName(), file.sha256(), "sources/pending.pdf", kind.name(), uploadedBy);
+                    file.fileName(), file.sha256(), "sources/pending.pdf", kind.name(), uploadedBy, answerKeySourceId);
             if (insertedId.isEmpty()) {
                 existingId = sourceDocumentRepository
                         .findBySha256(file.sha256())

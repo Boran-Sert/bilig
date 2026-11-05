@@ -66,7 +66,7 @@ def content_hash(content: QuestionContent) -> str:
 async def save_exam(
     connection: AsyncConnection,
     source_id: int,
-    unit_id: int,
+    unit_id: int | None,
     title: str,
     questions: list[ParsedQuestion],
 ) -> int:
@@ -99,7 +99,7 @@ async def publish_source_exams(connection: AsyncConnection, source_id: int) -> N
 
 
 async def _fetch_exam_id(
-    connection: AsyncConnection, source_id: int, unit_id: int, title: str
+    connection: AsyncConnection, source_id: int, unit_id: int | None, title: str
 ) -> int:
     """Kaynağın aynı başlıklı testini bulur; yoksa açar."""
     params = {"source_id": source_id, "unit_id": unit_id, "title": title}

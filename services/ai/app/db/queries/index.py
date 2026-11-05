@@ -2,8 +2,11 @@
 
 Kaynağın vektörü olmayan blokları ve soruları okunur, vektörleri yazılır. Kazanım eşleştirmenin
 aldığı içerik alınır: BILGI, ALINTI ve METIN blokları ile sorular; reddedilen içerik alınmaz.
-Vektörü olan içerik okunmaz, böylece adım tekrar çalışınca model ikinci kez çalışmaz. Tablolar
-core'un Flyway migration'larıyla kurulur.
+Notlar kaynağa bağlı olmadığı için vektörü olmayan bütün notlar alınır; notun vektörü, metni
+hesaplandığından beri başka bir iş tarafından değiştirilmediyse yazılır, değiştiyse not sonraki
+INDEX'e kalır. Vektörü olan kayıt
+okunmaz, böylece adım tekrar çalışınca model ikinci kez çalışmaz. Tablolar core'un Flyway
+migration'larıyla kurulur.
 """
 
 from typing import LiteralString
@@ -34,9 +37,18 @@ WHERE source_page.source_document_id = %(source_id)s
 ORDER BY question.id
 """
 
+SELECT_NODES_WITHOUT_EMBEDDING = """
+SELECT id, search_text FROM knowledge_node WHERE embedding IS NULL ORDER BY id
+"""
+
 UPDATE_BLOCK_EMBEDDING = "UPDATE content_block SET embedding = %(embedding)s WHERE id = %(id)s"
 
 UPDATE_QUESTION_EMBEDDING = "UPDATE question SET embedding = %(embedding)s WHERE id = %(id)s"
+
+UPDATE_NODE_EMBEDDING = """
+UPDATE knowledge_node SET embedding = %(embedding)s
+WHERE id = %(id)s AND embedding IS NULL AND search_text = %(text)s
+"""
 
 
 async def fetch_blocks_without_embedding(
@@ -58,6 +70,12 @@ async def fetch_questions_without_embedding(
     ]
 
 
+async def fetch_nodes_without_embedding(connection: AsyncConnection) -> list[tuple[int, str]]:
+    """Vektörü olmayan notların kimliğini ve arama metnini döner."""
+    cursor = await connection.execute(SELECT_NODES_WITHOUT_EMBEDDING)
+    return [(row[0], row[1]) for row in await cursor.fetchall()]
+
+
 async def save_block_embeddings(
     connection: AsyncConnection, embeddings: list[tuple[int, list[float]]]
 ) -> None:
@@ -70,6 +88,23 @@ async def save_question_embeddings(
 ) -> None:
     """Soruların vektörlerini yazar."""
     await _save(connection, UPDATE_QUESTION_EMBEDDING, embeddings)
+
+
+async def save_node_embeddings(
+    connection: AsyncConnection,
+    nodes: list[tuple[int, str]],
+    embeddings: list[tuple[int, list[float]]],
+) -> None:
+    """Notların vektörlerini, metni hesaplandığından beri değişmemişse yazar."""
+    texts = dict(nodes)
+    async with connection.cursor() as cursor:
+        await cursor.executemany(
+            UPDATE_NODE_EMBEDDING,
+            [
+                {"id": node_id, "embedding": Vector(vector), "text": texts[node_id]}
+                for node_id, vector in embeddings
+            ],
+        )
 
 
 async def _save(

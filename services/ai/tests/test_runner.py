@@ -46,6 +46,10 @@ PRICE = PriceTier(
 )
 PRICES = {config.model: [PRICE] for config in TASK_CONFIGS.values()}
 VARIABLES = {"question": "Roman nedir?"}
+SOURCES = [
+    CitationSource(source="TDE 12 · s. 174", title="Roman › Türler", text="Tarihî roman."),
+    CitationSource(source="TDE 12 · s. 175", title="Roman › Türler", text="Psikolojik roman."),
+]
 
 READ_CALL = """
 SELECT task, model, prompt_version, input_tokens, output_tokens, cache_read_tokens, cost_usd,
@@ -292,16 +296,13 @@ async def test_student_is_logged_by_id_only(messages: FakeMessages, db: Connecti
 @pytest.mark.asyncio
 async def test_stream_sends_sources_as_search_results(messages: FakeMessages) -> None:
     """Kaynaklar alıntısı açık search_result bloğu olarak, prompt'tan önce gider."""
-    sources = [
-        CitationSource(source="TDE 12 · s. 174", title="Roman › Türler", text="Tarihî roman."),
-        CitationSource(source="TDE 12 · s. 175", title="Roman › Türler", text="Psikolojik roman."),
-    ]
+    sources = SOURCES
 
     parts = [part async for part in stream_task(LlmTask.HINT, VARIABLES, sources)]
 
     assert parts == [
         StreamText(text="Tarihî roman "),
-        StreamCitation(source_index=1),
+        StreamCitation(source=sources[1]),
         StreamText(text="konusunu tarihten alır."),
     ]
     content = messages.requests[0]["messages"][0]["content"]
@@ -320,7 +321,7 @@ async def test_stream_is_logged_when_finished(messages: FakeMessages, db: Connec
     """Akış bitince çağrı token ve request_id ile llm_call_log'a yazılır."""
     messages.response = make_response(request_id="req_stream")
 
-    async for _ in stream_task(LlmTask.HINT, VARIABLES, [], user_id=None):
+    async for _ in stream_task(LlmTask.HINT, VARIABLES, SOURCES, user_id=None):
         pass
 
     call = await read_call(db, "req_stream")

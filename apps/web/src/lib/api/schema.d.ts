@@ -148,6 +148,22 @@ export interface paths {
     patch?: never;
     trace?: never;
   };
+  "/api/admin/sources/{id}/reprocess": {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    get?: never;
+    put?: never;
+    post: operations["reprocess"];
+    delete?: never;
+    options?: never;
+    head?: never;
+    patch?: never;
+    trace?: never;
+  };
   "/api/admin/review/{id}": {
     parameters: {
       query?: never;
@@ -808,6 +824,7 @@ export interface operations {
       query?: {
         page?: number;
         size?: number;
+        kind?: "UNKNOWN" | "PROGRAM" | "TEXTBOOK" | "TEST" | "QUESTION_BANK" | "ANSWER_KEY";
       };
       header?: never;
       path?: never;
@@ -830,6 +847,7 @@ export interface operations {
     parameters: {
       query: {
         kind: "UNKNOWN" | "PROGRAM" | "TEXTBOOK" | "TEST" | "QUESTION_BANK" | "ANSWER_KEY";
+        answerKeySourceId?: number;
       };
       header?: never;
       path?: never;
@@ -851,6 +869,28 @@ export interface operations {
         content: {
           "*/*": components["schemas"]["UploadResponse"];
         };
+      };
+    };
+  };
+  reprocess: {
+    parameters: {
+      query?: {
+        answerKeySourceId?: number;
+      };
+      header?: never;
+      path: {
+        id: number;
+      };
+      cookie?: never;
+    };
+    requestBody?: never;
+    responses: {
+      /** @description OK */
+      200: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content?: never;
       };
     };
   };

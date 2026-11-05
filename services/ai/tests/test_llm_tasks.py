@@ -34,3 +34,19 @@ def test_unknown_task_is_rejected(tmp_path: Path) -> None:
 
     with pytest.raises(ValidationError):
         load_task_configs(path)
+
+
+def test_chat_reads_notes_with_three_tool_calls() -> None:
+    """Sohbet üç okuma tool'unu en fazla üç çağrıyla kullanır."""
+    chat = load_task_configs(LLM_TASKS_PATH)[LlmTask.CHAT]
+
+    assert chat.tools == ("search_notes", "open_note", "get_outcome")
+    assert chat.max_tool_calls == 3
+
+
+def test_other_tasks_have_no_tools() -> None:
+    """Sohbet dışındaki görevlere tool verilmez."""
+    configs = load_task_configs(LLM_TASKS_PATH)
+
+    others = [config for task, config in configs.items() if task is not LlmTask.CHAT]
+    assert all(config.tools == () and config.max_tool_calls == 0 for config in others)

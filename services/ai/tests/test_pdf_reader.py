@@ -203,6 +203,17 @@ def test_render_page_draws_png_at_requested_resolution() -> None:
     assert int.from_bytes(image[16:20], "big") == round(595 * 150 / 72)
 
 
+def test_first_page_text_keeps_repeated_heading() -> None:
+    """İlk sayfanın ham metni, kenarda tekrarlayan başlık dahil verilir; ikinci sayfa gelmez."""
+    source = lines_pdf([["Şiir - 4", "1. Soru metni"], ["Şiir - 4", "2. Soru metni"]])
+
+    text = pdf.read_first_page_text(source)
+
+    assert "Şiir - 4" in text
+    assert "1. Soru metni" in text
+    assert "2. Soru metni" not in text
+
+
 def test_unreadable_pdf_raises_pdf_read_error() -> None:
     """PDF olmayan baytlar PdfReadError verir."""
     with pytest.raises(pdf.PdfReadError):

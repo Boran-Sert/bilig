@@ -59,12 +59,12 @@ class SourceServiceTest {
     void uploadsNewPdfAndEnqueuesIngestJob() throws Exception {
         when(sourceDocumentRepository.findBySha256(anyString())).thenReturn(Optional.empty());
         when(sourceDocumentRepository.insertIfAbsent(
-                        anyString(), anyString(), anyString(), anyString(), eq(UPLOADER_ID)))
+                        anyString(), anyString(), anyString(), anyString(), eq(UPLOADER_ID), isNull()))
                 .thenReturn(Optional.of(42L));
 
         MockMultipartFile file = pdfFile("ders-kitabi.pdf", "tiny.pdf");
 
-        UploadResponse response = sourceService.upload(List.of(file), SourceKind.TEXTBOOK, UPLOADER_ID);
+        UploadResponse response = sourceService.upload(List.of(file), SourceKind.TEXTBOOK, null, UPLOADER_ID);
 
         assertThat(response.files()).singleElement().satisfies(uploadedFile -> {
             assertThat(uploadedFile.sourceId()).isEqualTo(42L);
@@ -73,7 +73,12 @@ class SourceServiceTest {
         });
         verify(sourceDocumentRepository)
                 .insertIfAbsent(
-                        eq("ders-kitabi.pdf"), anyString(), eq("sources/pending.pdf"), eq("TEXTBOOK"), eq(UPLOADER_ID));
+                        eq("ders-kitabi.pdf"),
+                        anyString(),
+                        eq("sources/pending.pdf"),
+                        eq("TEXTBOOK"),
+                        eq(UPLOADER_ID),
+                        isNull());
         verify(sourceDocumentRepository, never()).save(any(SourceDocument.class));
         verify(fileStorage).save(eq("sources/42.pdf"), any(InputStream.class));
         verify(jobQueue)
@@ -88,11 +93,11 @@ class SourceServiceTest {
     void acceptsPdfContentWithNonPdfExtension() throws Exception {
         when(sourceDocumentRepository.findBySha256(anyString())).thenReturn(Optional.empty());
         when(sourceDocumentRepository.insertIfAbsent(
-                        anyString(), anyString(), anyString(), anyString(), eq(UPLOADER_ID)))
+                        anyString(), anyString(), anyString(), anyString(), eq(UPLOADER_ID), isNull()))
                 .thenReturn(Optional.of(42L));
 
-        UploadResponse response =
-                sourceService.upload(List.of(pdfFile("ders-kitabi.txt", "tiny.pdf")), SourceKind.TEXTBOOK, UPLOADER_ID);
+        UploadResponse response = sourceService.upload(
+                List.of(pdfFile("ders-kitabi.txt", "tiny.pdf")), SourceKind.TEXTBOOK, null, UPLOADER_ID);
 
         assertThat(response.files().get(0).fileName()).isEqualTo("ders-kitabi.txt");
         verify(fileStorage).save(eq("sources/42.pdf"), any(InputStream.class));
@@ -105,8 +110,8 @@ class SourceServiceTest {
         existing.setId(13L);
         when(sourceDocumentRepository.findBySha256(anyString())).thenReturn(Optional.of(existing));
 
-        UploadResponse response =
-                sourceService.upload(List.of(pdfFile("tekrar.pdf", "tiny.pdf")), SourceKind.TEXTBOOK, UPLOADER_ID);
+        UploadResponse response = sourceService.upload(
+                List.of(pdfFile("tekrar.pdf", "tiny.pdf")), SourceKind.TEXTBOOK, null, UPLOADER_ID);
 
         assertThat(response.files()).singleElement().satisfies(uploadedFile -> {
             assertThat(uploadedFile.sourceId()).isEqualTo(13L);
@@ -125,11 +130,11 @@ class SourceServiceTest {
         when(sourceDocumentRepository.findBySha256(anyString())).thenReturn(Optional.empty(), Optional.of(existing));
 
         when(sourceDocumentRepository.insertIfAbsent(
-                        anyString(), anyString(), anyString(), anyString(), eq(UPLOADER_ID)))
+                        anyString(), anyString(), anyString(), anyString(), eq(UPLOADER_ID), isNull()))
                 .thenReturn(Optional.empty());
 
-        UploadResponse response =
-                sourceService.upload(List.of(pdfFile("tekrar.pdf", "tiny.pdf")), SourceKind.TEXTBOOK, UPLOADER_ID);
+        UploadResponse response = sourceService.upload(
+                List.of(pdfFile("tekrar.pdf", "tiny.pdf")), SourceKind.TEXTBOOK, null, UPLOADER_ID);
 
         assertThat(response.files()).singleElement().satisfies(uploadedFile -> {
             assertThat(uploadedFile.sourceId()).isEqualTo(99L);
@@ -140,7 +145,7 @@ class SourceServiceTest {
         verify(sourceDocumentRepository, times(2)).findBySha256(anyString());
 
         verify(sourceDocumentRepository)
-                .insertIfAbsent(anyString(), anyString(), anyString(), anyString(), eq(UPLOADER_ID));
+                .insertIfAbsent(anyString(), anyString(), anyString(), anyString(), eq(UPLOADER_ID), isNull());
 
         verify(sourceDocumentRepository, never()).updateFilePath(anyLong(), anyString());
 
@@ -154,15 +159,15 @@ class SourceServiceTest {
     void deduplicatesRepeatedFilesWithinBatch() throws Exception {
         when(sourceDocumentRepository.findBySha256(anyString())).thenReturn(Optional.empty());
         when(sourceDocumentRepository.insertIfAbsent(
-                        anyString(), anyString(), anyString(), anyString(), eq(UPLOADER_ID)))
+                        anyString(), anyString(), anyString(), anyString(), eq(UPLOADER_ID), isNull()))
                 .thenReturn(Optional.of(42L));
         List<MultipartFile> files = List.of(pdfFile("ilk.pdf", "tiny.pdf"), pdfFile("tekrar.pdf", "tiny.pdf"));
 
-        UploadResponse response = sourceService.upload(files, SourceKind.TEXTBOOK, UPLOADER_ID);
+        UploadResponse response = sourceService.upload(files, SourceKind.TEXTBOOK, null, UPLOADER_ID);
 
         assertThat(response.files()).extracting(UploadedFile::duplicate).containsExactly(false, true);
         verify(sourceDocumentRepository, times(1))
-                .insertIfAbsent(anyString(), anyString(), anyString(), anyString(), eq(UPLOADER_ID));
+                .insertIfAbsent(anyString(), anyString(), anyString(), anyString(), eq(UPLOADER_ID), isNull());
         verify(sourceDocumentRepository).updateFilePath(42L, "sources/42.pdf");
         verify(fileStorage).save(eq("sources/42.pdf"), any(InputStream.class));
         verify(jobQueue).enqueue(eq(JobType.INGEST_SOURCE), any());
@@ -173,7 +178,7 @@ class SourceServiceTest {
     void uploadsMultipleDistinctPdfs() throws Exception {
         when(sourceDocumentRepository.findBySha256(anyString())).thenReturn(Optional.empty());
         when(sourceDocumentRepository.insertIfAbsent(
-                        anyString(), anyString(), anyString(), anyString(), eq(UPLOADER_ID)))
+                        anyString(), anyString(), anyString(), anyString(), eq(UPLOADER_ID), isNull()))
                 .thenReturn(Optional.of(42L), Optional.of(43L));
         List<MultipartFile> files = List.of(
                 pdfFile("ilk.pdf", "tiny.pdf"),
@@ -183,7 +188,7 @@ class SourceServiceTest {
                         "application/pdf",
                         "%PDF-1.4 ikinci test PDF".getBytes(StandardCharsets.US_ASCII)));
 
-        UploadResponse response = sourceService.upload(files, SourceKind.TEXTBOOK, UPLOADER_ID);
+        UploadResponse response = sourceService.upload(files, SourceKind.TEXTBOOK, null, UPLOADER_ID);
 
         assertThat(response.files()).extracting(UploadedFile::duplicate).containsExactly(false, false);
         assertThat(response.files()).extracting(UploadedFile::sourceId).containsExactly(42L, 43L);
@@ -198,7 +203,7 @@ class SourceServiceTest {
         List<MultipartFile> files =
                 List.of(pdfFile("gecerli.pdf", "tiny.pdf"), pdfFile("gecersiz.pdf", "not-a-pdf.pdf"));
 
-        assertThatThrownBy(() -> sourceService.upload(files, SourceKind.TEXTBOOK, UPLOADER_ID))
+        assertThatThrownBy(() -> sourceService.upload(files, SourceKind.TEXTBOOK, null, UPLOADER_ID))
                 .isInstanceOfSatisfying(
                         ApiException.class,
                         exception -> assertThat(exception.getErrorCode()).isEqualTo(ErrorCode.FILE_NOT_PDF));
@@ -212,7 +217,7 @@ class SourceServiceTest {
         MultipartFile oversizedFile = org.mockito.Mockito.mock(MultipartFile.class);
         when(oversizedFile.getSize()).thenReturn(MAXIMUM_FILE_SIZE.toBytes() + 1);
 
-        assertThatThrownBy(() -> sourceService.upload(List.of(oversizedFile), SourceKind.TEXTBOOK, UPLOADER_ID))
+        assertThatThrownBy(() -> sourceService.upload(List.of(oversizedFile), SourceKind.TEXTBOOK, null, UPLOADER_ID))
                 .isInstanceOfSatisfying(
                         ApiException.class,
                         exception -> assertThat(exception.getErrorCode()).isEqualTo(ErrorCode.FILE_TOO_LARGE));
@@ -238,7 +243,7 @@ class SourceServiceTest {
         try {
             when(sourceDocumentRepository.findBySha256(anyString())).thenReturn(Optional.empty());
             when(sourceDocumentRepository.insertIfAbsent(
-                            anyString(), anyString(), anyString(), anyString(), eq(UPLOADER_ID)))
+                            anyString(), anyString(), anyString(), anyString(), eq(UPLOADER_ID), isNull()))
                     .thenReturn(Optional.of(42L), Optional.of(43L));
 
             doNothing()
@@ -254,7 +259,7 @@ class SourceServiceTest {
                             "application/pdf",
                             "%PDF-1.4 ikinci test PDF".getBytes(StandardCharsets.US_ASCII)));
 
-            assertThatThrownBy(() -> sourceService.upload(files, SourceKind.TEXTBOOK, UPLOADER_ID))
+            assertThatThrownBy(() -> sourceService.upload(files, SourceKind.TEXTBOOK, null, UPLOADER_ID))
                     .isInstanceOf(ApiException.class);
 
             List<TransactionSynchronization> synchronizations = TransactionSynchronizationManager.getSynchronizations();
@@ -277,10 +282,11 @@ class SourceServiceTest {
         try {
             when(sourceDocumentRepository.findBySha256(anyString())).thenReturn(Optional.empty());
             when(sourceDocumentRepository.insertIfAbsent(
-                            anyString(), anyString(), anyString(), anyString(), eq(UPLOADER_ID)))
+                            anyString(), anyString(), anyString(), anyString(), eq(UPLOADER_ID), isNull()))
                     .thenReturn(Optional.of(42L));
 
-            sourceService.upload(List.of(pdfFile("ders-kitabi.pdf", "tiny.pdf")), SourceKind.TEXTBOOK, UPLOADER_ID);
+            sourceService.upload(
+                    List.of(pdfFile("ders-kitabi.pdf", "tiny.pdf")), SourceKind.TEXTBOOK, null, UPLOADER_ID);
 
             List<TransactionSynchronization> synchronizations = TransactionSynchronizationManager.getSynchronizations();
 

@@ -3,8 +3,8 @@
  * @vitest-environment jsdom
  */
 import "@testing-library/jest-dom/vitest";
-import { cleanup, render, screen } from "@testing-library/react";
-import { afterEach, describe, expect, test } from "vitest";
+import { cleanup, fireEvent, render, screen } from "@testing-library/react";
+import { afterEach, describe, expect, test, vi } from "vitest";
 import "../../../lib/i18n";
 import type { SourceListItem } from "../types";
 import SourceList from "./SourceList";
@@ -13,7 +13,7 @@ afterEach(cleanup);
 
 describe("SourceList", () => {
   test("boş liste verildiğinde boş liste uyarısını gösterir", () => {
-    render(<SourceList items={[]} />);
+    render(<SourceList items={[]} answerKeys={[]} isReprocessing={false} onReprocess={vi.fn()} />);
     expect(screen.getByText("Henüz yüklenmiş bir kaynak bulunmuyor.")).toBeInTheDocument();
   });
 
@@ -32,7 +32,9 @@ describe("SourceList", () => {
       },
     ];
 
-    render(<SourceList items={items} />);
+    render(
+      <SourceList items={items} answerKeys={[]} isReprocessing={false} onReprocess={vi.fn()} />,
+    );
 
     expect(screen.getByText("tde12-ders-kitabi.pdf")).toBeInTheDocument();
     expect(screen.getByText("Ders kitabı")).toBeInTheDocument();
@@ -42,6 +44,7 @@ describe("SourceList", () => {
     expect(segments).toHaveLength(6);
     const completed = segments.filter((segment) => !segment.className.includes("bg-muted"));
     expect(completed).toHaveLength(2);
+    expect(screen.queryByRole("button", { name: "Yeniden işle" })).not.toBeInTheDocument();
   });
 
   test("hatalı dosyada hata metnini ekranda gösterir (Kabul Kriteri 2)", () => {
@@ -59,7 +62,9 @@ describe("SourceList", () => {
       },
     ];
 
-    render(<SourceList items={items} />);
+    render(
+      <SourceList items={items} answerKeys={[]} isReprocessing={false} onReprocess={vi.fn()} />,
+    );
 
     expect(screen.getByText("bozuk-dosya.pdf")).toBeInTheDocument();
     const alert = screen.getByRole("alert");
@@ -82,9 +87,52 @@ describe("SourceList", () => {
       },
     ];
 
-    render(<SourceList items={items} />);
+    render(
+      <SourceList items={items} answerKeys={[]} isReprocessing={false} onReprocess={vi.fn()} />,
+    );
 
     expect(screen.getByText("soru-bankasi.pdf")).toBeInTheDocument();
     expect(screen.getByText("İnceleme listesinde")).toBeInTheDocument();
+  });
+
+  test("biten testte anahtar seçilince bağlayıp, düğmeyle de anahtarsız yeniden işler", () => {
+    const onReprocess = vi.fn();
+    const base = {
+      lastCompletedStep: "INDEX" as const,
+      stepIndex: 6,
+      totalSteps: 6,
+      error: null,
+      createdAt: "2026-11-02T10:00:00Z",
+    };
+    const test14: SourceListItem = {
+      ...base,
+      sourceId: 104,
+      fileName: "14.pdf",
+      kind: "TEST",
+      status: "REVIEW",
+    };
+    const answerKey: SourceListItem = {
+      ...base,
+      sourceId: 7,
+      fileName: "CEVAP_ANAHTARI.pdf",
+      kind: "ANSWER_KEY",
+      status: "PUBLISHED",
+    };
+
+    render(
+      <SourceList
+        items={[test14]}
+        answerKeys={[answerKey]}
+        isReprocessing={false}
+        onReprocess={onReprocess}
+      />,
+    );
+    fireEvent.change(screen.getByLabelText("Anahtar bağla ve yeniden işle"), {
+      target: { value: "7" },
+    });
+    fireEvent.click(screen.getByRole("button", { name: "Yeniden işle" }));
+
+    expect(onReprocess).toHaveBeenNthCalledWith(1, 104, 7);
+    expect(onReprocess).toHaveBeenNthCalledWith(2, 104);
   });
 });

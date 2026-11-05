@@ -15,7 +15,8 @@ public class SourceDocumentRepositoryCustomImpl implements SourceDocumentReposit
 
     /** SHA-256 çakışmasını hata üretmeden atomik olarak yönetir. */
     @Override
-    public Optional<Long> insertIfAbsent(String title, String sha256, String filePath, String kind, Long uploadedBy) {
+    public Optional<Long> insertIfAbsent(
+            String title, String sha256, String filePath, String kind, Long uploadedBy, Long answerKeySourceId) {
 
         @SuppressWarnings("unchecked")
         List<Number> results = entityManager
@@ -25,14 +26,16 @@ public class SourceDocumentRepositoryCustomImpl implements SourceDocumentReposit
                     sha256,
                     file_path,
                     kind,
-                    uploaded_by
+                    uploaded_by,
+                    answer_key_source_id
                 )
                 VALUES (
                     :title,
                     :sha256,
                     :filePath,
                     :kind,
-                    :uploadedBy
+                    :uploadedBy,
+                    :answerKeySourceId
                 )
                 ON CONFLICT (sha256) DO NOTHING
                 RETURNING id
@@ -42,6 +45,7 @@ public class SourceDocumentRepositoryCustomImpl implements SourceDocumentReposit
                 .setParameter("filePath", filePath)
                 .setParameter("kind", kind)
                 .setParameter("uploadedBy", uploadedBy)
+                .setParameter("answerKeySourceId", answerKeySourceId)
                 .getResultList();
 
         if (results.isEmpty()) {

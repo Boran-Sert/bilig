@@ -36,6 +36,7 @@ public enum ErrorCode {
     // kaynak
     FILE_NOT_PDF(HttpStatus.BAD_REQUEST),
     FILE_TOO_LARGE(HttpStatus.CONTENT_TOO_LARGE),
+    SOURCE_BUSY(HttpStatus.CONFLICT),
 
     // iş
 

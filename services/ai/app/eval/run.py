@@ -1,14 +1,10 @@
-"""Kazanım eşleştirmenin doğruluk ölçümü (plan A8, 13.15).
+"""LLM görevlerinin kontrol setlerinde doğruluk ölçümü.
 
-Komut: uv run python -m app.eval.run --task OUTCOME_MATCH
-Kontrol setindeki her soru gerçek eşleştirmeden (aday arama ve OUTCOME_MATCH) geçer; seçilen
-kazanımlar insanın işaretledikleriyle karşılaştırılır. Soru başına kesinlik (seçilenlerin kaçı
-doğru) ve duyarlılık (doğruların kaçı seçildi) hesaplanır, toplamda ikisinin ortalaması alınır.
-Hiç kazanım seçilmeyen sorunun kesinliği sıfırdır. Sonuç ekrana ve data/eval altına model ve
-prompt sürümüyle yazılır. Gerçek Claude çağrısı yaptığı için CI'da çalışmaz. Veritabanında
-program ve üniteler yüklü olmalıdır; vektörü olmayan kazanımların vektörü hesaplanır, soru ve
-bağ yazılmaz. Kontrol setinin ünite adı programın 12. sınıf ünitesine CONTROL_SET_UNIT_TITLES
-ile çevrilir.
+Komutlar: uv run python -m app.eval.run --task OUTCOME_MATCH ve
+uv run python -m app.eval.run --task ERROR_TYPE. Her görev gerçek Claude çağrısı yapar, sonuçları
+model ve prompt sürümüyle data/eval altına yazar ve CI'da çalışmaz. OUTCOME_MATCH, program ve
+ünitelerin veritabanında yüklü olmasını ister; vektörü olmayan kazanımların vektörü
+hesaplanır, soru ve bağ yazılmaz.
 """
 
 import argparse
@@ -25,6 +21,7 @@ from app.constants import (
     CONTROL_SET_GRADE,
     CONTROL_SET_PATH,
     CONTROL_SET_UNIT_TITLES,
+    ERROR_TYPE_CONTROL_SET_PATH,
     EVAL_OUTPUT_DIR,
     PROGRAM_CURRICULUM_NAME,
     PROGRAM_SUBJECT_CODE,
@@ -32,6 +29,7 @@ from app.constants import (
 )
 from app.db.pool import close_pool, open_pool
 from app.db.queries.outcomes import question_item
+from app.eval import error_type
 from app.ingest.outcomes import embed_missing_outcomes, match_outcomes
 from app.llm.prompts import prompt_version
 from app.llm.tasks import LlmTask, get_task_configs
@@ -85,16 +83,39 @@ class EvalReport(BaseModel):
 
 def main(argv: list[str] | None = None) -> None:
     """Komut satırından ölçümü çalıştırır, sonucu ekrana ve dosyaya yazar."""
-    parser = argparse.ArgumentParser(description="Measure outcome matching on the control set.")
-    parser.add_argument("--task", type=LlmTask, choices=[LlmTask.OUTCOME_MATCH], required=True)
-    parser.add_argument("--control-set", type=Path, default=CONTROL_SET_PATH)
+    parser = argparse.ArgumentParser(description="Measure AI tasks on their control sets.")
+    parser.add_argument(
+        "--task", type=LlmTask, choices=[LlmTask.OUTCOME_MATCH, LlmTask.ERROR_TYPE], required=True
+    )
+    parser.add_argument("--control-set", type=Path)
     parser.add_argument("--output-dir", type=Path, default=EVAL_OUTPUT_DIR)
     arguments = parser.parse_args(argv)
     configure_logging(LogSettings())
-    questions = read_control_set(arguments.control_set)
+    if arguments.task == LlmTask.ERROR_TYPE:
+        evaluate_error_types(
+            arguments.control_set or ERROR_TYPE_CONTROL_SET_PATH, arguments.output_dir
+        )
+        return
+    evaluate_outcomes(arguments.control_set or CONTROL_SET_PATH, arguments.output_dir)
+
+
+def evaluate_error_types(control_set: Path, output_dir: Path) -> None:
+    """Hata türü kontrol setini çalıştırır ve sınıflandırma raporunu yazar."""
+    questions = error_type.read_control_set(control_set)
+    scores = asyncio.run(
+        error_type.score_questions(questions), loop_factory=asyncio.SelectorEventLoop
+    )
+    report = error_type.build_report(error_type.now_utc(), scores)
+    path = error_type.write_report(report, output_dir)
+    error_type.print_report(report, path)
+
+
+def evaluate_outcomes(control_set: Path, output_dir: Path) -> None:
+    """Kazanım kontrol setini çalıştırır ve eşleştirme raporunu yazar."""
+    questions = read_control_set(control_set)
     scores = asyncio.run(score_questions(questions), loop_factory=asyncio.SelectorEventLoop)
-    report = build_report(arguments.task, datetime.now(UTC), scores)
-    path = write_report(report, arguments.output_dir)
+    report = build_report(LlmTask.OUTCOME_MATCH, datetime.now(UTC), scores)
+    path = write_report(report, output_dir)
     print_report(report, path)
 
 

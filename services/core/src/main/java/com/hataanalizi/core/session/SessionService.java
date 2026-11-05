@@ -6,6 +6,8 @@ import com.hataanalizi.core.common.AppConstants;
 import com.hataanalizi.core.common.ErrorCode;
 import com.hataanalizi.core.exam.Exam;
 import com.hataanalizi.core.exam.ExamRepository;
+import com.hataanalizi.core.job.JobQueue;
+import com.hataanalizi.core.job.JobType;
 import com.hataanalizi.core.question.Question;
 import com.hataanalizi.core.question.QuestionRepository;
 import com.hataanalizi.core.session.dto.AnswerRequest;
@@ -34,6 +36,7 @@ public class SessionService {
     private final StudentAnswerRepository studentAnswerRepository;
     private final ObjectMapper objectMapper;
     private final ScoringPolicy scoringPolicy;
+    private final JobQueue jobQueue;
 
     /** Oturum ve test veritabanı bağımlılıklarını saklar. */
     public SessionService(
@@ -42,13 +45,15 @@ public class SessionService {
             QuestionRepository questionRepository,
             StudentAnswerRepository studentAnswerRepository,
             ObjectMapper objectMapper,
-            ScoringPolicy scoringPolicy) {
+            ScoringPolicy scoringPolicy,
+            JobQueue jobQueue) {
         this.examRepository = examRepository;
         this.studySessionRepository = studySessionRepository;
         this.questionRepository = questionRepository;
         this.studentAnswerRepository = studentAnswerRepository;
         this.objectMapper = objectMapper;
         this.scoringPolicy = scoringPolicy;
+        this.jobQueue = jobQueue;
     }
 
     /** Yayındaki test için öğrencinin açık oturumunu döndürür veya yenisini açar. */
@@ -164,7 +169,12 @@ public class SessionService {
         answer.setCorrect(correct);
         answer.setDurationMs(request.durationMs());
         answer.setHintUsed(request.hintUsed());
-        studentAnswerRepository.save(answer);
+        StudentAnswer savedAnswer = studentAnswerRepository.save(answer);
+        if (!correct) {
+            jobQueue.enqueue(
+                    JobType.ANALYZE_ANSWER,
+                    objectMapper.createObjectNode().put("studentAnswerId", savedAnswer.getId()));
+        }
     }
 
     /** Yalnız yayındaki testi bulur. */

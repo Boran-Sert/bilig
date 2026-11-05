@@ -1,0 +1,52 @@
+# Sohbetin okuma tool'larının açıklamaları, girdi şemaları ve tool sonuçlarındaki sabit mesajlar
+# (plan Bölüm 5, 13.10). Bu metinler prompt'tur: değişince kullanan görevin prompt sürümü (chat.j2)
+# bir artırılır. Şemalar strict çalışır: her alan zorunlu, fazladan alan yok.
+tools:
+  search_notes:
+    description: >-
+      Search the knowledge notes about authors, works, periods, movements, genres and concepts.
+      Returns a plain list of the best matching notes with their id, type, short text and links
+      to other notes. The list cannot be cited; open a note with open_note to get the textbook
+      passages you can cite. Call this when the textbook passages you were given do not answer
+      the student's message, for example to find who wrote a work, which period or movement an
+      author belongs to, or what a term means.
+    input_schema:
+      type: object
+      properties:
+        query:
+          type: string
+          description: >-
+            What to look for, in Turkish: a name, a work title or a short phrase such as
+            "Tarık Buğra romanları".
+      required: [query]
+      additionalProperties: false
+  open_note:
+    description: >-
+      Open one knowledge note by its id. Returns the note with its links and the textbook
+      passages those links are based on, as citable search results. Call this after
+      search_notes when you need textbook evidence for a note or want to follow its links.
+    input_schema:
+      type: object
+      properties:
+        note_id:
+          type: integer
+          description: The id of a note returned by search_notes or listed in a note's links.
+      required: [note_id]
+      additionalProperties: false
+  get_outcome:
+    description: >-
+      Get a learning outcome of the curriculum by its code: its title and the Ministry of
+      Education (MEB) explanation. Call this when the student asks what an outcome code means or
+      what the exam expects for it.
+    input_schema:
+      type: object
+      properties:
+        code:
+          type: string
+          description: The outcome code, for example "A.2.7".
+      required: [code]
+      additionalProperties: false
+messages:
+  no_notes: No notes match this search.
+  note_not_found: There is no published note with this id.
+  outcome_not_found: There is no learning outcome with this code.

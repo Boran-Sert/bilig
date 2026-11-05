@@ -15,6 +15,8 @@ import com.hataanalizi.core.common.AppConstants;
 import com.hataanalizi.core.common.ErrorCode;
 import com.hataanalizi.core.exam.Exam;
 import com.hataanalizi.core.exam.ExamRepository;
+import com.hataanalizi.core.job.JobQueue;
+import com.hataanalizi.core.job.JobType;
 import com.hataanalizi.core.question.QuestionRepository;
 import com.hataanalizi.core.session.dto.AnswerRequest;
 import java.util.List;
@@ -24,6 +26,9 @@ import org.junit.jupiter.api.extension.ExtendWith;
 import org.mockito.InjectMocks;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
+import tools.jackson.databind.ObjectMapper;
+import tools.jackson.databind.json.JsonMapper;
+import tools.jackson.databind.node.ObjectNode;
 
 /** Oturum servisinin devam etme ve yeni oturum açma kurallarını doğrular. */
 @ExtendWith(MockitoExtension.class)
@@ -43,6 +48,12 @@ class SessionServiceTest {
 
     @Mock
     private ScoringPolicy scoringPolicy;
+
+    @Mock
+    private JobQueue jobQueue;
+
+    @Mock
+    private ObjectMapper objectMapper;
 
     @InjectMocks
     private SessionService sessionService;
@@ -107,7 +118,33 @@ class SessionServiceTest {
         assertThat(response.correctOption()).isEqualTo("B");
         assertThat(response.outcomes()).isEmpty();
         verify(studentAnswerRepository).save(any(StudentAnswer.class));
+        verify(jobQueue, never()).enqueue(any(), any());
         verify(studentAnswerRepository).moveToFirstUnansweredPosition(31L, AppConstants.QUESTION_STATUS_PUBLISHED);
+    }
+
+    /** Yanlış cevabın kimliğini analiz işi olarak kuyruğa ekler. */
+    @Test
+    void enqueuesAnalysisForWrongAnswer() {
+        StudentAnswerRepository.SessionContext sessionContext = sessionContext(7L, "IN_PROGRESS");
+        StudentAnswerRepository.QuestionContext questionContext = questionContext("B");
+        StudentAnswer answer = new StudentAnswer();
+        answer.setId(91L);
+        ObjectNode payload = JsonMapper.builder().build().createObjectNode();
+        when(studentAnswerRepository.lockSessionById(31L)).thenReturn(Optional.of(sessionContext));
+        when(studentAnswerRepository.findPublishedQuestionInSession(31L, 42L, AppConstants.QUESTION_STATUS_PUBLISHED))
+                .thenReturn(Optional.of(questionContext));
+        when(studentAnswerRepository.existsByStudySessionIdAndQuestionId(31L, 42L))
+                .thenReturn(false);
+        when(studentAnswerRepository.findLearningOutcomesByQuestionId(42L)).thenReturn(List.of());
+        when(studentAnswerRepository.save(any(StudentAnswer.class))).thenReturn(answer);
+        when(objectMapper.createObjectNode()).thenReturn(payload);
+
+        var response = sessionService.submitAnswer(
+                31L, 42L, new AuthUser(7L, "student@example.test", "STUDENT"), new AnswerRequest("A", 1200, true));
+
+        assertThat(response.isCorrect()).isFalse();
+        assertThat(payload.toString()).isEqualTo("{\"studentAnswerId\":91}");
+        verify(jobQueue).enqueue(JobType.ANALYZE_ANSWER, payload);
     }
 
     /** Başka öğrencinin oturumuna cevap kaydetmeyi engeller. */

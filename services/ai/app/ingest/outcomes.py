@@ -7,11 +7,13 @@ aranır. Seçimi OUTCOME_MATCH yapar; kod, kodların adaylardan geldiğini ve en
 kaldığını kontrol eder. Herhangi bir kazanımın güveni orta ya da düşükse, aday dışı kod geldiyse
 ya da geçerli kazanım kalmadıysa içerik LOW_CONFIDENCE ile incelemeye düşer; düşmeyen içerik
 güven eşiğini geçmiştir ve doğrudan yayına alınır (PUBLISHED). Bağlar MODEL olarak
-yazılır; sıra ya da ağırlık yoktur. Bağı ya da inceleme kaydı olan içerik atlanır, bu yüzden adım
-ikinci kez çalışınca kopya bağ ve ikinci model çağrısı olmaz. Vektörü olmayan kazanımların
-vektörü önce hesaplanır. Havuz bağlantısı autocommit olmadığı için her okuma ve yazma kendi
-transaction'ında yapılır: her içeriğin sonucu ayrı commit edilir, Claude çağrısı sırasında açık
-transaction kalmaz ve yarıda kalan iş, eşlenmiş içerikler için modeli tekrar çağırmaz.
+yazılır; sıra ya da ağırlık yoktur. Doğrudan yayına giren ünitesiz sorunun ünitesi, bağlanan
+kazanımlar kaynağın programı ve sınıfında tek üniteye aitse o ünite olur; değilse boş kalır.
+Bağı ya da inceleme kaydı olan içerik atlanır, bu yüzden adım ikinci kez çalışınca kopya bağ ve
+ikinci model çağrısı olmaz. Vektörü olmayan kazanımların vektörü önce hesaplanır. Havuz bağlantısı
+autocommit olmadığı için her okuma ve yazma kendi transaction'ında yapılır: her içeriğin sonucu
+ayrı commit edilir, Claude çağrısı sırasında açık transaction kalmaz ve yarıda kalan iş, eşlenmiş
+içerikler için modeli tekrar çağırmaz.
 """
 
 import asyncio
@@ -24,6 +26,7 @@ from app.db.queries.outcomes import (
     fetch_candidates,
     fetch_outcomes_without_embedding,
     fetch_unmatched_items,
+    fill_question_unit,
     open_review,
     publish_item,
     save_links,
@@ -132,5 +135,7 @@ async def save_choice(
         await save_links(connection, kind, item_id, [outcome.id for outcome in choice.outcomes])
     if choice.needs_review:
         await open_review(connection, kind, item_id)
-    else:
-        await publish_item(connection, kind, item_id)
+        return
+    await publish_item(connection, kind, item_id)
+    if kind is ItemKind.QUESTION:
+        await fill_question_unit(connection, item_id)
