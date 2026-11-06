@@ -84,9 +84,9 @@ public class AiClient {
         return stream("/internal/explanations", new ExplanationRequest(userId, questionId, selectedOption));
     }
 
-    /** Python'dan sohbet yanıtının olay akışını alır. */
-    public Flux<StreamEvent> streamChat(Long conversationId, Long userId) {
-        return stream("/internal/chat", new ChatRequest(conversationId, userId));
+    /** Python'dan sohbet yanıtının olay akışını alır; cevaplanmamış soruda doğru şık saklanır. */
+    public Flux<StreamEvent> streamChat(Long conversationId, Long userId, boolean answerHidden) {
+        return stream("/internal/chat", new ChatRequest(conversationId, userId, answerHidden));
     }
 
     /** Python'un SSE akışını okur ve servis hatalarını ortak hata kodlarına çevirir. */
@@ -131,5 +131,5 @@ public class AiClient {
     private record ExplanationRequest(Long userId, Long questionId, String selectedOption) {}
 
     /** Python sohbet isteğinin JSON gövdesini tanımlar. */
-    private record ChatRequest(Long conversationId, Long userId) {}
+    private record ChatRequest(Long conversationId, Long userId, boolean answerHidden) {}
 }

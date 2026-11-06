@@ -40,6 +40,9 @@ _INLINE_ANSWER = re.compile(
 )
 _TEST_HEADING = re.compile(r"^[ \t]*(?:Test|TEST)[ \t]+(\d{1,3})\b[ \t]*:?", re.MULTILINE)
 _TEST_NUMBER = re.compile(r"-[ \t]*\d{1,2}[ \t\r]*\n[ \t]*(\d{1,3})[ \t\r]*$", re.MULTILINE)
+_TEST_NUMBER_ABOVE = re.compile(
+    r"^[ \t]*(\d{1,3})[ \t\r]*\n[^\n]*-[ \t]*\d{1,2}[ \t\r]*$", re.MULTILINE
+)
 _KEY_HEADING = "cevap anahtarı"
 
 
@@ -72,8 +75,8 @@ def is_answer_key(text: str) -> bool:
 
 
 def find_test_number(page_text: str) -> int | None:
-    """İlk sayfanın altındaki "Şiir - 4" satırının ardından gelen test numarasını bulur."""
-    numbers = _TEST_NUMBER.findall(page_text)
+    """İlk sayfadaki "Şiir - 4" satırının altında ya da üstünde yazan test numarasını bulur."""
+    numbers = _TEST_NUMBER.findall(page_text) or _TEST_NUMBER_ABOVE.findall(page_text)
     return int(numbers[-1]) if numbers else None
 
 

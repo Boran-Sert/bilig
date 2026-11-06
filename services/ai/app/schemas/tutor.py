@@ -43,10 +43,11 @@ class ExplanationRequest(CamelModel):
 
 
 class ChatRequest(CamelModel):
-    """Son mesajı öğrenciden gelmiş sohbet."""
+    """Son mesajı öğrenciden gelmiş sohbet; öğrenci henüz cevaplamadıysa doğru şık saklanır."""
 
     conversation_id: int
     user_id: int
+    answer_hidden: bool = False
 
 
 class ExplainStyle(StrEnum):

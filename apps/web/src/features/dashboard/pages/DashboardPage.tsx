@@ -27,12 +27,10 @@ export default function DashboardPage() {
       <PageMeta title={t("title")} description={t("metaDescription")} />
 
       <header className="space-y-1">
-        <h1 className="text-2xl font-bold tracking-tight text-foreground sm:text-3xl">
+        <h1 className="text-3xl font-semibold tracking-tight text-heading">
           {t("greeting", { name: user?.displayName ?? "" })}
         </h1>
-        <p className="text-xs text-muted-foreground sm:text-sm">
-          {t("gradeAndCurriculum", { grade: user?.grade ?? 12 })}
-        </p>
+        <p className="text-muted-foreground">{t("subtitle")}</p>
       </header>
 
       {dashboardQuery.isPending && (

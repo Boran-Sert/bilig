@@ -3,7 +3,8 @@
 Java öğrencinin mesajını kaydettikten sonra sohbetin numarasıyla çağırır; geçmiş tutor_message'dan
 okunur ve son mesaj öğrencinin sorusudur. Sohbet bir soru için açıldıysa kaynak araması o sorunun
 kazanımlarında, açılmadıysa bütün yayındaki paragraflarda yapılır. Sohbet öğrencinin değilse boş
-döner; son mesaj öğrenciden değilse hata verir. Model cevap verirken okuma tool'larını
+döner; son mesaj öğrenciden değilse hata verir. Öğrenci soruyu henüz cevaplamadıysa
+(answer_hidden) doğru şık modele verilmez. Model cevap verirken okuma tool'larını
 (app/tutor/tools.py) en fazla llm_tasks.yaml'daki sınır kadar çağırabilir.
 """
 
@@ -36,7 +37,9 @@ async def prepare_chat(connection: AsyncConnection, request: ChatRequest) -> Pre
     sources = await find_sources(connection, message, outcome_ids or None)
     variables = {
         "question": "" if question is None else question.content.to_text(),
-        "correct_option": "" if question is None else question.correct_option,
+        "correct_option": ""
+        if question is None or request.answer_hidden
+        else question.correct_option,
         "history": turns[:-1],
         "message": message,
         "style": style.value,

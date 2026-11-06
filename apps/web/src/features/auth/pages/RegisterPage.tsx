@@ -15,6 +15,7 @@ import { getFieldErrors, getProblemMessage } from "../../../lib/api/problem";
 import { PASSWORD_MAX_BYTES, PASSWORD_MIN_LENGTH, ROUTES } from "../../../lib/constants";
 import { applyServerFieldErrors } from "../../../lib/forms";
 import { useRegister } from "../api";
+import AuthLayout from "../components/AuthLayout";
 import GradeSelect from "../components/GradeSelect";
 
 const REGISTER_FIELDS = [
@@ -100,72 +101,79 @@ export default function RegisterPage() {
     registerMutation.isError && getFieldErrors(registerMutation.error).length === 0;
 
   return (
-    <section className="mx-auto w-full max-w-md space-y-6 py-10">
-      <PageMeta title={t("register.title")} description={t("register.metaDescription")} />
-      <header className="space-y-2">
-        <h1 className="text-3xl font-semibold tracking-tight">{t("register.title")}</h1>
-        <p className="text-sm text-muted-foreground">{t("register.description")}</p>
-      </header>
+    <AuthLayout>
+      <section className="space-y-6">
+        <PageMeta title={t("register.title")} description={t("register.metaDescription")} />
+        <header className="space-y-2">
+          <h1 className="text-3xl font-semibold tracking-tight">{t("register.title")}</h1>
+          <p className="text-sm text-muted-foreground">{t("register.description")}</p>
+        </header>
 
-      <form onSubmit={onSubmit} noValidate className="space-y-4">
-        <FormField
-          id="displayName"
-          autoComplete="nickname"
-          label={t("register.displayName")}
-          hint={t("register.displayNameHint")}
-          error={errors.displayName?.message}
-          {...register("displayName")}
-        />
-        <FormField
-          id="email"
-          type="email"
-          autoComplete="email"
-          label={t("register.email")}
-          error={errors.email?.message}
-          {...register("email")}
-        />
-        <FormField
-          id="password"
-          type="password"
-          autoComplete="new-password"
-          label={t("register.password")}
-          hint={t("register.passwordHint", { min: PASSWORD_MIN_LENGTH })}
-          error={errors.password?.message}
-          {...register("password")}
-        />
+        <form onSubmit={onSubmit} noValidate className="space-y-4">
+          <FormField
+            id="displayName"
+            autoComplete="nickname"
+            label={t("register.displayName")}
+            hint={t("register.displayNameHint")}
+            error={errors.displayName?.message}
+            {...register("displayName")}
+          />
+          <FormField
+            id="email"
+            type="email"
+            autoComplete="email"
+            label={t("register.email")}
+            error={errors.email?.message}
+            {...register("email")}
+          />
+          <FormField
+            id="password"
+            type="password"
+            autoComplete="new-password"
+            label={t("register.password")}
+            hint={t("register.passwordHint", { min: PASSWORD_MIN_LENGTH })}
+            error={errors.password?.message}
+            {...register("password")}
+          />
 
-        <GradeSelect error={errors.grade?.message} {...register("grade")} />
-        <CheckboxField
-          id="privacyNoticeAccepted"
-          label={t("register.privacyNotice")}
-          error={errors.privacyNoticeAccepted?.message}
-          {...register("privacyNoticeAccepted")}
-        />
-        <CheckboxField
-          id="consentAccepted"
-          label={t("register.consent")}
-          hint={t("register.consentHint")}
-          error={errors.consentAccepted?.message}
-          {...register("consentAccepted")}
-        />
+          <GradeSelect error={errors.grade?.message} {...register("grade")} />
+          <CheckboxField
+            id="privacyNoticeAccepted"
+            label={t("register.privacyNotice")}
+            error={errors.privacyNoticeAccepted?.message}
+            {...register("privacyNoticeAccepted")}
+          />
+          <CheckboxField
+            id="consentAccepted"
+            label={t("register.consent")}
+            hint={t("register.consentHint")}
+            error={errors.consentAccepted?.message}
+            {...register("consentAccepted")}
+          />
 
-        {showGeneralError && (
-          <p role="alert" className="text-sm text-destructive">
-            {getProblemMessage(registerMutation.error)}
-          </p>
-        )}
+          {showGeneralError && (
+            <p role="alert" className="text-sm text-destructive">
+              {getProblemMessage(registerMutation.error)}
+            </p>
+          )}
 
-        <Button type="submit" size="lg" className="w-full" disabled={registerMutation.isPending}>
-          {registerMutation.isPending ? t("register.submitting") : t("register.submit")}
-        </Button>
-      </form>
+          <Button
+            type="submit"
+            size="lg"
+            className="h-12! w-full rounded-xl! text-base!"
+            disabled={registerMutation.isPending}
+          >
+            {registerMutation.isPending ? t("register.submitting") : t("register.submit")}
+          </Button>
+        </form>
 
-      <p className="text-center text-sm text-muted-foreground">
-        {t("register.hasAccount")}{" "}
-        <Link to={ROUTES.login} className="font-medium text-primary underline">
-          {t("register.loginLink")}
-        </Link>
-      </p>
-    </section>
+        <p className="text-center text-sm text-muted-foreground">
+          {t("register.hasAccount")}{" "}
+          <Link to={ROUTES.login} className="font-medium text-info underline">
+            {t("register.loginLink")}
+          </Link>
+        </p>
+      </section>
+    </AuthLayout>
   );
 }

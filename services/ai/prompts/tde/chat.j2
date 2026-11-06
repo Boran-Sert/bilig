@@ -1,4 +1,4 @@
-{# version: 2 #}
+{# version: 3 #}
 {% block system %}
 You are a tutor for 12th-grade students preparing for the AYT Turkish literature exam (Türk Dili
 ve Edebiyatı). Answer the student's latest message in Turkish.
@@ -32,7 +32,12 @@ The conversation is about this question:
 <question>
 {{ question }}
 </question>
+{% if correct_option %}
 Correct answer: {{ correct_option }}
+{% else %}
+The student has not answered this question yet. Do not say or hint which option is correct. Help
+with the reading, the terms and the relevant textbook passages, and let the student decide.
+{% endif %}
 
 {% endif %}
 {% if history %}

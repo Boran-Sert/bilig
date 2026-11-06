@@ -3,6 +3,7 @@ package com.hataanalizi.core.tutor;
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
 import static org.mockito.ArgumentMatchers.any;
+import static org.mockito.ArgumentMatchers.anyBoolean;
 import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
@@ -14,6 +15,7 @@ import com.hataanalizi.core.session.StudySession;
 import com.hataanalizi.core.session.StudySessionRepository;
 import com.hataanalizi.core.tutor.dto.ChatMessageRequest;
 import com.hataanalizi.core.tutor.dto.ExplanationRequest;
+import com.hataanalizi.core.tutor.dto.StartChatRequest;
 import java.time.Duration;
 import java.util.List;
 import java.util.Optional;
@@ -126,7 +128,7 @@ class TutorServiceTest {
                 ErrorCode.NOT_FOUND, () -> tutorService.chat(USER_ID, CONVERSATION_ID, new ChatMessageRequest("Soru")));
 
         verify(messageRepository, never()).saveAndFlush(any(TutorMessage.class));
-        verify(aiClient, never()).streamChat(any(), any());
+        verify(aiClient, never()).streamChat(any(), any(), anyBoolean());
     }
 
     /** Python çağrısından önce öğrenci iletisini USER rolüyle saklar. */
@@ -138,7 +140,7 @@ class TutorServiceTest {
                 .thenAnswer(invocation -> invocation.getArgument(0));
         when(messageRepository.findFirstByTutorConversationIdOrderByIdDesc(CONVERSATION_ID))
                 .thenReturn(Optional.of(message("USER")));
-        when(aiClient.streamChat(CONVERSATION_ID, USER_ID)).thenReturn(reactor.core.publisher.Flux.never());
+        when(aiClient.streamChat(CONVERSATION_ID, USER_ID, false)).thenReturn(reactor.core.publisher.Flux.never());
 
         tutorService
                 .chat(USER_ID, CONVERSATION_ID, new ChatMessageRequest("Soru"))
@@ -148,7 +150,7 @@ class TutorServiceTest {
         verify(messageRepository).saveAndFlush(messageCaptor.capture());
         assertThat(messageCaptor.getValue().getRole()).isEqualTo("USER");
         assertThat(messageCaptor.getValue().getContent()).isEqualTo("Soru");
-        verify(aiClient).streamChat(CONVERSATION_ID, USER_ID);
+        verify(aiClient).streamChat(CONVERSATION_ID, USER_ID, false);
     }
 
     /** Son mesajın USER olmaması durumunda Python sohbet çağrısını reddeder. */
@@ -165,7 +167,83 @@ class TutorServiceTest {
                 ErrorCode.TUTOR_CONFLICT,
                 () -> tutorService.chat(USER_ID, CONVERSATION_ID, new ChatMessageRequest("Soru")));
 
-        verify(aiClient, never()).streamChat(any(), any());
+        verify(aiClient, never()).streamChat(any(), any(), anyBoolean());
+    }
+
+    /** Açık oturumda cevaplanmamış soruda doğru şık Python'a saklama bayrağıyla gider. */
+    @Test
+    void hidesAnswerWhenQuestionIsUnansweredInOpenSession() {
+        TutorConversation questionConversation = conversation(null, CONVERSATION_ID);
+        questionConversation.setQuestionId(QUESTION_ID);
+        when(conversationRepository.findByIdAndUserId(CONVERSATION_ID, USER_ID))
+                .thenReturn(Optional.of(questionConversation));
+        when(messageRepository.saveAndFlush(any(TutorMessage.class)))
+                .thenAnswer(invocation -> invocation.getArgument(0));
+        when(messageRepository.findFirstByTutorConversationIdOrderByIdDesc(CONVERSATION_ID))
+                .thenReturn(Optional.of(message("USER")));
+        when(studentAnswerRepository.existsUnansweredInProgressSession(USER_ID, QUESTION_ID, "IN_PROGRESS"))
+                .thenReturn(true);
+        when(aiClient.streamChat(CONVERSATION_ID, USER_ID, true)).thenReturn(reactor.core.publisher.Flux.never());
+
+        tutorService
+                .chat(USER_ID, CONVERSATION_ID, new ChatMessageRequest("Soru"))
+                .complete();
+
+        verify(aiClient).streamChat(CONVERSATION_ID, USER_ID, true);
+    }
+
+    /** Başkasının oturumu için sohbet açmayı sohbet kaydı oluşmadan reddeder. */
+    @Test
+    void rejectsStartChatForAnotherUsersSession() {
+        when(studySessionRepository.findById(SESSION_ID)).thenReturn(Optional.of(session(4L, "IN_PROGRESS")));
+
+        assertError(ErrorCode.SESSION_NOT_FOUND, () -> tutorService.startChat(USER_ID, startChatRequest()));
+
+        verify(conversationRepository, never()).saveAndFlush(any());
+    }
+
+    /** Oturumda olmayan soru için sohbet açmayı reddeder. */
+    @Test
+    void rejectsStartChatForQuestionNotInSession() {
+        when(studySessionRepository.findById(SESSION_ID)).thenReturn(Optional.of(session(USER_ID, "IN_PROGRESS")));
+        when(studentAnswerRepository.findPublishedQuestionInSession(SESSION_ID, QUESTION_ID, "PUBLISHED"))
+                .thenReturn(Optional.empty());
+
+        assertError(ErrorCode.QUESTION_NOT_FOUND, () -> tutorService.startChat(USER_ID, startChatRequest()));
+
+        verify(conversationRepository, never()).saveAndFlush(any());
+    }
+
+    /** Cevaplanmamış soruda sohbeti soruya bağlı açar ve ilk iletiyi saklar. */
+    @Test
+    void startsChatBoundToQuestion() {
+        when(studySessionRepository.findById(SESSION_ID)).thenReturn(Optional.of(session(USER_ID, "IN_PROGRESS")));
+        when(studentAnswerRepository.findPublishedQuestionInSession(SESSION_ID, QUESTION_ID, "PUBLISHED"))
+                .thenReturn(Optional.of(questionContext()));
+        when(conversationRepository.saveAndFlush(any(TutorConversation.class)))
+                .thenAnswer(invocation -> conversation(invocation.getArgument(0), CONVERSATION_ID));
+        TutorConversation saved = conversation(null, CONVERSATION_ID);
+        saved.setQuestionId(QUESTION_ID);
+        when(conversationRepository.findByIdAndUserId(CONVERSATION_ID, USER_ID)).thenReturn(Optional.of(saved));
+        when(messageRepository.saveAndFlush(any(TutorMessage.class)))
+                .thenAnswer(invocation -> invocation.getArgument(0));
+        when(messageRepository.findFirstByTutorConversationIdOrderByIdDesc(CONVERSATION_ID))
+                .thenReturn(Optional.of(message("USER")));
+        when(studentAnswerRepository.existsUnansweredInProgressSession(USER_ID, QUESTION_ID, "IN_PROGRESS"))
+                .thenReturn(true);
+        when(aiClient.streamChat(CONVERSATION_ID, USER_ID, true)).thenReturn(reactor.core.publisher.Flux.never());
+
+        tutorService.startChat(USER_ID, startChatRequest()).complete();
+
+        ArgumentCaptor<TutorConversation> captor = ArgumentCaptor.forClass(TutorConversation.class);
+        verify(conversationRepository).saveAndFlush(captor.capture());
+        assertThat(captor.getValue().getQuestionId()).isEqualTo(QUESTION_ID);
+        verify(aiClient).streamChat(CONVERSATION_ID, USER_ID, true);
+    }
+
+    /** Test sohbet başlatma isteğini üretir. */
+    private StartChatRequest startChatRequest() {
+        return new StartChatRequest(SESSION_ID, QUESTION_ID, "Bu soruda ne isteniyor?");
     }
 
     /** Oluşturulan servis bağımlılıklarına gerçek JSON okuyucusunu verir. */

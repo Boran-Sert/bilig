@@ -47,6 +47,7 @@ class FakeClassifier:
     def __init__(self) -> None:
         """Boş çağrı listesiyle başlar."""
         self.calls: list[tuple[LlmTask, Mapping[str, object]]] = []
+        self.user_ids: list[int | None] = []
 
     async def __call__(
         self,
@@ -54,9 +55,11 @@ class FakeClassifier:
         variables: Mapping[str, object],
         *,
         output_model: type[ErrorTypeAnalysis],
+        user_id: int | None = None,
     ) -> ErrorTypeAnalysis:
         """Çağrıyı kaydeder ve inceleme gerektiren sınıflandırmayı döner."""
         self.calls.append((task, variables))
+        self.user_ids.append(user_id)
         assert output_model is ErrorTypeAnalysis
         return ErrorTypeAnalysis(error_type=ErrorType.MISCONCEPTION, needs_review=True)
 
@@ -183,6 +186,19 @@ async def assert_analysis_saved(
         )
     ).fetchone()
     assert row == ("MISCONCEPTION", True, "MISCONCEPTION")
+    owner = await (
+        await connection.execute(
+            """
+            SELECT study_session.user_id
+            FROM student_answer
+            JOIN study_session ON study_session.id = student_answer.study_session_id
+            WHERE student_answer.id = %s
+            """,
+            (answer_id,),
+        )
+    ).fetchone()
+    assert owner is not None
+    assert classifier.user_ids == [owner[0]]
 
 
 @pytest.mark.asyncio
@@ -226,7 +242,9 @@ async def test_handler_builds_personal_data_free_prompt(
 
     async def fetch_answer(_connection: object, _student_answer_id: int) -> AnswerForAnalysis:
         """Sahte yanlış cevabı döner."""
-        return AnswerForAnalysis(content=content, selected_option="A", correct_option="B")
+        return AnswerForAnalysis(
+            content=content, selected_option="A", correct_option="B", user_id=9
+        )
 
     async def save_answer(
         _connection: object, student_answer_id: int, analysis: ErrorTypeAnalysis
@@ -258,6 +276,7 @@ async def test_handler_builds_personal_data_free_prompt(
             },
         )
     ]
+    assert classifier.user_ids == [9]
     assert saved == [(73, ErrorTypeAnalysis(error_type=ErrorType.MISCONCEPTION, needs_review=True))]
 
 

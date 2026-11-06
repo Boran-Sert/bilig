@@ -5,7 +5,7 @@ import { expect, test } from "vitest";
 import { getReturnPath } from "./returnPath";
 
 test("durum yoksa ana sayfayı döndürür", () => {
-  expect(getReturnPath(null)).toBe("/");
+  expect(getReturnPath(null)).toBe("/panel");
 });
 
 test("uygulama içi adresi sorgusuyla döndürür", () => {
@@ -15,5 +15,5 @@ test("uygulama içi adresi sorgusuyla döndürür", () => {
 });
 
 test("başka siteye giden adresi reddeder", () => {
-  expect(getReturnPath({ from: { pathname: "//evil.example" } })).toBe("/");
+  expect(getReturnPath({ from: { pathname: "//evil.example" } })).toBe("/panel");
 });

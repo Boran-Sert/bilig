@@ -169,7 +169,60 @@ export function useTutorChat() {
     }
   }, []);
 
-  /** Öğrencinin yeni sohbet mesajını gönderir. */
+  /** Öğrenci mesajını verilen uca gönderir ve asistan yanıtını akıtır. */
+  const streamUserMessage = useCallback(async (url: string, body: object, text: string) => {
+    const userMessageId = `user-${Date.now()}`;
+    const assistantMessageId = `assistant-${Date.now()}`;
+
+    setMessages((previous) => [
+      ...previous,
+      { id: userMessageId, role: "user", text, citationBlockIds: [] },
+      {
+        id: assistantMessageId,
+        role: "assistant",
+        text: "",
+        citationBlockIds: [],
+        isStreaming: true,
+      },
+    ]);
+
+    setIsStreaming(true);
+    setError(null);
+
+    try {
+      const xsrf = getCookie("XSRF-TOKEN");
+      const response = await fetch(url, {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+          ...(xsrf ? { "X-XSRF-TOKEN": xsrf } : {}),
+        },
+        credentials: "include",
+        body: JSON.stringify(body),
+      });
+
+      if (!response.ok) {
+        const limitReached = response.status === 429;
+        setIsLimitReached(limitReached);
+        setError(
+          i18n.t(limitReached ? "solve.dailyLimitReached" : "solve.sendFailed", { ns: "test" }),
+        );
+        return;
+      }
+
+      await consumeSseStream(response, assistantMessageId, (newConvId) => {
+        if (newConvId) {
+          setConversationId(newConvId);
+        }
+      });
+    } catch {
+      setError(i18n.t("solve.sendFailed", { ns: "test" }));
+    } finally {
+      stopStreaming(assistantMessageId);
+    }
+  }, []);
+
+  /** Öğrencinin yeni sohbet mesajını mevcut sohbete gönderir. */
   const sendMessage = useCallback(
     async (text: string) => {
       const trimmedText = text.trim();
@@ -177,54 +230,51 @@ export function useTutorChat() {
         return;
       }
 
-      const userMessageId = `user-${Date.now()}`;
-      const assistantMessageId = `assistant-${Date.now()}`;
-
-      setMessages((previous) => [
-        ...previous,
-        { id: userMessageId, role: "user", text: trimmedText, citationBlockIds: [] },
-        {
-          id: assistantMessageId,
-          role: "assistant",
-          text: "",
-          citationBlockIds: [],
-          isStreaming: true,
-        },
-      ]);
-
-      setIsStreaming(true);
-      setError(null);
-
-      try {
-        const xsrf = getCookie("XSRF-TOKEN");
-        const response = await fetch(`/api/tutor/conversations/${conversationId}/messages`, {
-          method: "POST",
-          headers: {
-            "Content-Type": "application/json",
-            ...(xsrf ? { "X-XSRF-TOKEN": xsrf } : {}),
-          },
-          credentials: "include",
-          body: JSON.stringify({ text: trimmedText }),
-        });
-
-        if (!response.ok) {
-          const limitReached = response.status === 429;
-          setIsLimitReached(limitReached);
-          setError(
-            i18n.t(limitReached ? "solve.dailyLimitReached" : "solve.sendFailed", { ns: "test" }),
-          );
-          return;
-        }
-
-        await consumeSseStream(response, assistantMessageId);
-      } catch {
-        setError(i18n.t("solve.sendFailed", { ns: "test" }));
-      } finally {
-        stopStreaming(assistantMessageId);
-      }
+      await streamUserMessage(
+        `/api/tutor/conversations/${conversationId}/messages`,
+        { text: trimmedText },
+        trimmedText,
+      );
     },
-    [conversationId, isStreaming, isLimitReached],
+    [conversationId, isStreaming, isLimitReached, streamUserMessage],
   );
+
+  /** Cevaplanmamış soruda ilk mesajla yeni sohbet açar. */
+  const startChat = useCallback(
+    async (sessionId: number, questionId: number, text: string) => {
+      const trimmedText = text.trim();
+      if (!trimmedText || isStreaming || isLimitReached) {
+        return;
+      }
+
+      await streamUserMessage(
+        "/api/tutor/chats",
+        { sessionId, questionId, text: trimmedText },
+        trimmedText,
+      );
+    },
+    [isStreaming, isLimitReached, streamUserMessage],
+  );
+
+  /** İpucu gibi hazır bir soru-cevap çiftini sohbete ekler. */
+  const addExchange = useCallback((userText: string, assistantText: string) => {
+    const stamp = Date.now();
+    setMessages((previous) => [
+      ...previous,
+      { id: `user-${stamp}`, role: "user", text: userText, citationBlockIds: [] },
+      { id: `assistant-${stamp}`, role: "assistant", text: assistantText, citationBlockIds: [] },
+    ]);
+  }, []);
+
+  /** Başka soruya geçilirken sohbeti ve çalışan akışı sıfırlar. */
+  const reset = useCallback(() => {
+    abortControllerRef.current?.abort();
+    setMessages([]);
+    setConversationId(null);
+    setIsStreaming(false);
+    setError(null);
+    setIsLimitReached(false);
+  }, []);
 
   return {
     messages,
@@ -233,6 +283,9 @@ export function useTutorChat() {
     error,
     isLimitReached,
     startExplanation,
+    startChat,
     sendMessage,
+    addExchange,
+    reset,
   };
 }

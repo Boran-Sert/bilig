@@ -3,9 +3,8 @@
  */
 import { useTranslation } from "react-i18next";
 import { Link } from "react-router";
-import { buttonVariants } from "../../../components/ui/button";
+import { linkButtonClass } from "../../../lib/buttonStyles";
 import { ROUTES } from "../../../lib/constants";
-import { cn } from "../../../lib/utils";
 import type { DashboardFailedOutcome } from "../types";
 
 interface FailedOutcomesSectionProps {
@@ -19,8 +18,8 @@ export default function FailedOutcomesSection({ outcomes }: FailedOutcomesSectio
   const { t } = useTranslation("dashboard");
 
   return (
-    <section className="space-y-3 rounded-xl border border-border bg-card p-5 shadow-sm">
-      <h2 className="text-base font-semibold text-foreground">{t("failedOutcomes.title")}</h2>
+    <section className="space-y-4 rounded-2xl border border-border bg-card p-6 shadow-sm">
+      <h2 className="text-lg font-semibold text-heading">{t("failedOutcomes.title")}</h2>
 
       {outcomes.length === 0 ? (
         <p className="py-4 text-xs text-muted-foreground">{t("failedOutcomes.empty")}</p>
@@ -38,21 +37,18 @@ export default function FailedOutcomesSection({ outcomes }: FailedOutcomesSectio
             return (
               <div
                 key={idx}
-                className="flex flex-col gap-2 rounded-lg border border-destructive/20 bg-destructive/5 p-3 sm:flex-row sm:items-center sm:justify-between"
+                className="flex flex-col gap-2 rounded-xl bg-danger-soft p-4 sm:flex-row sm:items-center sm:justify-between"
               >
                 <div className="space-y-1">
                   <div className="flex items-center gap-2">
-                    <span className="font-semibold text-foreground">{outcome.code}</span>
+                    <span className="font-semibold text-heading">{outcome.code}</span>
                     <span className="text-xs text-muted-foreground">{outcome.title}</span>
                   </div>
                   <p className="text-xs font-medium text-destructive">{detailText}</p>
                 </div>
                 <Link
                   to={ROUTES.tests}
-                  className={cn(
-                    buttonVariants({ variant: "outline", size: "sm" }),
-                    "w-full sm:w-auto",
-                  )}
+                  className={linkButtonClass("outline", "w-full bg-card sm:w-auto")}
                 >
                   {t("failedOutcomes.practice")}
                 </Link>

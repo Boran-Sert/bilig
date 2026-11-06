@@ -92,6 +92,16 @@ describe("ResultPage", () => {
     expect(useSessionResultMock).toHaveBeenCalledWith(99);
   });
 
+  test("testlere dön ve testi kontrol et düğmelerini gösterir", () => {
+    renderResultPage(mockResult);
+
+    expect(screen.getByRole("button", { name: "Testlere Dön" })).toBeInTheDocument();
+    expect(screen.getByRole("link", { name: "Testi Kontrol Et" })).toHaveAttribute(
+      "href",
+      "/sessions/99/review",
+    );
+  });
+
   test("sonuç bilgisi olmadığında boş durum uyarısı gösterir", () => {
     renderResultPage(undefined);
 

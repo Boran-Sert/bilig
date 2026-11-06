@@ -88,7 +88,9 @@ describe("DashboardPage", () => {
     );
 
     expect(screen.getByText("Merhaba Elif")).toBeInTheDocument();
-    expect(screen.getByText("12. sınıf · AYT Türk Dili ve Edebiyatı")).toBeInTheDocument();
+    expect(
+      screen.getByText("Genel ilerleme özetin ve kaldığın yerden devam edebileceğin testler."),
+    ).toBeInTheDocument();
   });
 
   test("özet metrikleri (soru, doğruluk, son net) doğru gösterir", () => {

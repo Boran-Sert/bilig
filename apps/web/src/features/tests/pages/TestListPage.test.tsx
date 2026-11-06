@@ -107,4 +107,33 @@ describe("TestListPage", () => {
     fireEvent.click(screen.getByRole("button", { name: "Devam et" }));
     expect(navigateMock).toHaveBeenCalledWith("/tests/2/solve");
   });
+
+  test("arama, ders ve kazanım alanlarını devre dışı gösterir; Tümü kartı gerçek sayıyı verir", () => {
+    useTestsMock.mockReturnValue({
+      data: [
+        {
+          id: 1,
+          title: "Roman Testi",
+          questionCount: 10,
+          answeredCount: 0,
+          sessionId: null,
+          status: null,
+        },
+      ],
+      isPending: false,
+      isError: false,
+    });
+
+    render(
+      <MemoryRouter>
+        <TestListPage />
+      </MemoryRouter>,
+    );
+
+    expect(screen.getByRole("searchbox", { name: "Test ara" })).toBeDisabled();
+    expect(screen.getByRole("combobox", { name: "Ders" })).toBeDisabled();
+    expect(screen.getByRole("combobox", { name: "Kazanım" })).toBeDisabled();
+    expect(screen.getByText("1 test")).toBeInTheDocument();
+    expect(screen.getAllByText("Yakında")).toHaveLength(4);
+  });
 });

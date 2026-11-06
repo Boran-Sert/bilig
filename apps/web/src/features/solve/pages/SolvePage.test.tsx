@@ -32,6 +32,17 @@ vi.mock("../api", () => ({
   useCompleteSession: useCompleteSessionMock,
 }));
 
+vi.mock("../useQuestionHints", () => ({
+  /** Test için ipucu hook'unu sahte olarak sunar. */
+  useQuestionHints: () => ({
+    messages: [],
+    error: null,
+    isPending: false,
+    requestHint: vi.fn(),
+    reset: vi.fn(),
+  }),
+}));
+
 vi.mock("../components/ExplanationSection", () => ({
   /** Test için anlatım bölümü sahte bileşenini sunar. */
   default: ({ questionId }: { questionId: number }) => (

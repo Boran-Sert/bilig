@@ -27,7 +27,7 @@ function renderRegisterPage() {
     <MemoryRouter initialEntries={["/register"]}>
       <Routes>
         <Route path="/register" element={<RegisterPage />} />
-        <Route path="/" element={<h1>Ana sayfa</h1>} />
+        <Route path="/panel" element={<h1>Ana sayfa</h1>} />
       </Routes>
     </MemoryRouter>,
   );

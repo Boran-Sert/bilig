@@ -34,6 +34,59 @@ public interface StudentAnswerRepository extends JpaRepository<StudentAnswer, Lo
             @Param("questionId") Long questionId,
             @Param("publishedStatus") String publishedStatus);
 
+    /** Öğrencinin açık oturumlarından birinde sorunun hâlâ cevaplanmamış olup olmadığını söyler. */
+    @Query(value = """
+                    SELECT EXISTS (
+                        SELECT 1
+                        FROM study_session
+                        JOIN exam_question ON exam_question.exam_id = study_session.exam_id
+                            AND exam_question.question_id = :questionId
+                        WHERE study_session.user_id = :userId
+                            AND study_session.status = :inProgressStatus
+                            AND NOT EXISTS (
+                                SELECT 1
+                                FROM student_answer
+                                WHERE student_answer.study_session_id = study_session.id
+                                    AND student_answer.question_id = :questionId))
+                    """, nativeQuery = true)
+    boolean existsUnansweredInProgressSession(
+            @Param("userId") Long userId,
+            @Param("questionId") Long questionId,
+            @Param("inProgressStatus") String inProgressStatus);
+
+    /** Oturumdaki yayımlanmış soruların doğru şıkkını ve öğrencinin cevabını tek sorguda getirir. */
+    @Query(value = """
+                    SELECT question.id AS "questionId",
+                           question.correct_option AS "correctOption",
+                           student_answer.selected_option AS "selectedOption",
+                           student_answer.is_correct AS correct
+                    FROM study_session
+                    JOIN exam_question ON exam_question.exam_id = study_session.exam_id
+                    JOIN question ON question.id = exam_question.question_id
+                        AND question.status = :publishedStatus
+                    LEFT JOIN student_answer ON student_answer.study_session_id = study_session.id
+                        AND student_answer.question_id = question.id
+                    WHERE study_session.id = :sessionId
+                    """, nativeQuery = true)
+    List<ReviewAnswer> findReviewAnswersBySessionId(
+            @Param("sessionId") Long sessionId, @Param("publishedStatus") String publishedStatus);
+
+    /** Oturumdaki yayımlanmış soruların kazanımlarını tek sorguda getirir. */
+    @Query(value = """
+                    SELECT question.id AS "questionId",
+                           learning_outcome.code AS code,
+                           learning_outcome.title AS title
+                    FROM study_session
+                    JOIN exam_question ON exam_question.exam_id = study_session.exam_id
+                    JOIN question ON question.id = exam_question.question_id
+                        AND question.status = :publishedStatus
+                    JOIN question_outcome ON question_outcome.question_id = question.id
+                    JOIN learning_outcome ON learning_outcome.id = question_outcome.learning_outcome_id
+                    WHERE study_session.id = :sessionId
+                    """, nativeQuery = true)
+    List<ReviewOutcome> findReviewOutcomesBySessionId(
+            @Param("sessionId") Long sessionId, @Param("publishedStatus") String publishedStatus);
+
     /** Aynı oturumda soruya daha önce cevap verilip verilmediğini söyler. */
     boolean existsByStudySessionIdAndQuestionId(Long studySessionId, Long questionId);
 
@@ -105,6 +158,35 @@ public interface StudentAnswerRepository extends JpaRepository<StudentAnswer, Lo
                     """, nativeQuery = true)
     int moveToFirstUnansweredPosition(
             @Param("sessionId") Long sessionId, @Param("publishedStatus") String publishedStatus);
+
+    /** Sorunun doğru şıkkını ve öğrencinin varsa cevabını taşır. */
+    interface ReviewAnswer {
+
+        /** Soru kimliğini döndürür. */
+        Long getQuestionId();
+
+        /** Sorunun doğru şıkkını döndürür. */
+        String getCorrectOption();
+
+        /** Öğrencinin seçtiği şıkkı döndürür; cevaplanmamışsa boştur. */
+        String getSelectedOption();
+
+        /** Cevabın doğruluğunu döndürür; cevaplanmamışsa boştur. */
+        Boolean getCorrect();
+    }
+
+    /** Bir sorunun kazanımını taşır. */
+    interface ReviewOutcome {
+
+        /** Soru kimliğini döndürür. */
+        Long getQuestionId();
+
+        /** Kazanım kodunu döndürür. */
+        String getCode();
+
+        /** Kazanım başlığını döndürür. */
+        String getTitle();
+    }
 
     /** Cevap isteği için oturum bilgisini taşır. */
     interface SessionContext {

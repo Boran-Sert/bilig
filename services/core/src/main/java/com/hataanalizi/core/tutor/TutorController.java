@@ -3,6 +3,7 @@ package com.hataanalizi.core.tutor;
 import com.hataanalizi.core.auth.AuthUser;
 import com.hataanalizi.core.tutor.dto.ChatMessageRequest;
 import com.hataanalizi.core.tutor.dto.ExplanationRequest;
+import com.hataanalizi.core.tutor.dto.StartChatRequest;
 import jakarta.validation.Valid;
 import org.springframework.http.MediaType;
 import org.springframework.security.core.annotation.AuthenticationPrincipal;
@@ -33,6 +34,16 @@ public class TutorController {
     public SseEmitter explain(
             @AuthenticationPrincipal AuthUser principal, @Valid @RequestBody ExplanationRequest request) {
         return tutorService.explain(principal.id(), request);
+    }
+
+    /** Sorunun sohbetini ilk iletiyle açar; soru cevaplanmamış olsa da çalışır. */
+    @PostMapping(
+            value = "/chats",
+            consumes = MediaType.APPLICATION_JSON_VALUE,
+            produces = MediaType.TEXT_EVENT_STREAM_VALUE)
+    public SseEmitter startChat(
+            @AuthenticationPrincipal AuthUser principal, @Valid @RequestBody StartChatRequest request) {
+        return tutorService.startChat(principal.id(), request);
     }
 
     /** Öğrenci sohbet iletisini kaydeder ve yanıt akışını başlatır. */

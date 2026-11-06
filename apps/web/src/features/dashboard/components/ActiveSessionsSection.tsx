@@ -3,9 +3,8 @@
  */
 import { useTranslation } from "react-i18next";
 import { generatePath, Link } from "react-router";
-import { buttonVariants } from "../../../components/ui/button";
+import { actionLinkClass } from "../../../lib/buttonStyles";
 import { ROUTES } from "../../../lib/constants";
-import { cn } from "../../../lib/utils";
 import type { DashboardActiveSession } from "../types";
 
 interface ActiveSessionsSectionProps {
@@ -19,8 +18,8 @@ export default function ActiveSessionsSection({ sessions }: ActiveSessionsSectio
   const { t } = useTranslation("dashboard");
 
   return (
-    <section className="space-y-3 rounded-xl border border-border bg-card p-5 shadow-sm">
-      <h2 className="text-base font-semibold text-foreground">{t("activeSessions.title")}</h2>
+    <section className="space-y-4 rounded-2xl border border-border bg-card p-6 shadow-sm">
+      <h2 className="text-lg font-semibold text-heading">{t("activeSessions.title")}</h2>
 
       {sessions.length === 0 ? (
         <p className="py-4 text-xs text-muted-foreground">{t("activeSessions.empty")}</p>
@@ -29,10 +28,10 @@ export default function ActiveSessionsSection({ sessions }: ActiveSessionsSectio
           {sessions.map((session) => (
             <div
               key={session.sessionId}
-              className="flex flex-col gap-2 rounded-lg border border-border/60 bg-muted/30 p-3 sm:flex-row sm:items-center sm:justify-between"
+              className="flex flex-col gap-3 rounded-xl bg-info-soft p-4 sm:flex-row sm:items-center sm:justify-between"
             >
               <div>
-                <p className="text-sm font-medium text-foreground">{session.examTitle}</p>
+                <p className="font-medium text-heading">{session.examTitle}</p>
                 <p className="text-xs text-muted-foreground">
                   {t("activeSessions.progress", {
                     current: session.answeredCount,
@@ -42,7 +41,7 @@ export default function ActiveSessionsSection({ sessions }: ActiveSessionsSectio
               </div>
               <Link
                 to={generatePath(ROUTES.solve, { testId: String(session.examId) })}
-                className={cn(buttonVariants({ size: "sm" }), "w-full sm:w-auto")}
+                className={actionLinkClass("w-full sm:w-auto")}
               >
                 {t("activeSessions.resume")}
               </Link>

@@ -42,7 +42,7 @@ describe("SourceList", () => {
 
     const segments = screen.getAllByTestId("step-segment");
     expect(segments).toHaveLength(6);
-    const completed = segments.filter((segment) => !segment.className.includes("bg-muted"));
+    const completed = segments.filter((segment) => !segment.className.includes("bg-navy-soft"));
     expect(completed).toHaveLength(2);
     expect(screen.queryByRole("button", { name: "Yeniden işle" })).not.toBeInTheDocument();
   });

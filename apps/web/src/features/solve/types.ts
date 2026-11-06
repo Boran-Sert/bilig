@@ -15,3 +15,6 @@ export type ExamSummary = components["schemas"]["ExamSummaryResponse"];
 export type SessionCompletionResponse = components["schemas"]["SessionCompletionResponse"];
 export type SessionCompletionOutcome = components["schemas"]["SessionCompletionOutcome"];
 export type BlockResponse = components["schemas"]["BlockResponse"];
+export type HintResponse = components["schemas"]["HintResponse"];
+export type SessionReviewResponse = components["schemas"]["SessionReviewResponse"];
+export type ReviewQuestion = components["schemas"]["ReviewQuestion"];

@@ -321,6 +321,27 @@ async def test_chat_reads_history_and_searches_last_message(
 
 
 @pytest.mark.asyncio
+async def test_chat_hides_correct_option_until_student_answers(
+    db: Connection, seed: Seed, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    """Öğrenci henüz cevaplamadıysa doğru şık modele verilmez; soru metni yine verilir."""
+    question_id = await add_question(db, seed)
+    conversation_id = await add_conversation(
+        db, seed.user_id, question_id, ("USER", "Bu soruda ne isteniyor?")
+    )
+    use_search(monkeypatch, [])
+
+    prepared = await prepare_chat(
+        db,
+        ChatRequest(conversation_id=conversation_id, user_id=seed.user_id, answer_hidden=True),
+    )
+
+    assert prepared is not None
+    assert prepared.variables["correct_option"] == ""
+    assert prepared.variables["question"] != ""
+
+
+@pytest.mark.asyncio
 async def test_chat_without_question_searches_everywhere(
     db: Connection, seed: Seed, monkeypatch: pytest.MonkeyPatch
 ) -> None:

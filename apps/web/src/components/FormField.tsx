@@ -23,9 +23,12 @@ export default function FormField({ id, label, hint, error, ...inputProps }: For
 
   return (
     <div className="space-y-2">
-      <Label htmlFor={id}>{label}</Label>
+      <Label htmlFor={id} className="text-heading">
+        {label}
+      </Label>
       <Input
         id={id}
+        className="h-11! rounded-xl! bg-card! px-4! text-[15px]!"
         aria-invalid={Boolean(error)}
         aria-describedby={[hintId, errorId].filter(Boolean).join(" ") || undefined}
         {...inputProps}

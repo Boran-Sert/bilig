@@ -116,6 +116,52 @@ class SessionCompletionControllerIT {
                 .andExpect(jsonPath("$.code").value("SESSION_NOT_FOUND"));
     }
 
+    /** Tamamlanmış oturumun soruları doğru şık, öğrenci cevabı ve kazanımlarıyla tek istekte gelir. */
+    @Test
+    void returnsReviewWithCorrectOptionsAfterCompletion() throws Exception {
+        SessionFixture fixture = createScoringSession();
+        completeSession(fixture.sessionId(), fixture.userId()).andExpect(status().isOk());
+
+        var result = sessionReview(fixture.sessionId(), fixture.userId())
+                .andExpect(status().isOk())
+                .andReturn();
+
+        JsonNode questions =
+                objectMapper.readTree(result.getResponse().getContentAsString()).get("questions");
+        int correct = 0;
+        int wrong = 0;
+        int blank = 0;
+        for (JsonNode question : questions) {
+            assertThat(question.get("correctOption").asString()).isNotBlank();
+            assertThat(question.get("outcomes").isArray()).isTrue();
+            JsonNode isCorrect = question.get("isCorrect");
+            if (isCorrect.isNull()) {
+                assertThat(question.get("selectedOption").isNull()).isTrue();
+                blank++;
+            } else if (isCorrect.asBoolean()) {
+                correct++;
+            } else {
+                wrong++;
+            }
+        }
+        assertThat(questions.size()).isEqualTo(8);
+        assertThat(new int[] {correct, wrong, blank}).containsExactly(2, 4, 2);
+    }
+
+    /** Başka öğrencinin oturumunun ve bitmemiş oturumun incelemesini vermez. */
+    @Test
+    void rejectsAnotherUsersAndUnfinishedSessionReviews() throws Exception {
+        SessionFixture fixture = createEmptySession();
+
+        sessionReview(fixture.sessionId(), fixture.userId())
+                .andExpect(status().isConflict())
+                .andExpect(jsonPath("$.code").value("SESSION_NOT_COMPLETED"));
+        completeSession(fixture.sessionId(), fixture.userId()).andExpect(status().isOk());
+        sessionReview(fixture.sessionId(), insertUser())
+                .andExpect(status().isNotFound())
+                .andExpect(jsonPath("$.code").value("SESSION_NOT_FOUND"));
+    }
+
     /** Tamamlanma yanıtındaki kazanım sayımlarını kodlarına göre doğrular. */
     private void assertOutcomeFailures(String response) throws Exception {
         Map<String, JsonNode> outcomes = new HashMap<>();
@@ -295,6 +341,11 @@ class SessionCompletionControllerIT {
     /** Oturum sonucunu okumak için istek gönderir. */
     private ResultActions sessionResult(Long sessionId, Long userId) throws Exception {
         return mockMvc.perform(get("/api/sessions/{id}/result", sessionId).with(student(userId)));
+    }
+
+    /** Oturum incelemesini okumak için istek gönderir. */
+    private ResultActions sessionReview(Long sessionId, Long userId) throws Exception {
+        return mockMvc.perform(get("/api/sessions/{id}/review", sessionId).with(student(userId)));
     }
 
     /** İstek için test öğrencisinin kimliğini hazırlar. */

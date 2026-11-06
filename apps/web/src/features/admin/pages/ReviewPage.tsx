@@ -47,11 +47,11 @@ export default function ReviewPage() {
 
       <header className="flex items-center justify-between">
         <div>
-          <h1 className="text-2xl font-bold tracking-tight">{t("review.title")}</h1>
+          <h1 className="text-3xl font-semibold tracking-tight">{t("review.title")}</h1>
           <p className="text-sm text-muted-foreground">{t("review.metaDescription")}</p>
         </div>
         {total > 0 && (
-          <span className="rounded-full bg-muted px-3 py-1 text-xs font-medium">
+          <span className="rounded-full bg-navy-soft px-3 py-1 text-xs font-medium text-navy">
             {t("review.recordCount", { count: total })}
           </span>
         )}

@@ -16,6 +16,7 @@ import com.hataanalizi.core.session.dto.QuestionContent;
 import com.hataanalizi.core.session.dto.SessionCompletionResponse;
 import com.hataanalizi.core.session.dto.SessionQuestionResponse;
 import com.hataanalizi.core.session.dto.SessionResponse;
+import com.hataanalizi.core.session.dto.SessionReviewResponse;
 import java.math.BigDecimal;
 import java.util.Collection;
 import java.util.List;
@@ -119,6 +120,61 @@ public class SessionService {
             throw new ApiException(ErrorCode.SESSION_NOT_COMPLETED);
         }
         return summarize(sessionId);
+    }
+
+    /** Tamamlanmış oturumdaki soruları doğru şık, öğrenci cevabı ve kazanımlarıyla tek seferde döndürür. */
+    @Transactional(readOnly = true)
+    public SessionReviewResponse getReview(Long sessionId, AuthUser authUser) {
+        StudySession session = studySessionRepository
+                .findById(sessionId)
+                .filter(candidate -> candidate.getUserId().equals(authUser.id()))
+                .orElseThrow(() -> new ApiException(ErrorCode.SESSION_NOT_FOUND));
+        if (!AppConstants.SESSION_STATUS_COMPLETED.equals(session.getStatus())) {
+            throw new ApiException(ErrorCode.SESSION_NOT_COMPLETED);
+        }
+        List<ExamRepository.ExamQuestionPosition> positions =
+                examRepository.findQuestionPositions(session.getExamId(), AppConstants.QUESTION_STATUS_PUBLISHED);
+        Map<Long, Question> questionsById = findQuestions(positions);
+        Map<Long, StudentAnswerRepository.ReviewAnswer> answers =
+                studentAnswerRepository
+                        .findReviewAnswersBySessionId(sessionId, AppConstants.QUESTION_STATUS_PUBLISHED)
+                        .stream()
+                        .collect(Collectors.toMap(
+                                StudentAnswerRepository.ReviewAnswer::getQuestionId, Function.identity()));
+        Map<Long, List<AnswerResponse.Outcome>> outcomes =
+                studentAnswerRepository
+                        .findReviewOutcomesBySessionId(sessionId, AppConstants.QUESTION_STATUS_PUBLISHED)
+                        .stream()
+                        .collect(Collectors.groupingBy(
+                                StudentAnswerRepository.ReviewOutcome::getQuestionId,
+                                Collectors.mapping(
+                                        outcome -> new AnswerResponse.Outcome(outcome.getCode(), outcome.getTitle()),
+                                        Collectors.toList())));
+        List<SessionReviewResponse.ReviewQuestion> questions = positions.stream()
+                .map(position -> toReviewQuestion(position, questionsById, answers, outcomes))
+                .toList();
+        return new SessionReviewResponse(questions);
+    }
+
+    /** Sıralı soruyu doğru şık, öğrenci cevabı ve kazanımlarıyla inceleme nesnesine dönüştürür. */
+    private SessionReviewResponse.ReviewQuestion toReviewQuestion(
+            ExamRepository.ExamQuestionPosition position,
+            Map<Long, Question> questionsById,
+            Map<Long, StudentAnswerRepository.ReviewAnswer> answers,
+            Map<Long, List<AnswerResponse.Outcome>> outcomes) {
+        Question question = questionsById.get(position.getQuestionId());
+        StudentAnswerRepository.ReviewAnswer answer = answers.get(position.getQuestionId());
+        if (question == null || answer == null) {
+            throw new IllegalStateException("Exam question is missing from the question table.");
+        }
+        return new SessionReviewResponse.ReviewQuestion(
+                question.getId(),
+                position.getPosition(),
+                objectMapper.convertValue(question.getContent(), QuestionContent.class),
+                answer.getSelectedOption(),
+                answer.getCorrectOption().trim(),
+                answer.getCorrect(),
+                outcomes.getOrDefault(question.getId(), List.of()));
     }
 
     /** Oturumun cevap sayılarını, AYT netini ve kazanım bazlı yanlışlarını hesaplar. */

@@ -33,7 +33,7 @@ export default function UploadResultList({ files }: UploadResultListProps) {
                   "inline-flex rounded-full px-2.5 py-0.5 text-xs font-medium",
                   file.duplicate
                     ? "bg-secondary text-secondary-foreground"
-                    : "bg-primary/10 text-primary",
+                    : "bg-success-soft text-success",
                 )}
               >
                 {file.duplicate ? t("sources.result.duplicate") : t("sources.result.uploaded")}

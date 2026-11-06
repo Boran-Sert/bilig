@@ -2,7 +2,7 @@
  * Test tamamlandığında öğrencinin net puanını ve kazanım bazlı özetini gösterir.
  */
 import { useTranslation } from "react-i18next";
-import { Link, useParams } from "react-router";
+import { generatePath, Link, useParams } from "react-router";
 import PageMeta from "../../../components/PageMeta";
 import { Button } from "../../../components/ui/button";
 import { ROUTES } from "../../../lib/constants";
@@ -60,25 +60,23 @@ export default function ResultPage() {
         <p className="text-sm text-muted-foreground">{t("result.metaDescription")}</p>
       </div>
 
-      <div className="grid grid-cols-4 gap-3 text-center">
-        <div className="rounded-lg border border-border bg-card p-4 shadow-sm">
-          <div className="text-3xl font-extrabold text-primary">{formattedNet}</div>
-          <div className="mt-1 text-xs font-medium text-muted-foreground">
-            {t("result.netScore")}
-          </div>
+      <div className="grid grid-cols-2 gap-3 text-center sm:grid-cols-4">
+        <div className="rounded-2xl bg-navy p-5 text-white shadow-sm">
+          <div className="text-3xl font-semibold">{formattedNet}</div>
+          <div className="mt-1 text-xs font-medium text-white/70">{t("result.netScore")}</div>
         </div>
-        <div className="rounded-lg border border-border bg-card p-4 shadow-sm">
-          <div className="text-3xl font-extrabold text-emerald-600">{result.correct}</div>
+        <div className="rounded-2xl bg-success-soft p-5 shadow-sm">
+          <div className="text-3xl font-semibold text-success">{result.correct}</div>
           <div className="mt-1 text-xs font-medium text-muted-foreground">
             {t("result.correct")}
           </div>
         </div>
-        <div className="rounded-lg border border-border bg-card p-4 shadow-sm">
-          <div className="text-3xl font-extrabold text-rose-600">{result.wrong}</div>
+        <div className="rounded-2xl bg-danger-soft p-5 shadow-sm">
+          <div className="text-3xl font-semibold text-destructive">{result.wrong}</div>
           <div className="mt-1 text-xs font-medium text-muted-foreground">{t("result.wrong")}</div>
         </div>
-        <div className="rounded-lg border border-border bg-card p-4 shadow-sm">
-          <div className="text-3xl font-extrabold text-muted-foreground">{result.blank}</div>
+        <div className="rounded-2xl bg-navy-soft p-5 shadow-sm">
+          <div className="text-3xl font-semibold text-muted-foreground">{result.blank}</div>
           <div className="mt-1 text-xs font-medium text-muted-foreground">{t("result.blank")}</div>
         </div>
       </div>
@@ -90,9 +88,9 @@ export default function ResultPage() {
             <li
               key={outcome.code}
               data-testid={`outcome-${outcome.code}`}
-              className={`flex items-center justify-between rounded-lg border p-4 transition-colors ${
+              className={`flex items-center justify-between rounded-xl border p-4 transition-colors ${
                 outcome.failed
-                  ? "border-destructive/50 bg-destructive/10 text-destructive-foreground shadow-sm"
+                  ? "border-destructive/40 bg-danger-soft shadow-sm"
                   : "border-border bg-card text-card-foreground"
               }`}
             >
@@ -101,9 +99,7 @@ export default function ResultPage() {
                   <span className="font-semibold text-sm">{outcome.code}</span>
                   <span
                     className={`rounded-full px-2 py-0.5 text-xs font-medium ${
-                      outcome.failed
-                        ? "bg-destructive text-destructive-foreground"
-                        : "bg-muted text-muted-foreground"
+                      outcome.failed ? "bg-destructive text-white" : "bg-navy-soft text-navy"
                     }`}
                   >
                     {outcome.failed ? t("result.failedBadge") : t("result.successBadge")}
@@ -120,9 +116,16 @@ export default function ResultPage() {
         </ul>
       </div>
 
-      <div className="flex justify-center pt-4">
+      <div className="flex flex-col justify-center gap-3 pt-4 sm:flex-row">
         <Link to={ROUTES.tests}>
-          <Button size="lg">{t("result.backToTests")}</Button>
+          <Button variant="outline" className="h-12 w-full rounded-xl px-7 text-base sm:w-auto">
+            {t("result.backToTests")}
+          </Button>
+        </Link>
+        <Link to={generatePath(ROUTES.sessionReview, { sessionId: String(sessionId) })}>
+          <Button className="h-12 w-full rounded-xl px-7 text-base sm:w-auto">
+            {t("result.reviewTest")}
+          </Button>
         </Link>
       </div>
     </section>

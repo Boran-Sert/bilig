@@ -12,7 +12,7 @@ export default function StepProgress({
   totalSteps: number;
   isFailed: boolean;
 }) {
-  const completedColor = isFailed ? "bg-destructive" : "bg-emerald-600 dark:bg-emerald-500";
+  const completedColor = isFailed ? "bg-destructive" : "bg-teal";
 
   return (
     <div className="flex gap-1">
@@ -20,7 +20,7 @@ export default function StepProgress({
         <div
           key={index}
           className={`h-1.5 w-4 rounded-full transition-colors ${
-            index < stepIndex ? completedColor : "bg-muted"
+            index < stepIndex ? completedColor : "bg-navy-soft"
           }`}
           data-testid="step-segment"
         />

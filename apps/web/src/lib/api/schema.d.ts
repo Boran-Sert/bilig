@@ -52,6 +52,22 @@ export interface paths {
     patch?: never;
     trace?: never;
   };
+  "/api/tutor/chats": {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    get?: never;
+    put?: never;
+    post: operations["startChat"];
+    delete?: never;
+    options?: never;
+    head?: never;
+    patch?: never;
+    trace?: never;
+  };
   "/api/tests/{id}/sessions": {
     parameters: {
       query?: never;
@@ -204,6 +220,22 @@ export interface paths {
       cookie?: never;
     };
     get: operations["listTests"];
+    put?: never;
+    post?: never;
+    delete?: never;
+    options?: never;
+    head?: never;
+    patch?: never;
+    trace?: never;
+  };
+  "/api/sessions/{id}/review": {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    get: operations["getReview"];
     put?: never;
     post?: never;
     delete?: never;
@@ -404,6 +436,13 @@ export interface components {
     ChatMessageRequest: {
       text: string;
     };
+    StartChatRequest: {
+      /** Format: int64 */
+      sessionId: number;
+      /** Format: int64 */
+      questionId: number;
+      text: string;
+    };
     Block: {
       /** @enum {string} */
       type: "paragraph" | "table" | "list" | "numbered_items";
@@ -512,6 +551,20 @@ export interface components {
       /** Format: int64 */
       sessionId: number | null;
       status: string | null;
+    };
+    ReviewQuestion: {
+      /** Format: int64 */
+      id: number;
+      /** Format: int32 */
+      position: number;
+      content: components["schemas"]["QuestionContent"];
+      selectedOption: string | null;
+      correctOption: string;
+      isCorrect: boolean | null;
+      outcomes: components["schemas"]["Outcome"][];
+    };
+    SessionReviewResponse: {
+      questions: components["schemas"]["ReviewQuestion"][];
     };
     SimilarQuestionResponse: {
       /** Format: int64 */
@@ -739,6 +792,30 @@ export interface operations {
     requestBody: {
       content: {
         "application/json": components["schemas"]["ChatMessageRequest"];
+      };
+    };
+    responses: {
+      /** @description OK */
+      200: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          "text/event-stream": components["schemas"]["SseEmitter"];
+        };
+      };
+    };
+  };
+  startChat: {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    requestBody: {
+      content: {
+        "application/json": components["schemas"]["StartChatRequest"];
       };
     };
     responses: {
@@ -1000,6 +1077,28 @@ export interface operations {
         };
         content: {
           "*/*": components["schemas"]["ExamSummaryResponse"][];
+        };
+      };
+    };
+  };
+  getReview: {
+    parameters: {
+      query?: never;
+      header?: never;
+      path: {
+        id: number;
+      };
+      cookie?: never;
+    };
+    requestBody?: never;
+    responses: {
+      /** @description OK */
+      200: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          "*/*": components["schemas"]["SessionReviewResponse"];
         };
       };
     };

@@ -30,23 +30,20 @@ export default function SourceDropzone({ isUploading, onDrop }: SourceDropzonePr
     <div
       {...getRootProps()}
       className={cn(
-        "flex flex-col items-center justify-center rounded-lg border-2 border-dashed p-10 text-center transition-colors",
-        isDragActive
-          ? "border-primary bg-primary/5"
-          : "border-border hover:border-muted-foreground/50",
+        "flex flex-col items-center justify-center rounded-2xl border-2 border-dashed bg-card p-12 text-center transition-colors",
+        isDragActive ? "border-info bg-info-soft" : "border-input hover:border-info",
         isUploading && "pointer-events-none opacity-60",
       )}
     >
       <input {...getInputProps()} />
-      <p className="text-base font-semibold">
+      <p className="text-lg font-semibold text-heading">
         {isDragActive ? t("sources.dropActive") : t("sources.dropTitle")}
       </p>
       <p className="mt-1 max-w-md text-sm text-muted-foreground">{t("sources.dropDescription")}</p>
       <Button
         type="button"
         variant="outline"
-        size="sm"
-        className="mt-4"
+        className="mt-4 h-10 rounded-xl px-5"
         onClick={open}
         disabled={isUploading}
       >

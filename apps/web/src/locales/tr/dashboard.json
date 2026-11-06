@@ -1,8 +1,7 @@
 {
   "title": "Öğrenci Paneli",
-  "metaDescription": "AYT Türk Dili ve Edebiyatı ilerlemeniz, çözülen sorular ve başarısız kazanımlar.",
+  "metaDescription": "İlerlemen, çözülen sorular ve başarısız kazanımların.",
   "greeting": "Merhaba {{name}}",
-  "gradeAndCurriculum": "{{grade}}. sınıf · AYT Türk Dili ve Edebiyatı",
   "loading": "Öğrenci paneli yükleniyor...",
   "empty": "Henüz test çözülmedi. İlk testini çözerek ilerlemeni görebilirsin.",
   "summary": {
@@ -35,5 +34,6 @@
     "MISCONCEPTION": "Kavram yanılgısı",
     "ATTENTION": "Dikkat",
     "READING": "Okuma"
-  }
+  },
+  "subtitle": "Genel ilerleme özetin ve kaldığın yerden devam edebileceğin testler."
 }

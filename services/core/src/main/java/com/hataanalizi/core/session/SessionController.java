@@ -5,6 +5,7 @@ import com.hataanalizi.core.session.dto.AnswerRequest;
 import com.hataanalizi.core.session.dto.AnswerResponse;
 import com.hataanalizi.core.session.dto.SessionCompletionResponse;
 import com.hataanalizi.core.session.dto.SessionResponse;
+import com.hataanalizi.core.session.dto.SessionReviewResponse;
 import jakarta.validation.Valid;
 import org.springframework.security.core.annotation.AuthenticationPrincipal;
 import org.springframework.web.bind.annotation.GetMapping;
@@ -46,6 +47,12 @@ public class SessionController {
     public SessionCompletionResponse completeSession(
             @PathVariable Long id, @AuthenticationPrincipal AuthUser authUser) {
         return sessionService.completeSession(id, authUser);
+    }
+
+    /** Tamamlanmış oturumdaki soruları doğru şık ve öğrenci cevabıyla döndürür. */
+    @GetMapping("/api/sessions/{id}/review")
+    public SessionReviewResponse getReview(@PathVariable Long id, @AuthenticationPrincipal AuthUser authUser) {
+        return sessionService.getReview(id, authUser);
     }
 
     /** Tamamlanmış oturumun AYT netini ve kazanım özetini döndürür. */

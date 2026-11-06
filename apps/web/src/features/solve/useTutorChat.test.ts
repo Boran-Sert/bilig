@@ -67,4 +67,35 @@ describe("useTutorChat", () => {
     await waitFor(() => expect(result.current.isLimitReached).toBe(true));
     expect(result.current.messages.every((message) => !message.isStreaming)).toBe(true);
   });
+
+  test("opens a chat for an unanswered question and keeps the conversation id", async () => {
+    const chunks = ['event:delta\ndata:{"text":"Önce metne bak."}\n\n'];
+    chunks.push('event:done\ndata:{"conversationId":4}\n\n');
+    const fetchMock = vi.fn().mockResolvedValue(streamResponse(chunks));
+    vi.stubGlobal("fetch", fetchMock);
+    const { result } = renderHook(() => useTutorChat());
+
+    await act(() => result.current.startChat(1, 5, "Bu soruda ne isteniyor?"));
+
+    expect(fetchMock).toHaveBeenCalledWith(
+      "/api/tutor/chats",
+      expect.objectContaining({
+        body: JSON.stringify({ sessionId: 1, questionId: 5, text: "Bu soruda ne isteniyor?" }),
+      }),
+    );
+    expect(result.current.conversationId).toBe(4);
+    expect(result.current.messages.map((message) => message.role)).toEqual(["user", "assistant"]);
+    expect(result.current.messages[1].text).toBe("Önce metne bak.");
+  });
+
+  test("adds a ready-made exchange and clears everything on reset", async () => {
+    const { result } = renderHook(() => useTutorChat());
+
+    act(() => result.current.addExchange("İpucu ver", "Genel mesaja bak."));
+    expect(result.current.messages).toHaveLength(2);
+
+    act(() => result.current.reset());
+    expect(result.current.messages).toHaveLength(0);
+    expect(result.current.conversationId).toBeNull();
+  });
 });

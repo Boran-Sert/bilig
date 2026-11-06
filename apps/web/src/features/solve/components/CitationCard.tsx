@@ -21,7 +21,7 @@ export default function CitationCard({ blockId }: CitationCardProps) {
 
   if (isPending) {
     return (
-      <div className="rounded-lg border border-border bg-card p-3 text-xs text-muted-foreground animate-pulse">
+      <div className="rounded-xl border border-border bg-card p-3 text-xs text-muted-foreground animate-pulse">
         {t("solve.citationLoading")}
       </div>
     );
@@ -36,12 +36,12 @@ export default function CitationCard({ blockId }: CitationCardProps) {
 
   return (
     <>
-      <div className="space-y-2 rounded-lg border border-border bg-card p-3.5 shadow-xs">
-        <div className="text-[11px] font-semibold tracking-wider text-muted-foreground uppercase">
+      <div className="space-y-2 rounded-xl border border-teal/30 bg-teal-soft/60 p-3.5">
+        <div className="text-[11px] font-semibold tracking-wider text-teal-strong uppercase">
           {headerText}
         </div>
 
-        <blockquote className="border-l-2 border-primary/50 py-0.5 pl-3 text-xs leading-relaxed italic text-foreground">
+        <blockquote className="border-l-2 border-teal py-0.5 pl-3 text-xs leading-relaxed text-heading">
           &ldquo;{block.markdown}&rdquo;
         </blockquote>
 
@@ -49,6 +49,7 @@ export default function CitationCard({ blockId }: CitationCardProps) {
           <Button
             variant="outline"
             size="sm"
+            className="rounded-lg border-info/40 text-info"
             onClick={() => setIsDialogOpen(true)}
             disabled={!block.pageId}
           >

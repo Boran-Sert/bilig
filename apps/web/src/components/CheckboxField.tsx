@@ -31,7 +31,7 @@ export default function CheckboxField({
         <input
           id={id}
           type="checkbox"
-          className="mt-0.5"
+          className="mt-0.5 size-4 accent-navy"
           aria-invalid={Boolean(error)}
           aria-describedby={[hintId, errorId].filter(Boolean).join(" ") || undefined}
           {...inputProps}

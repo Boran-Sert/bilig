@@ -14,16 +14,16 @@ interface AnswerOptionProps {
 }
 
 const BORDER_CLASSES: Record<OptionStatus, string> = {
-  default: "border-border hover:border-muted-foreground/50",
-  selected: "border-primary bg-primary/5",
-  correct: "border-emerald-600 bg-emerald-50/50 dark:bg-emerald-950/20",
-  wrong: "border-destructive bg-destructive/5",
+  default: "border-border bg-card hover:border-info hover:bg-info-soft/50",
+  selected: "border-navy bg-navy-soft",
+  correct: "border-success bg-success-soft",
+  wrong: "border-destructive bg-danger-soft",
 };
 
 const BADGE_COLORS: Record<OptionStatus, string> = {
   default: "",
-  selected: "text-primary",
-  correct: "text-emerald-600 dark:text-emerald-400",
+  selected: "text-navy",
+  correct: "text-success",
   wrong: "text-destructive",
 };
 
@@ -43,7 +43,7 @@ export default function AnswerOption({ option, status, disabled, onSelect }: Ans
       type="button"
       disabled={disabled}
       onClick={onSelect}
-      className={`flex w-full items-center justify-between rounded-lg border p-4 text-left transition-colors disabled:cursor-default ${BORDER_CLASSES[status]}`}
+      className={`flex w-full items-center justify-between rounded-xl border p-4 text-left transition-colors disabled:cursor-default ${BORDER_CLASSES[status]}`}
     >
       <div className="flex items-center gap-3">
         <OptionBubble label={option.label} status={status} />

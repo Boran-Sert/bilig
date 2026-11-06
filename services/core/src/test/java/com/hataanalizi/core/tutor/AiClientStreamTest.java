@@ -70,7 +70,9 @@ class AiClientStreamTest {
         AtomicReference<ClientRequest> capturedRequest = new AtomicReference<>();
         AiClient client = clientFor(HttpStatus.OK, "event: done\ndata: {}\n\n", capturedRequest);
 
-        assertThat(client.streamChat(9L, 3L).blockFirst(Duration.ofSeconds(2)).event())
+        assertThat(client.streamChat(9L, 3L, false)
+                        .blockFirst(Duration.ofSeconds(2))
+                        .event())
                 .isEqualTo("done");
 
         assertThat(capturedRequest.get().url().toString()).isEqualTo(BASE_URL + "/internal/chat");
@@ -81,7 +83,7 @@ class AiClientStreamTest {
     void mapsNotFoundResponse() {
         AiClient client = clientFor(HttpStatus.NOT_FOUND, "", new AtomicReference<>());
 
-        assertThatThrownBy(() -> client.streamChat(9L, 3L).collectList().block(Duration.ofSeconds(2)))
+        assertThatThrownBy(() -> client.streamChat(9L, 3L, false).collectList().block(Duration.ofSeconds(2)))
                 .isInstanceOfSatisfying(
                         ApiException.class,
                         exception -> assertThat(exception.getErrorCode()).isEqualTo(ErrorCode.NOT_FOUND));
@@ -92,7 +94,7 @@ class AiClientStreamTest {
     void mapsServerErrorResponse() {
         AiClient client = clientFor(HttpStatus.SERVICE_UNAVAILABLE, "", new AtomicReference<>());
 
-        assertThatThrownBy(() -> client.streamChat(9L, 3L).collectList().block(Duration.ofSeconds(2)))
+        assertThatThrownBy(() -> client.streamChat(9L, 3L, false).collectList().block(Duration.ofSeconds(2)))
                 .isInstanceOfSatisfying(
                         ApiException.class,
                         exception -> assertThat(exception.getErrorCode()).isEqualTo(ErrorCode.AI_UNAVAILABLE));

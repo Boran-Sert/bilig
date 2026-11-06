@@ -15,7 +15,9 @@ import SolvePage from "./features/solve/pages/SolvePage";
 import TestListPage from "./features/tests/pages/TestListPage";
 import { ROUTES } from "./lib/constants";
 import ResultPage from "./features/solve/pages/ResultPage";
+import SessionReviewPage from "./features/solve/pages/SessionReviewPage";
 import DashboardPage from "./features/dashboard/pages/DashboardPage";
+import LandingPage from "./features/landing/pages/LandingPage";
 
 /** Bulunamayan sayfa görünümünü gösterir. */
 function NotFoundPage() {
@@ -34,6 +36,23 @@ function NotFoundPage() {
 }
 
 export const router = createBrowserRouter([
+  { path: ROUTES.landing, element: <LandingPage /> },
+  {
+    path: ROUTES.login,
+    element: (
+      <RedirectIfAuthenticated>
+        <LoginPage />
+      </RedirectIfAuthenticated>
+    ),
+  },
+  {
+    path: ROUTES.register,
+    element: (
+      <RedirectIfAuthenticated>
+        <RegisterPage />
+      </RedirectIfAuthenticated>
+    ),
+  },
   {
     element: <AppLayout />,
     children: [
@@ -70,6 +89,14 @@ export const router = createBrowserRouter([
         ),
       },
       {
+        path: ROUTES.sessionReview,
+        element: (
+          <RequireAuth>
+            <SessionReviewPage />
+          </RequireAuth>
+        ),
+      },
+      {
         path: ROUTES.adminSources,
         element: (
           <RequireAuth>
@@ -83,22 +110,6 @@ export const router = createBrowserRouter([
           <RequireAuth>
             <ReviewPage />
           </RequireAuth>
-        ),
-      },
-      {
-        path: ROUTES.login,
-        element: (
-          <RedirectIfAuthenticated>
-            <LoginPage />
-          </RedirectIfAuthenticated>
-        ),
-      },
-      {
-        path: ROUTES.register,
-        element: (
-          <RedirectIfAuthenticated>
-            <RegisterPage />
-          </RedirectIfAuthenticated>
         ),
       },
       {

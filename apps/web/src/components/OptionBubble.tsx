@@ -11,19 +11,19 @@ interface OptionBubbleProps {
 
 /** Şık harfi balonunu durumuna göre renklendirerek oluşturur. */
 export default function OptionBubble({ label, status = "default" }: OptionBubbleProps) {
-  let colorClasses = "border-border bg-background text-foreground";
+  let colorClasses = "border-input bg-card text-heading";
 
   if (status === "selected") {
-    colorClasses = "border-primary bg-primary text-primary-foreground";
+    colorClasses = "border-navy bg-navy text-white";
   } else if (status === "correct") {
-    colorClasses = "border-emerald-600 bg-emerald-600 text-white dark:bg-emerald-500";
+    colorClasses = "border-success bg-success text-white";
   } else if (status === "wrong") {
-    colorClasses = "border-destructive bg-destructive text-destructive-foreground";
+    colorClasses = "border-destructive bg-destructive text-white";
   }
 
   return (
     <span
-      className={`inline-flex h-7 w-7 shrink-0 items-center justify-center rounded-full border text-xs font-semibold transition-colors ${colorClasses}`}
+      className={`inline-flex h-8 w-8 shrink-0 items-center justify-center rounded-full border text-sm font-semibold transition-colors ${colorClasses}`}
     >
       {label}
     </span>

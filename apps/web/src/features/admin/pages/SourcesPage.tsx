@@ -58,7 +58,7 @@ export default function SourcesPage() {
   return (
     <section className="space-y-6">
       <PageMeta title={t("sources.title")} description={t("sources.metaDescription")} />
-      <h1 className="text-2xl font-semibold tracking-tight">{t("sources.title")}</h1>
+      <h1 className="text-3xl font-semibold tracking-tight">{t("sources.title")}</h1>
 
       <div className="max-w-xs space-y-2">
         <Label htmlFor="source-kind">{t("sources.kindLabel")}</Label>
@@ -70,7 +70,7 @@ export default function SourcesPage() {
             setAnswerKeyId("");
             setKindMissing(false);
           }}
-          className="h-8 w-full rounded-lg border border-input bg-transparent px-2.5 text-sm outline-none focus-visible:border-ring focus-visible:ring-3 focus-visible:ring-ring/50"
+          className="h-11 w-full rounded-xl border border-input bg-card px-4 text-[15px] outline-none focus-visible:border-ring focus-visible:ring-3 focus-visible:ring-ring/50"
         >
           <option value="" disabled>
             {t("sources.kindPlaceholder")}
@@ -92,7 +92,7 @@ export default function SourcesPage() {
             onChange={(event) =>
               setAnswerKeyId(event.target.value === "" ? "" : Number(event.target.value))
             }
-            className="h-8 w-full rounded-lg border border-input bg-transparent px-2.5 text-sm outline-none focus-visible:border-ring focus-visible:ring-3 focus-visible:ring-ring/50"
+            className="h-11 w-full rounded-xl border border-input bg-card px-4 text-[15px] outline-none focus-visible:border-ring focus-visible:ring-3 focus-visible:ring-ring/50"
           >
             <option value="">{t("sources.answerKeyNone")}</option>
             {answerKeys.map((answerKey) => (

@@ -8,6 +8,13 @@ interface ErrorTypeDistributionSectionProps {
   errorTypeDistribution: DashboardErrorTypeCount[];
 }
 
+const ERROR_TONES: Record<string, string> = {
+  KNOWLEDGE: "bg-navy-soft text-navy",
+  MISCONCEPTION: "bg-info-soft text-info-strong",
+  ATTENTION: "bg-teal-soft text-teal-strong",
+  READING: "bg-action/15 text-action-foreground",
+};
+
 /**
  * Hata türü yüzdelerini etiket ve sayaç olarak listeler.
  */
@@ -19,8 +26,8 @@ export default function ErrorTypeDistributionSection({
   const totalErrors = errorTypeDistribution.reduce((sum, item) => sum + item.answerCount, 0);
 
   return (
-    <section className="space-y-3 rounded-xl border border-border bg-card p-5 shadow-sm">
-      <h2 className="text-base font-semibold text-foreground">{t("errorTypes.title")}</h2>
+    <section className="space-y-4 rounded-2xl border border-border bg-card p-6 shadow-sm">
+      <h2 className="text-lg font-semibold text-heading">{t("errorTypes.title")}</h2>
 
       {totalErrors === 0 ? (
         <p className="py-4 text-xs text-muted-foreground">{t("errorTypes.empty")}</p>
@@ -33,10 +40,10 @@ export default function ErrorTypeDistributionSection({
             return (
               <div
                 key={item.errorType}
-                className="flex items-center gap-2 rounded-lg border border-border bg-muted/40 px-3 py-2 text-xs"
+                className={`flex items-center gap-2 rounded-xl px-3 py-2 text-sm ${ERROR_TONES[item.errorType] ?? "bg-navy-soft text-navy"}`}
               >
-                <span className="text-muted-foreground">{label}</span>
-                <span className="font-bold text-foreground">%{percent}</span>
+                <span>{label}</span>
+                <span className="font-semibold">%{percent}</span>
               </div>
             );
           })}

@@ -42,6 +42,21 @@ final class TutorTestFixture {
         return new AnsweredQuestion(sessionId, questionId);
     }
 
+    /** Bir sorusu henüz cevaplanmamış açık test oturumunu oluşturur. */
+    AnsweredQuestion insertUnansweredQuestion(Long userId) {
+        Long unitId = insertCurriculumUnit();
+        Long questionId = insertQuestion(unitId);
+        Long examId = insertExam();
+        jdbcTemplate.update(
+                "INSERT INTO exam_question (exam_id, question_id, position) VALUES (?, ?, 1)", examId, questionId);
+        Long sessionId = jdbcTemplate.queryForObject("""
+                INSERT INTO study_session (user_id, exam_id)
+                VALUES (?, ?)
+                RETURNING id
+                """, Long.class, userId, examId);
+        return new AnsweredQuestion(sessionId, questionId);
+    }
+
     /** Öğrenciye ait boş bir sohbet oluşturur. */
     Long insertConversation(Long userId) {
         return jdbcTemplate.queryForObject(

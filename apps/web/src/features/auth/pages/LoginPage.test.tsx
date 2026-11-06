@@ -25,7 +25,7 @@ function renderLoginPage(state?: unknown) {
     <MemoryRouter initialEntries={[{ pathname: "/login", state }]}>
       <Routes>
         <Route path="/login" element={<LoginPage />} />
-        <Route path="/" element={<h1>Ana sayfa</h1>} />
+        <Route path="/panel" element={<h1>Ana sayfa</h1>} />
         <Route path="/private" element={<h1>Korumalı sayfa</h1>} />
       </Routes>
     </MemoryRouter>,

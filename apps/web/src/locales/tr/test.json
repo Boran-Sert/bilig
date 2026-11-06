@@ -1,23 +1,45 @@
 {
   "testList": {
     "title": "Testler",
-    "metaDescription": "AYT Türk Dili ve Edebiyatı kazanım testleri ve denemeleri.",
+    "metaDescription": "Ders ve kazanıma göre test bul ya da adına göre ara.",
     "empty": "Henüz yayınlanmış bir test bulunmuyor.",
     "start": "Başla",
     "resume": "Devam et",
     "questionCount": "{{count}} soru",
     "answeredCount": "{{count}} / {{total}} tamamlandı",
-    "completed": "Tamamlandı"
+    "completed": "Tamamlandı",
+    "sectionTitle": "Kazanım testleri",
+    "resultCount": "{{count}} sonuç",
+    "coverAlt": "Test görseli alanı",
+    "filters": {
+      "searchPlaceholder": "Test adına göre ara",
+      "searchLabel": "Test ara",
+      "subjectPlaceholder": "Ders seç",
+      "subjectLabel": "Ders",
+      "outcomePlaceholder": "Kazanım seç",
+      "outcomeLabel": "Kazanım",
+      "clear": "Temizle"
+    },
+    "subjects": {
+      "title": "Dersler",
+      "all": "Tümü",
+      "comingSoon": "Yakında",
+      "testCount": "{{count}} test",
+      "first": "Ders 1",
+      "second": "Ders 2",
+      "third": "Ders 3",
+      "fourth": "Ders 4"
+    }
   },
   "solve": {
     "backToTests": "Testler",
-    "metaDescription": "AYT Türk Dili ve Edebiyatı test sorusunu çöz, cevabının doğru olup olmadığını hemen gör.",
+    "metaDescription": "Test sorusunu çöz, cevabının doğru olup olmadığını hemen gör.",
     "questionNumber": "Soru {{current}} / {{total}}",
     "progressText": "%{{percent}} tamamlandı · kaldığın yerden devam ediyorsun",
     "yourAnswer": "Senin cevabın",
     "correctAnswer": "Doğru cevap",
     "outcomesLabel": "Bu sorunun kazanımları:",
-    "hint": "İpucu",
+    "hint": "İpucu al",
     "whyWrong": "Neden yanlış?",
     "similar": "Benzer soru çöz",
     "report": "Hatalı içerik bildir",
@@ -41,7 +63,11 @@
     "anotherExamplePrompt": "Başka bir örnekle açıklar mısın?",
     "dailyLimitReached": "Günlük mesaj limitine ulaşıldı.",
     "sendFailed": "Mesaj gönderilemedi. Biraz sonra tekrar dene.",
-    "explanationFailed": "Anlatım alınamadı. Biraz sonra tekrar dene."
+    "explanationFailed": "Anlatım alınamadı. Biraz sonra tekrar dene.",
+    "assistantTitle": "Soru asistanı",
+    "assistantGreeting": "Merhaba! Soruda takıldığın yerde bana yazabilirsin. İstersen cevabı söylemeden ipucu da verebilirim.",
+    "hintUserMessage": "İpucu ver",
+    "hintLoading": "İpucu hazırlanıyor..."
   },
   "result": {
     "title": "Test Sonucu",
@@ -56,6 +82,14 @@
     "successBadge": "Başarılı",
     "wrongCount": "{{count}} yanlış",
     "backToTests": "Testlere Dön",
-    "noResultFound": "Görüntülenecek test sonucu bulunamadı."
+    "noResultFound": "Görüntülenecek test sonucu bulunamadı.",
+    "reviewTest": "Testi Kontrol Et"
+  },
+  "review": {
+    "metaDescription": "Tamamlanan testin sorularını doğru cevaplarla incele.",
+    "loading": "Test yükleniyor...",
+    "backToResult": "Sonuca dön",
+    "blankNote": "Bu soruyu boş bıraktın.",
+    "notFound": "İncelenecek test bulunamadı."
   }
 }

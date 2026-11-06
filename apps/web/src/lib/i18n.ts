@@ -9,6 +9,7 @@ import auth from "../locales/tr/auth.json";
 import common from "../locales/tr/common.json";
 import test from "../locales/tr/test.json";
 import dashboard from "../locales/tr/dashboard.json";
+import landing from "../locales/tr/landing.json";
 
 void i18n.use(initReactI18next).init({
   resources: {
@@ -18,6 +19,7 @@ void i18n.use(initReactI18next).init({
       admin,
       test,
       dashboard,
+      landing,
     },
   },
   lng: "tr",

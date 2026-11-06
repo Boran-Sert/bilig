@@ -10,6 +10,7 @@ interface ChatInputBarProps {
   onSendMessage: (text: string) => void;
   isStreaming: boolean;
   isLimitReached: boolean;
+  showAnotherExample?: boolean;
 }
 
 /**
@@ -19,6 +20,7 @@ export default function ChatInputBar({
   onSendMessage,
   isStreaming,
   isLimitReached,
+  showAnotherExample = true,
 }: ChatInputBarProps) {
   const { t } = useTranslation("test");
   const [inputText, setInputText] = useState("");
@@ -43,7 +45,7 @@ export default function ChatInputBar({
   }
 
   return (
-    <div className="space-y-2 border-t border-border/80 pt-3">
+    <div className="space-y-2">
       <form onSubmit={handleSubmit} className="flex flex-col gap-2">
         <div className="flex gap-2">
           <input
@@ -54,29 +56,30 @@ export default function ChatInputBar({
               isLimitReached ? t("solve.dailyLimitReached") : t("solve.chatInputPlaceholder")
             }
             disabled={isStreaming || isLimitReached}
-            className="flex-1 rounded-lg border border-input bg-background px-3 py-2 text-sm shadow-xs placeholder:text-muted-foreground focus-visible:outline-hidden focus-visible:ring-2 focus-visible:ring-ring disabled:cursor-not-allowed disabled:opacity-50"
+            className="h-11 flex-1 rounded-xl border border-input bg-card px-4 text-sm placeholder:text-muted-foreground focus-visible:outline-hidden focus-visible:ring-2 focus-visible:ring-ring disabled:cursor-not-allowed disabled:opacity-50"
           />
           <Button
             type="submit"
-            size="sm"
+            className="h-11 rounded-xl px-5"
             disabled={!inputText.trim() || isStreaming || isLimitReached}
           >
             {t("solve.send")}
           </Button>
         </div>
 
-        <div className="flex items-center justify-between text-xs text-muted-foreground">
-          <Button
-            type="button"
-            variant="outline"
-            size="sm"
-            onClick={handleAnotherExample}
-            disabled={isStreaming || isLimitReached}
-            className="h-7 text-xs"
-          >
-            {t("solve.anotherExample")}
-          </Button>
-        </div>
+        {showAnotherExample && (
+          <div className="flex items-center justify-between text-xs text-muted-foreground">
+            <Button
+              type="button"
+              variant="outline"
+              onClick={handleAnotherExample}
+              disabled={isStreaming || isLimitReached}
+              className="h-9 rounded-xl border-info/40 px-4 text-info"
+            >
+              {t("solve.anotherExample")}
+            </Button>
+          </div>
+        )}
       </form>
     </div>
   );

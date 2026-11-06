@@ -20,7 +20,7 @@ export default function ReviewProblemBadge({ problem, onOpenPage }: ReviewProble
   const hasLocation = problem.test !== null || problem.number !== null || problem.pageNo !== null;
 
   return (
-    <div className="flex flex-wrap items-center justify-between gap-2 rounded border border-border bg-muted/40 px-3 py-2 text-xs">
+    <div className="flex flex-wrap items-center justify-between gap-2 rounded-xl bg-danger-soft px-4 py-3 text-xs">
       <div className="space-y-1">
         <span className="font-semibold text-destructive">{problemText}</span>
         {hasLocation && (

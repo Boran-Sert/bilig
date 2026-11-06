@@ -7,9 +7,11 @@ from app.schemas.answer_analysis import ErrorTypeAnalysis
 from app.schemas.question import OptionLabel, QuestionContent
 
 FETCH_ANSWER_FOR_ANALYSIS = """
-SELECT question.content, student_answer.selected_option, question.correct_option
+SELECT question.content, student_answer.selected_option, question.correct_option,
+    study_session.user_id
 FROM student_answer
 JOIN question ON question.id = student_answer.question_id
+JOIN study_session ON study_session.id = student_answer.study_session_id
 WHERE student_answer.id = %(student_answer_id)s
     AND student_answer.is_correct = false
     AND NOT EXISTS (
@@ -38,6 +40,7 @@ class AnswerForAnalysis(BaseModel):
     content: QuestionContent
     selected_option: OptionLabel
     correct_option: OptionLabel
+    user_id: int
 
 
 async def fetch_answer_for_analysis(
@@ -54,6 +57,7 @@ async def fetch_answer_for_analysis(
         content=QuestionContent.model_validate(row[0]),
         selected_option=row[1],
         correct_option=row[2].strip(),
+        user_id=row[3],
     )
 
 

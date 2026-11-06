@@ -6,10 +6,12 @@
   },
   "home": {
     "title": "Ana sayfa",
-    "metaDescription": "AYT Türk Dili ve Edebiyatı yanlışlarını kazanım bazında analiz eden çalışma asistanı."
+    "metaDescription": "Yanlışlarını kazanım bazında analiz eden, yapay zeka destekli çalışma asistanı."
   },
   "navigation": {
     "home": "Ana sayfa",
+    "dashboard": "Panel",
+    "tests": "Testler",
     "adminSources": "İçerik yükle",
     "adminReview": "İnceleme listesi"
   },

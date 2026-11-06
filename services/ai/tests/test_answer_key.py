@@ -221,13 +221,15 @@ def test_split_by_test_reads_answers_on_the_heading_line() -> None:
         ("E) Ferit Edgü\nHikâye - 7\n9\n", 9),
         ("1923 - 1950\n12", None),
         ("12. Sınıf\nTürk Dili ve Edebiyatı", None),
+        ("Genel Müdürlüğü\r\n11\r\nŞiir - 1\r\n1. Ne içindeyim", 11),
+        ("Şiir - 1\r\n12. Sınıf\r\nEdebiyatı\r\n11\r\n", None),
     ],
-    ids=["poem", "story", "years", "no-footer"],
+    ids=["poem", "story", "years", "no-footer", "number-above-unit", "number-after-class"],
 )
-def test_find_test_number_reads_number_under_unit_line(
+def test_find_test_number_reads_number_beside_unit_line(
     page_text: str, expected: int | None
 ) -> None:
-    """Test numarası ünite satırının altındaki sayıdır; yıl aralığı numara sayılmaz."""
+    """Test numarası ünite satırının altındaki ya da üstündeki sayıdır; yıl numara sayılmaz."""
     assert find_test_number(page_text) == expected
 
 

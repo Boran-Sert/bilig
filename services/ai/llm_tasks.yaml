@@ -35,12 +35,12 @@ OUTCOME_MATCH:
 ANSWER_SOLVE:
   model: claude-sonnet-5-5
   prompt: answer_solve.j2
-  max_tokens: 16000
+  max_tokens: 512
   timeout_seconds: 120
 HINT:
   model: claude-haiku-5-5
   prompt: hint.j2
-  max_tokens: 16000
+  max_tokens: 512
   timeout_seconds: 120
 ERROR_TYPE:
   model: claude-haiku-5-5
@@ -50,12 +50,12 @@ ERROR_TYPE:
 TOPIC_EXPLAIN:
   model: claude-sonnet-5-5
   prompt: topic_explain.j2
-  max_tokens: 16000
+  max_tokens: 512
   timeout_seconds: 120
 CHAT:
   model: claude-sonnet-5-5
   prompt: chat.j2
-  max_tokens: 16000
+  max_tokens: 512
   timeout_seconds: 120
   tools: [search_notes, open_note, get_outcome]
   max_tool_calls: 3

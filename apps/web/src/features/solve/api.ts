@@ -9,8 +9,10 @@ import type {
   AnswerResponse,
   BlockResponse,
   ExamSummary,
+  HintResponse,
   SessionCompletionResponse,
   SessionResponse,
+  SessionReviewResponse,
 } from "./types";
 
 export const solveKeys = {
@@ -19,6 +21,8 @@ export const solveKeys = {
   session: (testId: number) => ["solve", "session", testId] as const,
   /** Oturum sonucu sorgu anahtarını üretir. */
   result: (sessionId: number) => ["solve", "result", sessionId] as const,
+  /** Oturum incelemesi sorgu anahtarını üretir. */
+  review: (sessionId: number) => ["solve", "review", sessionId] as const,
   /** Alıntı bloğu sorgu anahtarını üretir. */
   block: (id: number) => ["solve", "block", id] as const,
 };
@@ -161,6 +165,50 @@ export function useBlock(id: number | null) {
       }
       const { data, error, response } = await client.GET("/api/blocks/{id}", {
         params: { path: { id } },
+      });
+      const status = response.status;
+
+      if (error || !data) {
+        throw new ApiError(error, status);
+      }
+
+      return data;
+    },
+  });
+}
+
+/**
+ * Sorunun cevabını söylemeden öğrenciye yön gösteren ipucunu getirir.
+ */
+export function useHint() {
+  return useMutation<HintResponse, ApiError, number>({
+    /** İpucunu GET /api/questions/{id}/hint ucundan okur. */
+    mutationFn: async (questionId: number): Promise<HintResponse> => {
+      const { data, error, response } = await client.GET("/api/questions/{id}/hint", {
+        params: { path: { id: questionId } },
+      });
+      const status = response.status;
+
+      if (error || !data) {
+        throw new ApiError(error, status);
+      }
+
+      return data;
+    },
+  });
+}
+
+/**
+ * Tamamlanmış oturumun sorularını doğru şık ve cevaplarla tek istekte getirir.
+ */
+export function useSessionReview(sessionId: number) {
+  return useQuery<SessionReviewResponse, ApiError>({
+    queryKey: solveKeys.review(sessionId),
+    staleTime: Infinity,
+    /** İncelemeyi GET /api/sessions/{id}/review ucundan okur. */
+    queryFn: async (): Promise<SessionReviewResponse> => {
+      const { data, error, response } = await client.GET("/api/sessions/{id}/review", {
+        params: { path: { id: sessionId } },
       });
       const status = response.status;
 

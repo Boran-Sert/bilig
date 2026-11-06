@@ -19,23 +19,21 @@ export default function SummaryStats({ summary }: SummaryStatsProps) {
 
   return (
     <div className="grid grid-cols-1 gap-4 sm:grid-cols-3">
-      <div className="rounded-xl border border-border bg-card p-5 shadow-sm">
-        <p className="text-3xl font-bold tracking-tight text-foreground">
-          {summary.answeredQuestionCount}
-        </p>
-        <p className="text-xs text-muted-foreground">{t("summary.solvedQuestions")}</p>
+      <div className="rounded-2xl bg-navy p-6 text-white shadow-sm">
+        <p className="text-4xl font-semibold tracking-tight">{summary.answeredQuestionCount}</p>
+        <p className="text-sm text-white/70">{t("summary.solvedQuestions")}</p>
       </div>
 
-      <div className="rounded-xl border border-border bg-card p-5 shadow-sm">
-        <p className="text-3xl font-bold tracking-tight text-foreground">{formattedAccuracy}</p>
-        <p className="text-xs text-muted-foreground">{t("summary.accuracy")}</p>
+      <div className="rounded-2xl bg-info-soft p-6 shadow-sm">
+        <p className="text-4xl font-semibold tracking-tight text-heading">{formattedAccuracy}</p>
+        <p className="text-sm text-muted-foreground">{t("summary.accuracy")}</p>
       </div>
 
-      <div className="rounded-xl border border-border bg-card p-5 shadow-sm">
-        <p className="text-3xl font-bold tracking-tight text-foreground">
+      <div className="rounded-2xl bg-teal-soft p-6 shadow-sm">
+        <p className="text-4xl font-semibold tracking-tight text-heading">
           {hasLatestNet ? summary.latestNet : "-"}
         </p>
-        <p className="text-xs text-muted-foreground">
+        <p className="text-sm text-muted-foreground">
           {hasLatestNet
             ? t("summary.latestNet", { count: summary.latestQuestionCount })
             : t("summary.noNetYet")}

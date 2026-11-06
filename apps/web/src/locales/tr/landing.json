@@ -1,0 +1,113 @@
+{
+  "meta": {
+    "title": "Yapay zeka destekli yeni nesil eğitim",
+    "description": "Bilig yanlışlarını MEB kazanımlarına uygun şekilde kazanım bazında analiz eder, ders kitabından alıntıyla anlatır ve benzer sorular üretir."
+  },
+  "nav": {
+    "students": "Öğrenciler için",
+    "howItWorks": "Nasıl çalışır",
+    "institutions": "Kurumlar için",
+    "login": "Giriş yap",
+    "start": "Hemen başla"
+  },
+  "hero": {
+    "title": "Eğitimde yeni nesil, yapay zeka destekli öğretim",
+    "description": "Bilig, yanlışlarını MEB kazanımlarına uygun şekilde kazanım bazında analiz eder, ders kitabından alıntıyla anlatır ve sana benzer sorular üretir. Öğrenciler ve kurumlar için tasarlandı.",
+    "primaryCta": "Ücretsiz başla",
+    "secondaryCta": "Nasıl çalışır?",
+    "preview": {
+      "question": "Soru 7",
+      "wrongBadge": "Yanlış cevap",
+      "outcome": "Kazanım: Örnek kazanım başlığı",
+      "citationLabel": "DERS KİTABINDAN ALINTI",
+      "citationText": "İlgili konu anlatımı ve sayfa görüntüsü burada gösterilir.",
+      "similar": "Benzer soru üret",
+      "progressTitle": "Kazanım başarısı (örnek)",
+      "groupA": "Kazanım grubu A",
+      "groupB": "Kazanım grubu B"
+    }
+  },
+  "students": {
+    "overline": "ÖĞRENCİLER İÇİN",
+    "title": "Yanlışını anla, aynı hatayı bir daha yapma",
+    "description": "Her yanlış cevap bir MEB kazanımına bağlanır ve ders kitabındaki karşılığıyla birlikte açıklanır.",
+    "features": {
+      "analysis": {
+        "title": "Kazanım bazlı analiz",
+        "description": "Yanlışlarının hangi kazanımdan geldiğini görürsün. Zayıf konular net ortaya çıkar."
+      },
+      "citation": {
+        "title": "Kitaptan alıntılı anlatım",
+        "description": "Açıklamalar ders kitabındaki ilgili bölümden alıntıyla ve sayfa görüntüsüyle gelir."
+      },
+      "similar": {
+        "title": "Benzer soru üretimi",
+        "description": "Yanlış yaptığın kazanım için yapay zeka sana yeni, benzer sorular hazırlar."
+      }
+    }
+  },
+  "steps": {
+    "overline": "NASIL ÇALIŞIR",
+    "title": "Üç adımda daha güçlü bir hazırlık",
+    "solve": {
+      "title": "Testi çöz",
+      "description": "Kazanımlara göre hazırlanmış sorularla testini çöz."
+    },
+    "review": {
+      "title": "Yanlışlarını incele",
+      "description": "Her yanlış için kazanım ve kitaptan alıntılı açıklama gör."
+    },
+    "practice": {
+      "title": "Benzer soruyla pekiştir",
+      "description": "Aynı kazanımdan yeni sorular çözerek eksiğini kapat."
+    }
+  },
+  "institutions": {
+    "overline": "KURUMLAR İÇİN",
+    "title": "Kurumunuza özel entegrasyon",
+    "description": "Okulunuz ve kurumunuz için yeni nesil, yapay zeka destekli öğretim altyapısını kurumunuza özel entegrasyonla sunuyoruz.",
+    "cta": "İletişime geç",
+    "items": {
+      "integration": "Kuruma özel entegrasyon",
+      "data": "Öğrenci verisi kurumunuzun kontrolünde",
+      "support": "Kurulum ve geçiş desteği"
+    }
+  },
+  "cta": {
+    "title": "Hazırlığını bugün daha akıllı hale getir",
+    "primary": "Ücretsiz başla",
+    "secondary": "Giriş yap"
+  },
+  "footer": {
+    "description": "Yapay zeka destekli, kazanım bazlı yeni nesil öğretim. Öğrenciler ve kurumlar için.",
+    "emailLabel": "E-posta",
+    "email": "iletisim@ornek.com",
+    "phoneLabel": "Telefon",
+    "phone": "+90 (000) 000 00 00",
+    "product": {
+      "title": "Ürün",
+      "students": "Öğrenciler için",
+      "howItWorks": "Nasıl çalışır",
+      "login": "Giriş yap",
+      "register": "Kayıt ol"
+    },
+    "institutions": {
+      "title": "Kurumlar",
+      "forInstitutions": "Kurumlar için",
+      "integration": "Entegrasyon",
+      "contact": "İletişim"
+    },
+    "legal": {
+      "title": "Yasal",
+      "privacy": "Gizlilik politikası",
+      "terms": "Kullanım koşulları",
+      "kvkk": "KVKK aydınlatma metni"
+    },
+    "social": {
+      "linkedin": "LinkedIn",
+      "instagram": "Instagram",
+      "youtube": "YouTube"
+    },
+    "copyright": "© 2026 Bilig. Tüm hakları saklıdır."
+  }
+}

@@ -20,6 +20,9 @@ interface QuestionCardProps {
   isSubmitting: boolean;
   isExplanationOpen?: boolean;
   onToggleExplanation?: () => void;
+  onRequestHint?: () => void;
+  isHintPending?: boolean;
+  canExplain?: boolean;
 }
 
 /** Şıkkın durumunu sunucunun cevap sonucuna göre belirler. */
@@ -45,6 +48,9 @@ export default function QuestionCard({
   isSubmitting,
   isExplanationOpen,
   onToggleExplanation,
+  onRequestHint,
+  isHintPending,
+  canExplain = true,
 }: QuestionCardProps) {
   const { t } = useTranslation("test");
   const selectedOption = answer?.selectedOption ?? question.selectedOption;
@@ -55,7 +61,7 @@ export default function QuestionCard({
   return (
     <div className="space-y-6">
       {question.content.passage && question.content.passage.length > 0 && (
-        <div className="space-y-2 rounded-lg border border-border bg-muted/30 p-5 text-sm leading-relaxed">
+        <div className="space-y-2 rounded-2xl border border-navy/10 bg-card p-6 text-sm leading-relaxed shadow-xs">
           {question.content.passage.map((block, blockIndex) => (
             <Markdown key={blockIndex} content={block.md} />
           ))}
@@ -84,27 +90,36 @@ export default function QuestionCard({
       </div>
 
       {outcomes.length > 0 && (
-        <div className="rounded-md bg-muted/40 p-3 text-xs text-muted-foreground">
-          <span className="font-semibold text-foreground">{t("solve.outcomesLabel")} </span>
+        <div className="rounded-xl bg-info-soft p-3 text-xs text-foreground">
+          <span className="font-semibold text-heading">{t("solve.outcomesLabel")} </span>
           {outcomes.map((outcome) => `${outcome.code} ${outcome.title}`).join(" · ")}
         </div>
+      )}
+
+      {!isAnswered && (
+        <Button
+          type="button"
+          variant="outline"
+          disabled={isHintPending}
+          onClick={onRequestHint}
+          className="h-10 rounded-xl border-info/40 px-5 text-info"
+        >
+          {t("solve.hint")}
+        </Button>
       )}
 
       {isAnswered && (
         <div className="space-y-3 border-t border-border/60 pt-4">
           <div className="flex flex-wrap items-center gap-2">
-            <Button variant="outline" size="sm" disabled>
-              {t("solve.hint")}
-            </Button>
             <Button
               variant={isExplanationOpen ? "default" : "outline"}
-              size="sm"
+              className="h-10 rounded-xl px-5"
               onClick={onToggleExplanation}
-              disabled={!isWrongAnswer}
+              disabled={!isWrongAnswer || !canExplain}
             >
               {t("solve.whyWrong")}
             </Button>
-            <Button variant="outline" size="sm" disabled>
+            <Button variant="outline" className="h-10 rounded-xl px-5" disabled>
               {t("solve.similar")}
             </Button>
           </div>

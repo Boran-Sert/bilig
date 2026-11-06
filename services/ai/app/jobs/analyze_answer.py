@@ -34,6 +34,7 @@ async def run_analyze_answer(job: Job) -> None:
             "correct_option": answer.correct_option,
         },
         output_model=ErrorTypeAnalysis,
+        user_id=answer.user_id,
     )
     async with get_pool().connection() as connection:
         await save_answer_analysis(connection, payload.student_answer_id, analysis)

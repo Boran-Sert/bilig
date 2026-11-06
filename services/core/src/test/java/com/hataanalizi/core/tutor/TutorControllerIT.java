@@ -1,6 +1,8 @@
 package com.hataanalizi.core.tutor;
 
 import static org.assertj.core.api.Assertions.assertThat;
+import static org.mockito.ArgumentMatchers.anyLong;
+import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
@@ -113,7 +115,7 @@ class TutorControllerIT {
     void storesUserMessageBeforeStreamingChatResponse() throws Exception {
         Long userId = fixture.insertUser();
         Long conversationId = fixture.insertConversation(userId);
-        when(aiClient.streamChat(conversationId, userId)).thenAnswer(invocation -> {
+        when(aiClient.streamChat(conversationId, userId, false)).thenAnswer(invocation -> {
             assertThat(fixture.messageCount(conversationId)).isEqualTo(1);
             return Flux.just(
                             new AiClient.StreamEvent("delta", "{\"text\":\"Evet.\"}"),
@@ -132,7 +134,54 @@ class TutorControllerIT {
                 .containsExactly(
                         java.util.Map.of("role", "USER", "content", "Devlet Ana da tarihî roman mı?"),
                         java.util.Map.of("role", "ASSISTANT", "content", "Evet."));
-        verify(aiClient).streamChat(conversationId, userId);
+        verify(aiClient).streamChat(conversationId, userId, false);
+    }
+
+    /** Cevaplanmamış soruda sohbeti açar, doğru şıkkı saklama bayrağıyla Python'a iletir. */
+    @Test
+    void startsChatForUnansweredQuestionAndHidesAnswer() throws Exception {
+        Long userId = fixture.insertUser();
+        TutorTestFixture.AnsweredQuestion question = fixture.insertUnansweredQuestion(userId);
+        when(aiClient.streamChat(anyLong(), eq(userId), eq(true)))
+                .thenReturn(Flux.just(
+                        new AiClient.StreamEvent("delta", "{\"text\":\"Önce metne bak.\"}"),
+                        new AiClient.StreamEvent("done", "{}")));
+
+        String response = sendStartChat(userId, startChatBody(question, "Bu soruda ne isteniyor?"));
+
+        assertOrderedEvents(response, "delta", "done");
+        Long conversationId = jdbcTemplate.queryForObject(
+                "SELECT id FROM tutor_conversation WHERE user_id = ? AND question_id = ?",
+                Long.class,
+                userId,
+                question.questionId());
+        assertThat(jdbcTemplate.queryForList(
+                        "SELECT role, content FROM tutor_message WHERE tutor_conversation_id = ? ORDER BY id",
+                        conversationId))
+                .containsExactly(
+                        java.util.Map.of("role", "USER", "content", "Bu soruda ne isteniyor?"),
+                        java.util.Map.of("role", "ASSISTANT", "content", "Önce metne bak."));
+        verify(aiClient).streamChat(conversationId, userId, true);
+    }
+
+    /** Başka öğrencinin oturumu için sohbet açmayı Python'a gitmeden reddeder. */
+    @Test
+    void rejectsStartChatForAnotherUsersSession() throws Exception {
+        Long ownerId = fixture.insertUser();
+        Long otherUserId = fixture.insertUser();
+        TutorTestFixture.AnsweredQuestion question = fixture.insertUnansweredQuestion(ownerId);
+
+        mockMvc.perform(post("/api/tutor/chats")
+                        .with(student(otherUserId))
+                        .with(csrf())
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content(startChatBody(question, "Merhaba")))
+                .andExpect(status().isNotFound());
+
+        verify(aiClient, never()).streamChat(anyLong(), anyLong(), org.mockito.ArgumentMatchers.anyBoolean());
+        assertThat(jdbcTemplate.queryForObject(
+                        "SELECT count(*) FROM tutor_conversation WHERE user_id = ?", Integer.class, otherUserId))
+                .isZero();
     }
 
     /** Python akış hatasını error olayıyla iletir ve yarım asistan mesajı kaydetmez. */
@@ -252,6 +301,29 @@ class TutorControllerIT {
                 .andReturn()
                 .getResponse()
                 .getContentAsString(StandardCharsets.UTF_8);
+    }
+
+    /** Sohbet başlatma uç isteğini SSE cevabı olarak tamamlar. */
+    private String sendStartChat(Long userId, String requestBody) throws Exception {
+        MvcResult result = mockMvc.perform(post("/api/tutor/chats")
+                        .with(student(userId))
+                        .with(csrf())
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .accept(MediaType.TEXT_EVENT_STREAM)
+                        .content(requestBody))
+                .andExpect(request().asyncStarted())
+                .andReturn();
+        return mockMvc.perform(asyncDispatch(result))
+                .andExpect(status().isOk())
+                .andReturn()
+                .getResponse()
+                .getContentAsString(StandardCharsets.UTF_8);
+    }
+
+    /** Sohbet başlatma isteğinin JSON gövdesini üretir. */
+    private String startChatBody(TutorTestFixture.AnsweredQuestion question, String text) {
+        return "{\"sessionId\":" + question.sessionId() + ",\"questionId\":" + question.questionId() + ",\"text\":\""
+                + text + "\"}";
     }
 
     /** Sohbet uç isteğini SSE cevabı olarak tamamlar. */

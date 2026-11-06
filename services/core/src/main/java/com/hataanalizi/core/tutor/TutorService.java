@@ -9,6 +9,7 @@ import com.hataanalizi.core.session.StudySession;
 import com.hataanalizi.core.session.StudySessionRepository;
 import com.hataanalizi.core.tutor.dto.ChatMessageRequest;
 import com.hataanalizi.core.tutor.dto.ExplanationRequest;
+import com.hataanalizi.core.tutor.dto.StartChatRequest;
 import java.io.IOException;
 import java.net.URI;
 import java.time.Duration;
@@ -100,7 +101,32 @@ public class TutorService {
         if (!USER_ROLE.equals(latestMessage.getRole())) {
             throw new ApiException(ErrorCode.TUTOR_CONFLICT);
         }
-        return startStream(conversation.getId(), aiClient.streamChat(conversationId, userId));
+        boolean answerHidden = isAnswerHidden(userId, conversation.getQuestionId());
+        return startStream(conversation.getId(), aiClient.streamChat(conversationId, userId, answerHidden));
+    }
+
+    /** Sorunun sohbetini ilk iletiyle açar; soru henüz cevaplanmamış olabilir. */
+    public SseEmitter startChat(Long userId, StartChatRequest request) {
+        studySessionRepository
+                .findById(request.sessionId())
+                .filter(candidate -> candidate.getUserId().equals(userId))
+                .orElseThrow(() -> new ApiException(ErrorCode.SESSION_NOT_FOUND));
+        studentAnswerRepository
+                .findPublishedQuestionInSession(
+                        request.sessionId(), request.questionId(), AppConstants.QUESTION_STATUS_PUBLISHED)
+                .orElseThrow(() -> new ApiException(ErrorCode.QUESTION_NOT_FOUND));
+        TutorConversation conversation = new TutorConversation();
+        conversation.setUserId(userId);
+        conversation.setQuestionId(request.questionId());
+        conversation = conversationRepository.saveAndFlush(conversation);
+        return chat(userId, conversation.getId(), new ChatMessageRequest(request.text()));
+    }
+
+    /** Öğrencinin açık oturumunda soru cevaplanmamışsa doğru şıkkın saklanması gerektiğini söyler. */
+    private boolean isAnswerHidden(Long userId, Long questionId) {
+        return questionId != null
+                && studentAnswerRepository.existsUnansweredInProgressSession(
+                        userId, questionId, AppConstants.SESSION_STATUS_IN_PROGRESS);
     }
 
     /** Python olaylarına abone olup sonucu SseEmitter üzerinden iletir. */

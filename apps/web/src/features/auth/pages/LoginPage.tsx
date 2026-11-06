@@ -14,6 +14,7 @@ import { getFieldErrors, getProblemMessage } from "../../../lib/api/problem";
 import { ROUTES } from "../../../lib/constants";
 import { applyServerFieldErrors } from "../../../lib/forms";
 import { useLogin } from "../api";
+import AuthLayout from "../components/AuthLayout";
 import { getReturnPath } from "../returnPath";
 import type { LoginRequest } from "../types";
 
@@ -57,55 +58,62 @@ export default function LoginPage() {
   const showGeneralError = login.isError && getFieldErrors(login.error).length === 0;
 
   return (
-    <section className="mx-auto w-full max-w-md space-y-6 py-10">
-      <PageMeta title={t("login.title")} description={t("login.metaDescription")} />
-      <header className="space-y-2">
-        <h1 className="text-3xl font-semibold tracking-tight">{t("login.title")}</h1>
-        <p className="text-sm text-muted-foreground">{t("login.description")}</p>
-      </header>
+    <AuthLayout>
+      <section className="space-y-6">
+        <PageMeta title={t("login.title")} description={t("login.metaDescription")} />
+        <header className="space-y-2">
+          <h1 className="text-3xl font-semibold tracking-tight">{t("login.title")}</h1>
+          <p className="text-sm text-muted-foreground">{t("login.description")}</p>
+        </header>
 
-      <form onSubmit={onSubmit} noValidate className="space-y-4">
-        <FormField
-          id="email"
-          type="email"
-          autoComplete="email"
-          label={t("login.email")}
-          error={errors.email?.message}
-          {...register("email")}
-        />
-        <FormField
-          id="password"
-          type="password"
-          autoComplete="current-password"
-          label={t("login.password")}
-          error={errors.password?.message}
-          {...register("password")}
-        />
+        <form onSubmit={onSubmit} noValidate className="space-y-4">
+          <FormField
+            id="email"
+            type="email"
+            autoComplete="email"
+            label={t("login.email")}
+            error={errors.email?.message}
+            {...register("email")}
+          />
+          <FormField
+            id="password"
+            type="password"
+            autoComplete="current-password"
+            label={t("login.password")}
+            error={errors.password?.message}
+            {...register("password")}
+          />
 
-        <CheckboxField
-          id="rememberMe"
-          label={t("login.rememberMe")}
-          hint={t("login.rememberMeHint")}
-          {...register("rememberMe")}
-        />
+          <CheckboxField
+            id="rememberMe"
+            label={t("login.rememberMe")}
+            hint={t("login.rememberMeHint")}
+            {...register("rememberMe")}
+          />
 
-        {showGeneralError && (
-          <p role="alert" className="text-sm text-destructive">
-            {getProblemMessage(login.error)}
-          </p>
-        )}
+          {showGeneralError && (
+            <p role="alert" className="text-sm text-destructive">
+              {getProblemMessage(login.error)}
+            </p>
+          )}
 
-        <Button type="submit" size="lg" className="w-full" disabled={login.isPending}>
-          {login.isPending ? t("login.submitting") : t("login.submit")}
-        </Button>
-      </form>
+          <Button
+            type="submit"
+            size="lg"
+            className="h-12! w-full rounded-xl! text-base!"
+            disabled={login.isPending}
+          >
+            {login.isPending ? t("login.submitting") : t("login.submit")}
+          </Button>
+        </form>
 
-      <p className="text-center text-sm text-muted-foreground">
-        {t("login.noAccount")}{" "}
-        <Link to={ROUTES.register} className="font-medium text-primary underline">
-          {t("login.registerLink")}
-        </Link>
-      </p>
-    </section>
+        <p className="text-center text-sm text-muted-foreground">
+          {t("login.noAccount")}{" "}
+          <Link to={ROUTES.register} className="font-medium text-info underline">
+            {t("login.registerLink")}
+          </Link>
+        </p>
+      </section>
+    </AuthLayout>
   );
 }

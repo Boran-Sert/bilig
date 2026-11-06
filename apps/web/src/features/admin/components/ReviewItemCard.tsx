@@ -64,10 +64,10 @@ export default function ReviewItemCard({
   }
 
   return (
-    <article className="space-y-4 rounded-xl border border-border bg-card p-5 shadow-sm">
+    <article className="space-y-4 rounded-2xl border border-border bg-card p-6 shadow-sm">
       <div className="flex flex-wrap items-center justify-between gap-2 border-b pb-3">
         <div className="flex items-center gap-2">
-          <span className="rounded bg-primary/10 px-2 py-0.5 text-xs font-semibold text-primary">
+          <span className="rounded-full bg-info-soft px-3 py-1 text-xs font-semibold text-info-strong">
             {t(`review.targetTypes.${item.targetType}`)}
           </span>
           <span className="text-xs text-muted-foreground">
@@ -89,7 +89,7 @@ export default function ReviewItemCard({
       {item.targetType === "QUESTION" && item.questionContent && (
         <div className="space-y-3 text-sm">
           {item.questionContent.passage != null && (
-            <div className="rounded bg-muted/30 p-3 text-xs leading-relaxed">
+            <div className="rounded-xl bg-background p-4 text-xs leading-relaxed">
               {renderMarkdownContent(item.questionContent.passage)}
             </div>
           )}
@@ -117,7 +117,7 @@ export default function ReviewItemCard({
       )}
 
       {!isSource && item.outcomes.length > 0 && (
-        <div className="rounded border border-dashed border-border p-3 text-xs">
+        <div className="rounded-xl border border-dashed border-input p-3 text-xs">
           <span className="font-semibold text-muted-foreground">
             {t("review.outcomes.title")}:{" "}
           </span>

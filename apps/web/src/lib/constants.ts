@@ -4,7 +4,8 @@
  */
 
 export const ROUTES = {
-  home: "/",
+  landing: "/",
+  home: "/panel",
   login: "/login",
   register: "/register",
   adminSources: "/admin/sources",
@@ -12,6 +13,7 @@ export const ROUTES = {
   tests: "/tests",
   solve: "/tests/:testId/solve",
   testResult: "/sessions/:sessionId/result",
+  sessionReview: "/sessions/:sessionId/review",
 } as const;
 
 export const HTTP_STATUS_UNAUTHORIZED = 401;

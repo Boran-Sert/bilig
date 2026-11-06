@@ -10,7 +10,7 @@ interface ChatMessageBubbleProps {
 }
 
 /**
- * Rolüne göre sağa (kullanıcı) veya sola (asistan) hizalı mesaj balonunu çizer.
+ * Rolüne göre sağa mavi (kullanıcı) veya sola beyaz (asistan) hizalı mesaj balonunu çizer.
  */
 export default function ChatMessageBubble({ message }: ChatMessageBubbleProps) {
   const isUser = message.role === "user";
@@ -18,7 +18,7 @@ export default function ChatMessageBubble({ message }: ChatMessageBubbleProps) {
   if (isUser) {
     return (
       <div className="flex justify-end">
-        <div className="max-w-[85%] rounded-2xl rounded-tr-xs bg-primary/15 px-4 py-2.5 text-sm text-foreground shadow-xs">
+        <div className="max-w-[85%] rounded-2xl rounded-tr-sm bg-info px-4 py-2.5 text-sm text-white shadow-xs">
           <p className="whitespace-pre-wrap leading-relaxed">{message.text}</p>
         </div>
       </div>
@@ -27,7 +27,7 @@ export default function ChatMessageBubble({ message }: ChatMessageBubbleProps) {
 
   return (
     <div className="flex justify-start">
-      <div className="w-full max-w-[95%] space-y-3 rounded-2xl rounded-tl-xs bg-muted/40 p-4 text-sm text-foreground shadow-xs">
+      <div className="w-full max-w-[95%] space-y-3 rounded-2xl rounded-tl-sm border border-info/15 bg-card p-4 text-sm text-heading shadow-xs">
         {message.text ? (
           <div className="leading-relaxed">
             <Markdown content={message.text} />
@@ -35,7 +35,7 @@ export default function ChatMessageBubble({ message }: ChatMessageBubbleProps) {
         ) : null}
 
         {message.isStreaming && (
-          <span className="inline-block h-2 w-2 rounded-full bg-primary animate-ping" />
+          <span className="inline-block h-2 w-2 rounded-full bg-info animate-ping" />
         )}
 
         {message.citationBlockIds.length > 0 && (
