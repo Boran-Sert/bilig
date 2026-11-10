@@ -22,12 +22,14 @@ import org.springframework.security.core.authority.SimpleGrantedAuthority;
 import org.springframework.test.context.ActiveProfiles;
 import org.springframework.test.web.servlet.MockMvc;
 import org.springframework.test.web.servlet.request.RequestPostProcessor;
+import org.springframework.transaction.annotation.Transactional;
 
 /** Benzer soru uç noktasının seçim kurallarını ve HTTP cevabını PostgreSQL ile doğrular. */
 @ActiveProfiles("test")
 @SpringBootTest
 @AutoConfigureMockMvc
 @Import(TestcontainersConfiguration.class)
+@Transactional
 class QuestionControllerIT {
 
     private static final String PUBLISHED = AppConstants.QUESTION_STATUS_PUBLISHED;
