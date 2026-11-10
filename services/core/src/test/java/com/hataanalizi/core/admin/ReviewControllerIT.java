@@ -1,6 +1,7 @@
 package com.hataanalizi.core.admin;
 
 import static org.assertj.core.api.Assertions.assertThat;
+import static org.springframework.security.test.web.servlet.request.SecurityMockMvcRequestPostProcessors.csrf;
 import static org.springframework.security.test.web.servlet.request.SecurityMockMvcRequestPostProcessors.testSecurityContext;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.post;
@@ -10,8 +11,6 @@ import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.
 import com.hataanalizi.core.TestcontainersConfiguration;
 import com.hataanalizi.core.admin.ReviewControllerTestData.ReviewFixture;
 import com.hataanalizi.core.auth.WithAuthUser;
-import jakarta.servlet.http.Cookie;
-import java.util.UUID;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
@@ -363,11 +362,9 @@ class ReviewControllerIT extends ReviewControllerTestSupport {
 
     /** CSRF doğrulamasıyla yönetici karar isteği gönderir. */
     private ResultActions postDecision(long reviewId, String body) throws Exception {
-        String csrfToken = UUID.randomUUID().toString();
         return mockMvc.perform(post("/api/admin/review/" + reviewId)
                 .with(testSecurityContext())
-                .cookie(new Cookie("XSRF-TOKEN", csrfToken))
-                .header("X-XSRF-TOKEN", csrfToken)
+                .with(csrf())
                 .contentType(MediaType.APPLICATION_JSON)
                 .content(body));
     }
