@@ -28,16 +28,23 @@ import org.springframework.http.MediaType;
 import org.springframework.jdbc.core.JdbcTemplate;
 import org.springframework.mock.web.MockHttpSession;
 import org.springframework.security.crypto.password.PasswordEncoder;
+import org.springframework.test.annotation.DirtiesContext;
 import org.springframework.test.context.ActiveProfiles;
 import org.springframework.test.web.servlet.MockMvc;
 import org.springframework.test.web.servlet.MvcResult;
 import org.springframework.test.web.servlet.request.RequestPostProcessor;
 
-/** Kayıt ve oturum uç noktalarının HTTP sözleşmesini PostgreSQL üzerinde doğrular. */
+/**
+ * Kayıt ve oturum uç noktalarının HTTP sözleşmesini PostgreSQL üzerinde doğrular.
+ *
+ * <p>Gerçek CSRF çerez akışını sınadığı için temiz bağlamla başlar; başka testlerin csrf()
+ * yardımcısı paylaşılan bağlamdaki CSRF deposunu değiştirir.
+ */
 @ActiveProfiles("test")
 @SpringBootTest
 @AutoConfigureMockMvc
 @Import(TestcontainersConfiguration.class)
+@DirtiesContext(classMode = DirtiesContext.ClassMode.BEFORE_CLASS)
 @ExtendWith(OutputCaptureExtension.class)
 class AuthControllerIT {
 

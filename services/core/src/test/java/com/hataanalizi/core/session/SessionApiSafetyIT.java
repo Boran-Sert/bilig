@@ -14,6 +14,7 @@ import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
 import java.util.concurrent.Future;
 import java.util.concurrent.TimeUnit;
+import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.context.SpringBootTest;
@@ -39,6 +40,7 @@ class SessionApiSafetyIT {
     private final MockMvc mockMvc;
     private final ObjectMapper objectMapper;
     private final SessionQuestionFixture questionFixture;
+    private Long createdExamId;
 
     /** Test bağımlılıklarını ve soru fixture'ını saklar. */
     @Autowired
@@ -47,6 +49,16 @@ class SessionApiSafetyIT {
         this.mockMvc = mockMvc;
         this.objectMapper = objectMapper;
         this.questionFixture = new SessionQuestionFixture(jdbcTemplate);
+    }
+
+    /** Commit edilen yayındaki testi siler; başka testlerin listesine sızmaz. */
+    @AfterEach
+    void deleteCreatedExam() {
+        if (createdExamId == null) {
+            return;
+        }
+        jdbcTemplate.update("DELETE FROM study_session WHERE exam_id = ?", createdExamId);
+        jdbcTemplate.update("DELETE FROM exam WHERE id = ?", createdExamId);
     }
 
     /** Eşzamanlı başlatmaların tek oturumu paylaşmasını ve yanıtı filtrelemesini doğrular. */
@@ -130,6 +142,7 @@ class SessionApiSafetyIT {
         Long questionId = questionFixture.insertQuestion(unitId);
         jdbcTemplate.update(
                 "INSERT INTO exam_question (exam_id, question_id, position) VALUES (?, ?, 1)", examId, questionId);
+        createdExamId = examId;
         return examId;
     }
 
